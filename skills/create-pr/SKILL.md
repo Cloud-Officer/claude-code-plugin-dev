@@ -1,7 +1,7 @@
 ---
 name: create-pr
 description: Generate commit message, PR title, and PR body for a pull request. Use when the user wants to create a PR, generate PR content, prepare a pull request, or fill a PR template from code changes.
-allowed-tools: Bash(git diff:*), Bash(git rev-parse:*), Bash(git status:*), Bash(git symbolic-ref:*), Bash(echo:*), Bash(tee:*), Bash(date:*), Read, Glob
+allowed-tools: Bash(git diff:*), Bash(git rev-parse:*), Bash(git status:*), Bash(git symbolic-ref:*), Bash(echo:*), Bash(tee:*), Bash(date:*), Bash(cat:*), Bash(DEFAULT_BRANCH=:*), Read, Glob
 ---
 
 # Create Pull Request Content
@@ -10,50 +10,45 @@ Generate all content needed for a pull request: commit message, PR title, and PR
 
 ## Step 1: Gather Information
 
-**DEBUG MODE:** Log all commands and outputs to `pr-debug.log` for troubleshooting:
+**YOU MUST EXECUTE THESE COMMANDS IN ORDER. DO NOT SKIP ANY STEP.**
+
+**Step 1.1:** Initialize debug log and get branch info:
 
 ```bash
-echo "=== PR SKILL DEBUG LOG ===" > pr-debug.log
-echo "Timestamp: $(date)" >> pr-debug.log
+echo "=== PR SKILL DEBUG LOG ===" > pr-debug.log && echo "Timestamp: $(date)" >> pr-debug.log && echo -e "\n=== CURRENT BRANCH ===" >> pr-debug.log && git rev-parse --abbrev-ref HEAD | tee -a pr-debug.log
 ```
 
-1. **Get the current branch name:**
+**Step 1.2:** Get the default branch:
 
-   ```bash
-   echo -e "\n=== CURRENT BRANCH ===" >> pr-debug.log
-   git rev-parse --abbrev-ref HEAD | tee -a pr-debug.log
-   ```
+```bash
+echo -e "\n=== DEFAULT BRANCH ===" >> pr-debug.log && git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@' | tee -a pr-debug.log
+```
 
-2. **Get the full picture of changes:**
+**Step 1.3:** Get the file change summary (THIS IS CRITICAL - you must see ALL files):
 
-   First, detect the default branch:
+```bash
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@') && echo -e "\n=== DIFF STAT (ALL FILES) ===" >> pr-debug.log && git diff $DEFAULT_BRANCH --stat -- . ':!docs/soup.md' ':!.soup.json' | tee -a pr-debug.log
+```
 
-   ```bash
-   echo -e "\n=== DEFAULT BRANCH ===" >> pr-debug.log
-   git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@' | tee -a pr-debug.log
-   ```
+**Step 1.4:** Get the full diff:
 
-   Run `git diff --stat` to get a summary list of ALL changed files:
+```bash
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@') && echo -e "\n=== FULL DIFF ===" >> pr-debug.log && git diff $DEFAULT_BRANCH -- . ':!docs/soup.md' ':!.soup.json' | tee -a pr-debug.log
+```
 
-   ```bash
-   echo -e "\n=== DIFF STAT (ALL FILES) ===" >> pr-debug.log
-   git diff $(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@') --stat -- . ':!docs/soup.md' ':!.soup.json' | tee -a pr-debug.log
-   ```
+**Step 1.5:** Find the PR template:
 
-   Run `git diff` to get the full diff content:
+```bash
+cat .github/pull_request_template.md 2>/dev/null || cat .github/PULL_REQUEST_TEMPLATE.md 2>/dev/null || echo "No PR template found"
+```
 
-   ```bash
-   echo -e "\n=== FULL DIFF ===" >> pr-debug.log
-   git diff $(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@') -- . ':!docs/soup.md' ':!.soup.json' | tee -a pr-debug.log
-   ```
+**Step 1.6:** Check for JIRA ticket:
 
-   **CRITICAL:** The PR summary MUST mention ALL files shown in the `--stat` output. Do not skip or omit any files. If the diff is large, group related files together (e.g., "Added 5 workflow files in .github/workflows/") but ensure every file is accounted for.
+```bash
+echo $JIRA_TICKET
+```
 
-3. **Find the PR template** by checking these locations in order:
-   - `.github/pull_request_template.md`
-   - `.github/PULL_REQUEST_TEMPLATE.md`
-
-4. **Check for JIRA ticket** by running: `echo $JIRA_TICKET`
+**CRITICAL:** The PR summary MUST mention ALL files shown in the Step 1.3 `--stat` output. Count the files and verify your summary accounts for all of them.
 
 ## Step 2: Generate Output
 
