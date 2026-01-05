@@ -27,13 +27,13 @@ echo -e "\n=== DEFAULT BRANCH ===" >> pr-debug.log && git symbolic-ref refs/remo
 **Step 1.3:** Get the file change summary (THIS IS CRITICAL - you must see ALL files):
 
 ```bash
-echo -e "\n=== DIFF STAT (STAGED CHANGES) ===" >> pr-debug.log && git diff --cached --stat -- ':!docs/soup.md' ':!.soup.json' | tee -a pr-debug.log
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "master") && echo -e "\n=== DIFF STAT (ALL CHANGES) ===" >> pr-debug.log && git diff ${DEFAULT_BRANCH}...HEAD --stat -- ':!docs/soup.md' ':!.soup.json' | tee -a pr-debug.log && git diff --cached --stat -- ':!docs/soup.md' ':!.soup.json' | tee -a pr-debug.log
 ```
 
-**Step 1.4:** Get the full diff of staged changes:
+**Step 1.4:** Get the full diff (committed + staged changes):
 
 ```bash
-echo -e "\n=== FULL DIFF (STAGED) ===" >> pr-debug.log && git diff --cached -- ':!docs/soup.md' ':!.soup.json' | tee -a pr-debug.log
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "master") && echo -e "\n=== FULL DIFF ===" >> pr-debug.log && git diff ${DEFAULT_BRANCH}...HEAD -- ':!docs/soup.md' ':!.soup.json' | tee -a pr-debug.log && git diff --cached -- ':!docs/soup.md' ':!.soup.json' | tee -a pr-debug.log
 ```
 
 **Step 1.5:** Find the PR template:
