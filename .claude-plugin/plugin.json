@@ -1,0 +1,12 @@
+{
+  "name": "co-dev",
+  "description": "Cloud Officer development workflow tools for PR management, issue tracking, and code quality",
+  "version": "1.0.0",
+  "author": {
+    "name": "Cloud Officer",
+    "email": "info@cloudofficer.ca"
+  },
+  "repository": "https://github.com/cloud-officer/claude-code-plugin-dev",
+  "license": "MIT",
+  "keywords": ["code-review", "pr", "linting", "jira", "github"]
+}
