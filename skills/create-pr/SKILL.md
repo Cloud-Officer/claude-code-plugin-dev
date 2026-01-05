@@ -14,10 +14,9 @@ Generate all content needed for a pull request: commit message, PR title, and PR
 
 2. **Get the full picture of changes:**
    - First, detect the default branch: `git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'`
-   - Run `git status` to see ALL changes including untracked files
-   - If on the default branch (new PR): `git diff --cached -- . ':!docs/soup.md' ':!.soup.json'`
-   - If on a feature branch (existing PR): `git diff <default-branch> -- . ':!docs/soup.md' ':!.soup.json'` to get changes to tracked files
-   - **IMPORTANT:** For any new/untracked files shown in `git status`, read their content directly using the Read tool to include them in your analysis
+   - Run `git diff <default-branch> --stat -- . ':!docs/soup.md' ':!.soup.json'` to get a **summary list of ALL changed files** - this is critical for ensuring no files are missed
+   - Run `git diff <default-branch> -- . ':!docs/soup.md' ':!.soup.json'` to get the full diff content
+   - **CRITICAL:** The PR summary MUST mention ALL files shown in the `--stat` output. Do not skip or omit any files. If the diff is large, group related files together (e.g., "Added 5 workflow files in .github/workflows/") but ensure every file is accounted for.
 
 3. **Find the PR template** by checking these locations in order:
    - `.github/pull_request_template.md`
