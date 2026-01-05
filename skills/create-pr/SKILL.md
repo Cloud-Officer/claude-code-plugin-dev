@@ -1,7 +1,7 @@
 ---
 name: create-pr
 description: Generate commit message, PR title, and PR body for a pull request. Use when the user wants to create a PR, generate PR content, prepare a pull request, or fill a PR template from code changes.
-allowed-tools: Bash(git diff:*), Bash(git rev-parse:*), Bash(git status:*), Bash(git symbolic-ref:*), Bash(echo:*), Read, Glob
+allowed-tools: Bash(git diff:*), Bash(git rev-parse:*), Bash(git status:*), Bash(git symbolic-ref:*), Bash(echo:*), Bash(tee:*), Bash(date:*), Read, Glob
 ---
 
 # Create Pull Request Content
@@ -10,13 +10,44 @@ Generate all content needed for a pull request: commit message, PR title, and PR
 
 ## Step 1: Gather Information
 
-1. **Get the current branch name** by running: `git rev-parse --abbrev-ref HEAD`
+**DEBUG MODE:** Log all commands and outputs to `pr-debug.log` for troubleshooting:
+
+```bash
+echo "=== PR SKILL DEBUG LOG ===" > pr-debug.log
+echo "Timestamp: $(date)" >> pr-debug.log
+```
+
+1. **Get the current branch name:**
+
+   ```bash
+   echo -e "\n=== CURRENT BRANCH ===" >> pr-debug.log
+   git rev-parse --abbrev-ref HEAD | tee -a pr-debug.log
+   ```
 
 2. **Get the full picture of changes:**
-   - First, detect the default branch: `git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'`
-   - Run `git diff <default-branch> --stat -- . ':!docs/soup.md' ':!.soup.json'` to get a **summary list of ALL changed files** - this is critical for ensuring no files are missed
-   - Run `git diff <default-branch> -- . ':!docs/soup.md' ':!.soup.json'` to get the full diff content
-   - **CRITICAL:** The PR summary MUST mention ALL files shown in the `--stat` output. Do not skip or omit any files. If the diff is large, group related files together (e.g., "Added 5 workflow files in .github/workflows/") but ensure every file is accounted for.
+
+   First, detect the default branch:
+
+   ```bash
+   echo -e "\n=== DEFAULT BRANCH ===" >> pr-debug.log
+   git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@' | tee -a pr-debug.log
+   ```
+
+   Run `git diff --stat` to get a summary list of ALL changed files:
+
+   ```bash
+   echo -e "\n=== DIFF STAT (ALL FILES) ===" >> pr-debug.log
+   git diff $(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@') --stat -- . ':!docs/soup.md' ':!.soup.json' | tee -a pr-debug.log
+   ```
+
+   Run `git diff` to get the full diff content:
+
+   ```bash
+   echo -e "\n=== FULL DIFF ===" >> pr-debug.log
+   git diff $(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@') -- . ':!docs/soup.md' ':!.soup.json' | tee -a pr-debug.log
+   ```
+
+   **CRITICAL:** The PR summary MUST mention ALL files shown in the `--stat` output. Do not skip or omit any files. If the diff is large, group related files together (e.g., "Added 5 workflow files in .github/workflows/") but ensure every file is accounted for.
 
 3. **Find the PR template** by checking these locations in order:
    - `.github/pull_request_template.md`
