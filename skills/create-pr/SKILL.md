@@ -27,13 +27,13 @@ echo -e "\n=== DEFAULT BRANCH ===" >> pr-debug.log && git symbolic-ref refs/remo
 **Step 1.3:** Get the file change summary (THIS IS CRITICAL - you must see ALL files):
 
 ```bash
-DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@') && echo -e "\n=== DIFF STAT (ALL FILES) ===" >> pr-debug.log && git diff $DEFAULT_BRANCH --stat -- . ':!docs/soup.md' ':!.soup.json' | tee -a pr-debug.log
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@') && echo -e "\n=== DIFF STAT (ALL FILES) ===" >> pr-debug.log && { git diff --cached --stat -- . ':!docs/soup.md' ':!.soup.json'; git diff $DEFAULT_BRANCH --stat -- . ':!docs/soup.md' ':!.soup.json'; } | sort -u | tee -a pr-debug.log
 ```
 
-**Step 1.4:** Get the full diff:
+**Step 1.4:** Get the full diff (includes both staged and committed changes):
 
 ```bash
-DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@') && echo -e "\n=== FULL DIFF ===" >> pr-debug.log && git diff $DEFAULT_BRANCH -- . ':!docs/soup.md' ':!.soup.json' | tee -a pr-debug.log
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@') && echo -e "\n=== FULL DIFF ===" >> pr-debug.log && { git diff --cached -- . ':!docs/soup.md' ':!.soup.json'; git diff $DEFAULT_BRANCH -- . ':!docs/soup.md' ':!.soup.json'; } | tee -a pr-debug.log
 ```
 
 **Step 1.5:** Find the PR template:
