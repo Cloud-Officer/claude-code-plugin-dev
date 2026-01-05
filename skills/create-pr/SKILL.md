@@ -12,43 +12,37 @@ Generate all content needed for a pull request: commit message, PR title, and PR
 
 **YOU MUST EXECUTE THESE COMMANDS IN ORDER. DO NOT SKIP ANY STEP.**
 
-**Step 1.1:** Initialize debug log and get branch info:
+**Step 1.1:** Get branch info:
 
 ```bash
-echo "=== PR SKILL DEBUG LOG ===" > pr-debug.log && echo "Timestamp: $(date)" >> pr-debug.log && echo -e "\n=== CURRENT BRANCH ===" >> pr-debug.log && git rev-parse --abbrev-ref HEAD | tee -a pr-debug.log
+git rev-parse --abbrev-ref HEAD
 ```
 
-**Step 1.2:** Get the default branch:
+**Step 1.2:** Get file change summary (THIS IS CRITICAL - you must see ALL files):
 
 ```bash
-echo -e "\n=== DEFAULT BRANCH ===" >> pr-debug.log && git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@' | tee -a pr-debug.log
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "master") && git diff ${DEFAULT_BRANCH}...HEAD --stat -- ':!docs/soup.md' ':!.soup.json' && git diff --cached --stat -- ':!docs/soup.md' ':!.soup.json'
 ```
 
-**Step 1.3:** Get the file change summary (THIS IS CRITICAL - you must see ALL files):
+**Step 1.3:** Get the full diff (committed + staged changes):
 
 ```bash
-DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "master") && echo -e "\n=== DIFF STAT (ALL CHANGES) ===" >> pr-debug.log && git diff ${DEFAULT_BRANCH}...HEAD --stat -- ':!docs/soup.md' ':!.soup.json' | tee -a pr-debug.log && git diff --cached --stat -- ':!docs/soup.md' ':!.soup.json' | tee -a pr-debug.log
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "master") && git diff ${DEFAULT_BRANCH}...HEAD -- ':!docs/soup.md' ':!.soup.json' && git diff --cached -- ':!docs/soup.md' ':!.soup.json'
 ```
 
-**Step 1.4:** Get the full diff (committed + staged changes):
-
-```bash
-DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "master") && echo -e "\n=== FULL DIFF ===" >> pr-debug.log && git diff ${DEFAULT_BRANCH}...HEAD -- ':!docs/soup.md' ':!.soup.json' | tee -a pr-debug.log && git diff --cached -- ':!docs/soup.md' ':!.soup.json' | tee -a pr-debug.log
-```
-
-**Step 1.5:** Find the PR template:
+**Step 1.4:** Find the PR template:
 
 ```bash
 cat .github/pull_request_template.md 2>/dev/null || cat .github/PULL_REQUEST_TEMPLATE.md 2>/dev/null || echo "No PR template found"
 ```
 
-**Step 1.6:** Check for JIRA ticket:
+**Step 1.5:** Check for JIRA ticket:
 
 ```bash
 echo $JIRA_TICKET
 ```
 
-**CRITICAL:** The PR summary MUST mention ALL files shown in the Step 1.3 `--stat` output. Count the files and verify your summary accounts for all of them.
+**CRITICAL:** The PR summary MUST mention ALL files shown in the Step 1.2 `--stat` output. Count the files and verify your summary accounts for all of them.
 
 ## Step 2: Generate Output
 
@@ -89,6 +83,8 @@ IMPORTANT formatting rules:
 ## PR Body Guidelines
 
 ### Summary
+
+**IMPORTANT: The Summary section heading must be `## Summary` (h2), not `# Summary` (h1).**
 
 Structure the summary as follows:
 
