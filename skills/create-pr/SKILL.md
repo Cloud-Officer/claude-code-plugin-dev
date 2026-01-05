@@ -1,7 +1,7 @@
 ---
 name: create-pr
 description: Generate commit message, PR title, and PR body for a pull request. Use when the user wants to create a PR, generate PR content, prepare a pull request, or fill a PR template from code changes.
-allowed-tools: Bash(git diff:*), Bash(git rev-parse:*), Bash(echo:*), Read, Glob
+allowed-tools: Bash(git diff:*), Bash(git rev-parse:*), Bash(git status:*), Bash(git symbolic-ref:*), Bash(echo:*), Read, Glob
 ---
 
 # Create Pull Request Content
@@ -12,10 +12,12 @@ Generate all content needed for a pull request: commit message, PR title, and PR
 
 1. **Get the current branch name** by running: `git rev-parse --abbrev-ref HEAD`
 
-2. **Get the git diff** based on the current branch:
+2. **Get the full picture of changes:**
    - First, detect the default branch: `git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'`
+   - Run `git status` to see ALL changes including untracked files
    - If on the default branch (new PR): `git diff --cached -- . ':!docs/soup.md' ':!.soup.json'`
-   - If on a feature branch (existing PR): `git diff <default-branch> -- . ':!docs/soup.md' ':!.soup.json'` to get ALL changes (committed + staged + unstaged) compared to the base branch
+   - If on a feature branch (existing PR): `git diff <default-branch> -- . ':!docs/soup.md' ':!.soup.json'` to get changes to tracked files
+   - **IMPORTANT:** For any new/untracked files shown in `git status`, read their content directly using the Read tool to include them in your analysis
 
 3. **Find the PR template** by checking these locations in order:
    - `.github/pull_request_template.md`
