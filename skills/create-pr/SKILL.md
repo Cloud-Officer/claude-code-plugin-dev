@@ -70,11 +70,11 @@ Structure the summary as follows:
 
 ### Types of changes
 
-Select the appropriate items from the list by marking them with `[x]` (no space inside brackets). Do NOT add new items or remove existing items from the template. Only mark what applies.
+**CRITICAL: Preserve ALL checkbox items from the template exactly as they appear.** Mark applicable items with `[x]` and leave non-applicable items as `[ ]`. Never delete, modify, or omit any checkbox items from the original template.
 
 ### Checklist
 
-Select the appropriate items from the list by marking them with `[x]` (no space inside brackets). Do NOT add new items or remove existing items from the template. Only mark what applies based on the diff analysis.
+**CRITICAL: Preserve ALL checkbox items from the template exactly as they appear.** Mark applicable items with `[x]` and leave non-applicable items as `[ ]`. Never delete, modify, or omit any checkbox items from the original template.
 
 ### Jira Tickets
 
