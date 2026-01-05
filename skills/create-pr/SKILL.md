@@ -13,8 +13,9 @@ Generate all content needed for a pull request: commit message, PR title, and PR
 1. **Get the current branch name** by running: `git rev-parse --abbrev-ref HEAD`
 
 2. **Get the git diff** based on the current branch:
-   - If on `master` or `main` (new PR): `git diff --cached -- . ':!docs/soup.md' ':!.soup.json'`
-   - If on a feature branch (existing PR update): `git diff master...HEAD -- . ':!docs/soup.md' ':!.soup.json'` combined with `git diff --cached -- . ':!docs/soup.md' ':!.soup.json'`
+   - First, detect the default branch: `git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'`
+   - If on the default branch (new PR): `git diff --cached -- . ':!docs/soup.md' ':!.soup.json'`
+   - If on a feature branch (existing PR): `git diff <default-branch> -- . ':!docs/soup.md' ':!.soup.json'` to get ALL changes (committed + staged + unstaged) compared to the base branch
 
 3. **Find the PR template** by checking these locations in order:
    - `.github/pull_request_template.md`
