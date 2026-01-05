@@ -1,0 +1,9 @@
+extends: relaxed
+rules:
+  trailing-spaces: disable
+  line-length: disable
+ignore: |
+  node_modules/
+  vendor/
+  tmp/
+  var/
