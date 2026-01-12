@@ -4,13 +4,13 @@ Claude Code plugin for development workflow automation.
 
 ## Table of Contents
 
-- [Introduction](#introduction)
-- [Installation](#installation)
-- [Usage](#usage)
-  - [Commands](#commands)
-  - [Skills](#skills)
-  - [Local Development](#local-development)
-- [Contributing](#contributing)
+* [Introduction](#introduction)
+* [Installation](#installation)
+* [Usage](#usage)
+  * [Commands](#commands)
+  * [Skills](#skills)
+  * [Local Development](#local-development)
+* [Contributing](#contributing)
 
 ## Introduction
 
@@ -50,4 +50,21 @@ claude --plugin-dir /path/to/claude-code-plugin-dev
 
 ## Contributing
 
-Contributions are welcome. Please open an issue or submit a pull request.
+We love your input! We want to make contributing to this project as easy and transparent as possible, whether it's:
+
+* Reporting a bug
+* Discussing the current state of the code
+* Submitting a fix
+* Proposing new features
+* Becoming a maintainer
+
+Pull requests are the best way to propose changes to the codebase. We actively welcome your pull requests:
+
+1. Fork the repo and create your branch from `master`.
+2. If you've added code that should be tested, add tests. Ensure the test suite passes.
+3. Update the documentation.
+4. Make sure your code lints.
+5. Issue that pull request!
+
+When you submit code changes, your submissions are understood to be under the same [License](license) that covers the
+project. Feel free to contact the maintainers if that's a concern.
