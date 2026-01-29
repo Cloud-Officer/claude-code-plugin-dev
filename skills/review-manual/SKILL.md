@@ -1,13 +1,85 @@
 ---
 name: review-manual
 description: Review, create, or update docs/manual.md with user documentation for the product
-allowed-tools: Bash(gh:*), Bash(git:*), Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(tail:*), Bash(jq:*), Bash(find:*), Bash(wc:*), Read, Write, Edit, Glob, Grep
+allowed-tools: Bash(gh:*), Bash(git:*), Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(tail:*), Bash(jq:*), Bash(find:*), Bash(wc:*), Bash(awk:*), Bash(sed:*), Bash(echo:*), Read, Write, Edit, Glob, Grep, WebSearch
 ---
 
 # Review User Manual Documentation
 
-Review the
-`docs/manual.md` file in a repository and create or update it with comprehensive user documentation. This skill analyzes the codebase to document the product from an end-user perspective, covering UI, features, workflows, and usage instructions. Works for all project types and languages.
+Review the `docs/manual.md` file in a repository and create or update it with comprehensive user documentation. This skill analyzes the codebase to document the product from an end-user perspective, covering UI, features, workflows, and usage instructions. Works for all project types and languages.
+
+## CRITICAL: Mandatory Analysis Tracking
+
+**You MUST maintain an analysis checklist throughout execution.** At each step, record what was found. This ensures consistent, reproducible results.
+
+**Before starting, create this tracking structure and update it as you progress:**
+
+```text
+=== ANALYSIS CHECKPOINT LOG ===
+[ ] Step 1: Repository Information
+    - organization: (pending)
+    - repository: (pending)
+    - description: (pending)
+    - has_manual: (pending)
+
+[ ] Step 2: Product Type Detection
+    - product_type: (pending) - web_app/cli_tool/api/library/mobile_app/desktop_app/hybrid
+    - framework: (pending)
+    - detection_evidence: (pending)
+
+[ ] Step 3-7: Deep Analysis (complete applicable sections)
+    For Web Applications:
+    [ ] 3.1 Routes/Pages - routes_found: (pending), count: (pending)
+    [ ] 3.2 Models/Data - models_found: (pending), count: (pending)
+    [ ] 3.3 Forms - forms_found: (pending), count: (pending)
+    [ ] 3.4 UI Components - components_found: (pending), count: (pending)
+    [ ] 3.5 Navigation - nav_elements: (pending)
+
+    For CLI Tools:
+    [ ] 4.1 Commands - commands_found: (pending), count: (pending)
+    [ ] 4.2 Help Output - help_extracted: (pending)
+    [ ] 4.3 Options/Flags - options_found: (pending), count: (pending)
+
+    For APIs:
+    [ ] 5.1 Endpoints - endpoints_found: (pending), count: (pending)
+    [ ] 5.2 Schemas - schemas_found: (pending)
+    [ ] 5.3 Authentication - auth_method: (pending)
+    [ ] 5.4 OpenAPI - openapi_exists: (pending)
+
+    For Libraries:
+    [ ] 6.1 Public API - exports_found: (pending), count: (pending)
+    [ ] 6.2 Docstrings - documented: (pending)
+    [ ] 6.3 Examples - examples_found: (pending)
+
+    For Mobile Apps:
+    [ ] 7.1 Screens - screens_found: (pending), count: (pending)
+    [ ] 7.2 Navigation - nav_structure: (pending)
+
+[ ] Step 8: Document Structure Validation (if manual.md exists)
+    - h1_title_correct: (pending)
+    - required_sections_present: (pending)
+    - toc_links_valid: (pending)
+
+[ ] Step 9: Report Generated
+    - all_checks_completed: (pending)
+    - features_in_code: (pending)
+    - features_documented: (pending)
+    - undocumented_features: (pending)
+    - issues_found: (pending)
+=== END CHECKPOINT LOG ===
+```
+
+**COMPLETION REQUIREMENT:** Before generating the final report, you MUST verify that ALL applicable checkpoints show actual values (not "pending"). If any checkpoint is still "pending", go back and complete that analysis step.
+
+**EVIDENCE REQUIREMENT:** For every check, you MUST record:
+
+1. **What the manual claims** - the exact feature, command, or workflow described
+2. **What the code shows** - the actual evidence (routes, controllers, CLI definitions, API endpoints)
+3. **Comparison result** - MATCH, MISMATCH, or MISSING with specific details
+
+A bare "PASS" without evidence is not acceptable. If you cannot provide evidence, the check is incomplete.
+
+**DO NOT SKIP STEPS.** Even if an earlier check seems to suggest no issues, you MUST complete ALL steps. Issues are often only revealed when cross-referencing multiple sources.
 
 ## Manual Document Structure
 
@@ -509,19 +581,46 @@ grep "^## " docs/manual.md
 ## FAQ
 ```
 
-### Cross-Reference with Code
+### Cross-Reference with Code (MANDATORY - do not skip)
 
-For each documented feature/page/command:
+**You MUST create a two-column comparison table:**
 
-1. Verify it exists in the codebase
-2. Check if the description matches the implementation
+| Documented Feature    | Code Evidence                               |
+| --------------------- | ------------------------------------------- |
+| {feature from manual} | {file:function where it exists, or MISSING} |
+
+For EACH documented feature/page/command:
+
+1. Verify it exists in the codebase - record the specific file and function
+2. Check if the description matches the implementation - record mismatches
 3. Flag outdated screenshots or examples
-4. Identify undocumented features
+
+For EACH feature found in code (from Steps 3-7):
+
+1. Check if it is documented in the manual
+2. Record undocumented features with their code location
 
 ## Step 9: Generate Comprehensive Report
 
+**MANDATORY PRE-REPORT VERIFICATION:**
+
+Before generating the report, you MUST:
+
+1. Review your checkpoint log from the start of analysis
+2. Verify ALL applicable checkpoints have actual values (not "pending")
+3. If ANY checkpoint is still pending, STOP and complete that step first
+4. Cross-reference findings: features found in code analysis MUST appear in the report
+
+**If you skipped any step, the review is incomplete and results will be inconsistent.**
+
+### Report Format
+
 ```text
 ## User Manual Review Report
+
+### Analysis Checkpoint Log
+
+{Include your completed checkpoint log here - ALL values must be filled in, none should say "pending"}
 
 ### Repository Info
 - **Organization:** {org}
@@ -1186,3 +1285,6 @@ Before completing, verify:
 8. **Ask before modifying** - Show proposed changes and get approval
 9. **Preserve existing content** - Only update, don't remove valid content
 10. **Run linters after changes** - Always run `/co-dev:run-linters`
+11. **Complete ALL steps** - Never skip analysis steps. Each step may reveal features not visible in other steps
+12. **Output checkpoint log** - Include the completed checkpoint log in your final report to prove all steps were executed
+13. **Never validate against world knowledge alone** - Do NOT use your training data to fact-check version numbers, release dates, or external claims. If uncertain about something, use web search to verify before flagging. Only validate things that can be cross-referenced against actual files in the repository or verified online.

@@ -21,14 +21,16 @@ git rev-parse --abbrev-ref HEAD
 **Step 1.2:** Get file change summary (THIS IS CRITICAL - you must see ALL files):
 
 ```bash
-DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "master") && echo "=== DIFF STAT ===" && git diff ${DEFAULT_BRANCH}...HEAD --stat -- ':!docs/soup.md' ':!.soup.json' && git diff --cached --stat -- ':!docs/soup.md' ':!.soup.json'
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "master") && echo "=== COMMITTED AHEAD OF BASE ===" && git diff ${DEFAULT_BRANCH}...HEAD --stat -- ':!docs/soup.md' ':!.soup.json' && echo "=== STAGED ===" && git diff --cached --stat -- ':!docs/soup.md' ':!.soup.json' && echo "=== UNSTAGED ===" && git diff --stat -- ':!docs/soup.md' ':!.soup.json'
 ```
 
-**Step 1.3:** Get the full diff (committed + staged changes):
+**Step 1.3:** Get the full diff (committed + staged + unstaged changes):
 
 ```bash
-DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "master") && echo "=== FULL DIFF ===" && git diff ${DEFAULT_BRANCH}...HEAD -- ':!docs/soup.md' ':!.soup.json' && git diff --cached -- ':!docs/soup.md' ':!.soup.json'
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "master") && echo "=== COMMITTED AHEAD OF BASE ===" && git diff ${DEFAULT_BRANCH}...HEAD -- ':!docs/soup.md' ':!.soup.json' && echo "=== STAGED ===" && git diff --cached -- ':!docs/soup.md' ':!.soup.json' && echo "=== UNSTAGED ===" && git diff -- ':!docs/soup.md' ':!.soup.json'
 ```
+
+**NOTE:** Include ALL three sections (committed, staged, unstaged) in your analysis. Changes may appear in any combination depending on the workflow.
 
 **Step 1.4:** Find the PR template:
 

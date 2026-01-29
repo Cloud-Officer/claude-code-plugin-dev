@@ -8,4 +8,3 @@
 .gitignore               @ydesgagn
 .markdownlint.yml        @ydesgagn
 .yamllint.yml            @ydesgagn
-codeowners               @ydesgagn

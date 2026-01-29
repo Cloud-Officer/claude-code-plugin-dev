@@ -86,12 +86,14 @@ Before starting, check if `.claude/DB.md` already exists.
 **If the file exists:**
 
 - Read the existing file to understand what was previously documented
-- Continue with full analysis (steps 1-9) to detect any code changes (new enums, fields, tables)
+- **You MUST still execute ALL steps 1-9.** Do not assume the existing file is accurate. Code and schemas change.
+- For each step, compare what the existing file claims vs what the fresh analysis finds
 - Merge new findings with existing data:
   - Preserve manually added notes or corrections
   - Update row counts, enum distributions, and date ranges from fresh queries
   - Add any new tables/fields found in code
-  - Mark removed tables/fields as deprecated (don't delete immediately)
+  - Remove tables/fields no longer present in code or database
+  - Flag any discrepancies between existing documentation and current state
 - Update the "Last verified" timestamp
 
 **If the file does not exist:**

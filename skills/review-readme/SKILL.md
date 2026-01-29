@@ -1,12 +1,94 @@
 ---
 name: review-readme
 description: Review, create, or update README.md to match organizational standards with accurate project-specific content
-allowed-tools: Bash(gh:*), Bash(git:*), Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(jq:*), Read, Write, Edit, Glob, Grep
+allowed-tools: Bash(gh:*), Bash(git:*), Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(jq:*), Bash(awk:*), Bash(sed:*), Bash(echo:*), Read, Write, Edit, Glob, Grep, WebSearch
 ---
 
 # Review README.md
 
 Review the main README.md file in a repository and create or update it to match organizational standards. This skill analyzes the codebase to ensure README content is accurate and complete. Works for all repository types (public/private) and all languages.
+
+## CRITICAL: Mandatory Analysis Tracking
+
+**You MUST maintain an analysis checklist throughout execution.** At each step, record what was found. This ensures consistent, reproducible results.
+
+**Before starting, create this tracking structure and update it as you progress:**
+
+```text
+=== ANALYSIS CHECKPOINT LOG ===
+[ ] Step 1: Repository Information
+    - organization: (pending)
+    - repository: (pending)
+    - visibility: (pending)
+    - description: (pending)
+    - has_build_yml: (pending)
+    - has_license: (pending)
+    - readme_file: (pending)
+
+[ ] Step 2: Project Type Detection
+    - project_type: (pending)
+    - package_manager: (pending)
+    - project_name: (pending)
+    - project_description: (pending)
+    - version: (pending)
+    - entry_points: (pending)
+    - available_scripts: (pending)
+    - dependencies: (pending)
+
+[ ] Step 3: Structure Validation
+    - h1_title_format: (pending) - expected vs actual
+    - required_h2_sections: (pending) - list found vs expected
+    - section_order: (pending) - correct/incorrect
+
+[ ] Step 4: Introduction Section
+    - section_exists: (pending)
+    - has_project_purpose: (pending)
+    - has_key_features: (pending)
+    - has_target_audience: (pending)
+    - matches_package_description: (pending)
+    - issues: (pending)
+
+[ ] Step 5: Installation Section
+    - section_exists: (pending)
+    - has_prerequisites: (pending)
+    - has_install_commands: (pending)
+    - has_verification_step: (pending)
+    - commands_match_project_type: (pending)
+    - issues: (pending)
+
+[ ] Step 6: Usage Section
+    - section_exists: (pending)
+    - has_basic_usage: (pending)
+    - has_examples: (pending)
+    - has_configuration: (pending)
+    - cli_commands_verified: (pending) - list commands checked
+    - api_exports_verified: (pending) - list exports checked
+    - issues: (pending)
+
+[ ] Step 7: License and Contributing
+    - license_file_exists: (pending)
+    - license_matches_visibility: (pending) - PASS/FAIL
+    - contributing_section_exists: (pending)
+    - contributing_matches_visibility: (pending) - PASS/FAIL
+    - issues: (pending)
+
+[ ] Step 8: Report Generated
+    - all_checks_completed: (pending)
+    - issues_found: (pending)
+=== END CHECKPOINT LOG ===
+```
+
+**COMPLETION REQUIREMENT:** Before generating the final report, you MUST verify that ALL checkpoints show actual values (not "pending"). If any checkpoint is still "pending", go back and complete that analysis step.
+
+**EVIDENCE REQUIREMENT:** For every check, you MUST record:
+
+1. **What the README claims** - the exact text/command/feature described
+2. **What the code shows** - the actual evidence (package.json bin field, entry points, exports, scripts)
+3. **Comparison result** - MATCH, MISMATCH, or MISSING with specific details
+
+A bare "PASS" without evidence is not acceptable. If you cannot provide evidence, the check is incomplete.
+
+**DO NOT SKIP STEPS.** Even if an earlier check seems to suggest no issues, you MUST complete ALL steps. Issues are often only revealed when cross-referencing multiple sources.
 
 ## Required README Structure
 
@@ -254,6 +336,8 @@ The Installation section must contain accurate, working instructions.
    - References outdated package managers
    - Missing build steps for compiled languages
 
+**Exception for Claude Code plugins:** Installation instructions using `/plugin marketplace add`, `/plugin install`, or `claude --plugin-dir` are valid and should NOT be flagged as incorrect. These plugins do not require prerequisites sections.
+
 ### Project-Specific Installation Templates
 
 **Node.js:**
@@ -369,16 +453,17 @@ The Usage section must show real, working examples.
 2. **Common examples**: 2-3 typical use cases
 3. **Configuration**: How to configure (if applicable)
 
-### Verification Process
+### Verification Process (MANDATORY - do not skip)
 
-1. Read the current Usage section
-2. Cross-reference with:
+1. Read the current Usage section and list every command, API, or feature it claims exists
+2. For EACH claimed command/API, verify it exists by cross-referencing with:
    - `bin` field in package.json (CLI commands)
    - Exported functions/classes in main entry point
    - Example files in `examples/` directory
    - Test files for usage patterns
    - npm scripts / make targets
-3. Flag if Usage:
+3. Record evidence for each: "README claims X → code shows Y → MATCH/MISMATCH"
+4. Flag if Usage:
    - Shows commands/APIs that don't exist
    - Missing primary use cases
    - Has outdated syntax
@@ -495,14 +580,14 @@ grep -A 5 'console_scripts' setup.py 2>/dev/null
 
 **For PUBLIC Repositories:**
 
-Must contain open source contribution guidelines with:
+Must contain contribution guidelines with:
 
-- Mention of forking the repo
-- Mention of creating branches
+- Instructions for contributing (forking or branching)
 - Mention of pull requests
-- Reference to the license
 
-Template:
+**IMPORTANT:** Do not flag as incorrect if the existing section covers these topics in a different style or wording. The template below is just ONE example - variations are acceptable as long as they explain how to contribute.
+
+Template (example, not required format):
 
 ```markdown
 ## Contributing
@@ -528,33 +613,46 @@ When you submit code changes, your submissions are understood to be under the sa
 
 **For PRIVATE Repositories:**
 
-Must contain internal contribution guidelines with:
+Must contain contribution guidelines with:
 
-- Instructions for submitting code
-- Coding standards or style guidelines
-- Does NOT reference open source licensing
+- Instructions for submitting code (branching, PRs, etc.)
 
-Template:
+**IMPORTANT:** Private repos may use any style of Contributing section. Do not flag as incorrect if the existing section covers these topics in a different style or wording. The template below is just ONE example - variations are acceptable as long as they explain how to contribute.
+
+Template (example, not required format):
 
 ```markdown
 ## Contributing
 
-### Submitting Changes
+We love your input! We want to make contributing to this project as easy and transparent as possible, whether it's:
 
-1. Create a feature branch from the main branch.
-2. Make your changes following the coding standards below.
-3. Ensure all tests pass and linters report no errors.
-4. Submit a pull request with a clear description of changes.
+* Reporting a bug
+* Discussing the current state of the code
+* Submitting a fix
+* Proposing new features
+* Becoming a maintainer
 
-### Coding Standards
+Pull requests are the best way to propose changes to the codebase. We actively welcome your pull requests:
 
-- Follow the established code style in the project.
-- Write meaningful commit messages.
-- Add tests for new functionality.
-- Update documentation as needed.
+1. Create your branch from `master`.
+2. If you've added code that should be tested, add tests. Ensure the test suite passes.
+3. Update the documentation.
+4. Make sure your code lints.
+5. Issue that pull request!
 ```
 
 ## Step 8: Generate Report and Apply Fixes
+
+**MANDATORY PRE-REPORT VERIFICATION:**
+
+Before generating the report, you MUST:
+
+1. Review your checkpoint log from the start of analysis
+2. Verify ALL checkpoints have actual values (not "pending")
+3. If ANY checkpoint is still pending, STOP and complete that step first
+4. Cross-reference findings: issues found in code analysis MUST appear in the report
+
+**If you skipped any step, the review is incomplete and results will be inconsistent.**
 
 After analysis, provide a comprehensive report:
 
@@ -562,6 +660,10 @@ After analysis, provide a comprehensive report:
 
 ```text
 ## README Review Report
+
+### Analysis Checkpoint Log
+
+{Include your completed checkpoint log here - ALL values must be filled in, none should say "pending"}
 
 ### Repository Info
 - **Organization:** {org}
@@ -627,3 +729,6 @@ Fix any linting errors before considering the task complete.
 6. **Use exact formatting** - The build badge URL format must match exactly for CI validation
 7. **Keep examples simple** - Show the most common use cases, not every option
 8. **Run linters after changes** - Always run `/co-dev:run-linters` after modifying README.md
+9. **Complete ALL steps** - Never skip analysis steps. Each step may reveal issues not visible in other steps
+10. **Output checkpoint log** - Include the completed checkpoint log in your final report to prove all steps were executed
+11. **Never validate against world knowledge alone** - Do NOT use your training data to fact-check version numbers, release dates, or external claims. If uncertain about something (e.g., "does Ruby 4.0 exist?"), use web search to verify before flagging. Only validate things that can be cross-referenced against actual files in the repository or verified online.

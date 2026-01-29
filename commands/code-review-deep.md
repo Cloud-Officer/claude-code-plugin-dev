@@ -8,6 +8,80 @@ You are a senior staff engineer orchestrating an exhaustive code audit using par
 
 ---
 
+## CRITICAL: Mandatory Phase Tracking
+
+**You MUST maintain a phase completion log throughout execution.** This ensures consistent, reproducible results across runs.
+
+**Before starting, create this tracking structure and update it after each phase:**
+
+```text
+=== CODE REVIEW PHASE LOG ===
+[ ] Pre-Flight Check
+    - existing_report: (pending)
+    - user_decision: (pending) - use_existing/delete_and_rerun/N/A
+
+[ ] Phase 1: Initial Scans (3 agents)
+    [ ] Agent 1.1 Tech Stack - status: (pending), result_received: (pending)
+        - languages: (pending)
+        - platforms: (pending)
+        - infrastructure: (pending)
+        - frameworks: (pending)
+    [ ] Agent 1.2 Config Files - status: (pending), result_received: (pending)
+        - categories_found: (pending)
+    [ ] Agent 1.3 Codebase Structure - status: (pending), result_received: (pending)
+        - source_files: (pending)
+        - test_files: (pending)
+        - estimated_loc: (pending)
+
+[ ] Phase 2: Deep Analysis (conditional agents based on Phase 1)
+    Core Agents (always run):
+    [ ] Agent 2.1 Security - status: (pending), findings: (pending)
+    [ ] Agent 2.2 Dependencies - status: (pending), findings: (pending)
+    [ ] Agent 2.3 Code Quality - status: (pending), findings: (pending)
+    [ ] Agent 2.4 Testing - status: (pending), findings: (pending)
+    [ ] Agent 2.12 Git Hygiene - status: (pending), findings: (pending)
+    [ ] Agent 2.15 Config Management - status: (pending), findings: (pending)
+    [ ] Agent 2.16 Bug Patterns - status: (pending), findings: (pending)
+    [ ] Agent 2.18 Documentation - status: (pending), findings: (pending)
+    [ ] Agent 2.19 CI/CD - status: (pending), findings: (pending)
+
+    Conditional Agents (mark N/A if not applicable):
+    [ ] Agent 2.5 IaC - applicable: (pending), status: (pending), findings: (pending)
+    [ ] Agent 2.6 Performance - applicable: (pending), status: (pending), findings: (pending)
+    [ ] Agent 2.7 Observability - applicable: (pending), status: (pending), findings: (pending)
+    [ ] Agent 2.8 API Design - applicable: (pending), status: (pending), findings: (pending)
+    [ ] Agent 2.9 Concurrency - applicable: (pending), status: (pending), findings: (pending)
+    [ ] Agent 2.10 AI/ML - applicable: (pending), status: (pending), findings: (pending)
+    [ ] Agent 2.11 Compliance - applicable: (pending), status: (pending), findings: (pending)
+    [ ] Agent 2.13 Migrations - applicable: (pending), status: (pending), findings: (pending)
+    [ ] Agent 2.14 i18n - applicable: (pending), status: (pending), findings: (pending)
+    [ ] Agent 2.17 Backwards Compat - applicable: (pending), status: (pending), findings: (pending)
+
+[ ] Phase 3: Validation
+    - total_findings_to_validate: (pending)
+    - findings_validated: (pending)
+    - findings_rejected: (pending)
+
+[ ] Phase 4: Report Generation
+    - all_phases_complete: (pending)
+    - health_score: (pending)
+    - total_findings: (pending)
+    - positives_documented: (pending)
+=== END PHASE LOG ===
+```
+
+**COMPLETION REQUIREMENTS:**
+
+1. **Phase 1 MUST complete before Phase 2** - All 3 agents must return results
+2. **Phase 2 agents determined by Phase 1** - Mark conditional agents as N/A if not applicable
+3. **ALL Phase 2 agents must complete before Phase 3** - Do not skip agents
+4. **Phase 3 must validate ALL findings** - Not just a sample
+5. **Phase 4 report must include the completed phase log** - Proves all phases executed
+
+**DO NOT SKIP PHASES OR AGENTS.** Even if early phases suggest no issues in an area, run ALL applicable agents. Issues are often only revealed through thorough analysis.
+
+---
+
 ## EXECUTION OVERVIEW
 
 This review uses **parallel agents** for speed and thoroughness. Execute phases in order, but launch agents within each phase **simultaneously in a single message**.
@@ -67,7 +141,7 @@ If the user chooses option 2, delete the existing `CODE_REVIEW_REPORT.md` and pr
 > - Environment: .env*, config/*.yml
 > - Platform: Info.plist, AndroidManifest.xml, entitlements
 > - Docker: Dockerfile, docker-compose.yml
-> - Docs: soup.md, architecture.md, README.md
+> - Docs: soup.json, soup.md, architecture.md, README.md
 >
 > Return as JSON grouped by category with file paths.
 
@@ -120,7 +194,7 @@ If the user chooses option 2, delete the existing `CODE_REVIEW_REPORT.md` and pr
 > 3. **Duplicates:** Find overlapping libraries (multiple image loaders, HTTP clients, etc.)
 > 4. **Maintenance:** Flag abandoned packages (12+ months inactive).
 > 5. **Licenses:** Flag copyleft (GPL/AGPL) in proprietary projects.
-> 6. **SOUP:** If soup.md exists, cross-reference coverage.
+> 6. **SOUP:** If soup.json exists (source of truth; soup.md is auto-generated from it), cross-reference coverage.
 >
 > Return as JSON: `{dependencies: [{name, current, latest, severity, issues}], duplicates: [{libs, overlap}], soup_coverage: "X of Y (Z%)"}`
 
@@ -526,7 +600,7 @@ If the user chooses option 2, delete the existing `CODE_REVIEW_REPORT.md` and pr
 >
 > - Check that files have ACTUAL content, not just headers/stubs
 > - Empty or stub documentation = MEDIUM finding
-> - soup.md must have actual dependency data, not just headers
+> - soup.json must exist (source of truth; soup.md is auto-generated from it) and have actual dependency data
 > - Architecture docs must have actual diagrams/descriptions
 >
 > **CRITICAL - Case-insensitive file search (MANDATORY):**
@@ -575,9 +649,21 @@ If the user chooses option 2, delete the existing `CODE_REVIEW_REPORT.md` and pr
 >    - Self-hosted runners without security hardening
 >
 > 4. **Dependency Monitoring:**
->    - Dependabot/Renovate not configured = HIGH
->    - Missing ecosystems in dependabot.yml (should cover all: npm, pip, gradle, swift, cocoapods, github-actions, docker)
->    - No auto-merge for patch updates
+>    - **CRITICAL: Check BOTH file-based AND repository-level settings before flagging:**
+>      - First, check if `dependabot.yml` or `renovate.json` exists in `.github/`
+>      - If no config file, check repository settings via GitHub API:
+>
+>        ```bash
+>        # Check if Dependabot Security Updates are enabled
+>        gh api repos/{owner}/{repo} --jq '.security_and_analysis.dependabot_security_updates.status'
+>        ```
+>
+>      - If returns "enabled", Dependabot Security Updates ARE configured (monitors CVEs and creates security PRs)
+>    - **Severity logic:**
+>      - Neither dependabot.yml/renovate.json NOR security updates enabled = HIGH (no dependency monitoring at all)
+>      - Security updates enabled but no dependabot.yml = INFO (CVE monitoring active, but no routine version updates - this is a valid approach)
+>      - dependabot.yml exists but missing ecosystems = MEDIUM (should cover all: npm, pip, gradle, swift, cocoapods, github-actions, docker)
+>    - No auto-merge for patch updates = LOW
 >
 > 5. **Build & Test Configuration:**
 >    - Tests not running in parallel where possible
@@ -592,7 +678,7 @@ If the user chooses option 2, delete the existing `CODE_REVIEW_REPORT.md` and pr
 >    - No deployment gates/checks
 >    - Secrets in workflow files instead of environment secrets
 >
-> Return as JSON: `{pipeline: [{stage, present: bool, severity}], security: [{issue, severity, file, line, fix}], optimization: [{issue, severity, estimated_impact}], dependency_monitoring: [{ecosystem, monitored: bool, severity}], deployment: [{issue, severity}]}`
+> Return as JSON: `{pipeline: [{stage, present: bool, severity}], security: [{issue, severity, file, line, fix}], optimization: [{issue, severity, estimated_impact}], dependency_monitoring: {security_updates_enabled: bool, config_file: "dependabot.yml|renovate.json|none", ecosystems: [{ecosystem, monitored: bool, severity}], issues: [{issue, severity}]}, deployment: [{issue, severity}]}`
 
 **Wait for all Phase 2 agents to complete before proceeding to Phase 3.**
 
@@ -630,9 +716,22 @@ If the user chooses option 2, delete the existing `CODE_REVIEW_REPORT.md` and pr
 
 **Only VALIDATED findings with HIGH confidence proceed to the report.**
 
+**ANTI-SHORTCUT RULE:** You MUST NOT skip Phase 3 or batch-approve findings without reading the actual code. Each validation agent must read the specific file and line referenced in the finding. If a validation agent returns without quoting the actual code it checked, its validation is invalid and must be re-run.
+
 ---
 
 ## PHASE 4: REPORT GENERATION
+
+**MANDATORY PRE-REPORT VERIFICATION:**
+
+Before generating the report, you MUST:
+
+1. Review your phase log from the start of the review
+2. Verify ALL phases show "complete" status (not "pending")
+3. Verify ALL applicable agents returned results
+4. If ANY phase or agent is incomplete, STOP and complete it first
+
+**If you skipped any phase or agent, the review is incomplete and results will be inconsistent.**
 
 After all validation agents complete:
 
@@ -641,6 +740,7 @@ After all validation agents complete:
 3. **Sort** by severity (Critical → High → Medium → Low → Info)
 4. **Generate** `CODE_REVIEW_REPORT.md` using the output format below
 5. **Include** positive observations from Phase 2 agents
+6. **Include** the completed phase log at the start of the report (proves all phases executed)
 
 ---
 
@@ -658,12 +758,14 @@ After all validation agents complete:
 | CODEOWNERS in `.github/` vs root | Both locations valid: `CODEOWNERS`, `.github/CODEOWNERS`, `.github/codeowners`, `docs/CODEOWNERS` |
 | README/LICENSE with different extensions (.md, .txt, none) | All valid |
 | Any "missing file" when a case variant exists | Search case-insensitively before flagging any missing file |
+| Version numbers in config files | Do NOT fact-check versions against world knowledge alone. If uncertain (e.g., "does Ruby 4.0 exist?"), use web search to verify before flagging as invalid. |
 | Missing/inconsistent AWS resource tags | Organization-specific, enforced by SCPs/Config Rules, not code review |
 | Administrators can bypass branch protection | Intentional GitHub feature for emergency fixes, org-level policy decision |
 | Branch protection not enforced for admins | Same as above - this is a trust/governance decision, not a code issue |
 | Users/teams in "bypass list" for branch protection | Intentional - bypass actors are explicitly configured for emergency access |
 | X users can bypass PR reviews | Same as above - these are trusted maintainers with emergency access |
 | Missing LICENSE file in private repos | Private repos are proprietary by default - LICENSE only required for public/open source repos |
+| Missing dependabot.yml when Dependabot Security Updates enabled | Security updates via repo settings (CVE-only) is a valid approach - only monitors vulnerabilities without noise from routine version bumps. Check `gh api repos/{owner}/{repo} --jq '.security_and_analysis.dependabot_security_updates.status'` before flagging |
 
 ---
 
@@ -745,10 +847,14 @@ The following sections provide detailed guidance for each agent. Share relevant 
 
 The review is complete when:
 
-- [ ] All MANDATORY checks have run
-- [ ] All files from "Mandatory File Reads" examined
+- [ ] Phase log shows ALL phases complete (no "pending" values)
+- [ ] All core Phase 2 agents returned results
+- [ ] All applicable conditional Phase 2 agents returned results (or marked N/A)
+- [ ] All Phase 3 validation agents completed
 - [ ] Findings documented with specific counts
+- [ ] Positive observations documented for each applicable category
 - [ ] Health score justified
+- [ ] Phase log included in report
 - [ ] Report generated in correct format
 
 ---
@@ -792,6 +898,12 @@ Never use vague language like "some tests exist" or "a few issues found".
 **Date:** [ISO-8601]
 **Reviewer:** AI Code Review
 **Health Score:** [A|B|C|D|F]
+
+---
+
+## Phase Completion Log
+
+{Include completed phase log here - ALL values filled in, proves all phases executed}
 
 ---
 
