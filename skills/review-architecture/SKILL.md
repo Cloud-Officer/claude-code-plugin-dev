@@ -1,13 +1,97 @@
 ---
 name: review-architecture
 description: Review, create, or update docs/architecture.md to match organizational standards with accurate technical content
-allowed-tools: Bash(gh:*), Bash(git:*), Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(tail:*), Bash(jq:*), Bash(find:*), Bash(wc:*), Read, Write, Edit, Glob, Grep
+allowed-tools: Bash(gh:*), Bash(git:*), Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(tail:*), Bash(jq:*), Bash(find:*), Bash(wc:*), Bash(stat:*), Bash(grep:*), Bash(awk:*), Bash(sed:*), Bash(echo:*), Read, Write, Edit, Glob, Grep, WebSearch
 ---
 
 # Review Architecture Documentation
 
-Review the
-`docs/architecture.md` file in a repository and create or update it to match organizational standards. This skill deeply analyzes the codebase to ensure architecture documentation is accurate, complete, and reflects the actual implementation. Works for all repository types and languages.
+Review the `docs/architecture.md` file in a repository and create or update it to match organizational standards. This skill deeply analyzes the codebase to ensure architecture documentation is accurate, complete, and reflects the actual implementation. Works for all repository types and languages.
+
+## CRITICAL: Mandatory Analysis Tracking
+
+**You MUST maintain an analysis checklist throughout execution.** At each step, record what was found. This ensures consistent, reproducible results.
+
+**Before starting, create this tracking structure and update it as you progress:**
+
+```text
+=== ANALYSIS CHECKPOINT LOG ===
+[ ] Step 1: Repository Information
+    - organization: (pending)
+    - repository: (pending)
+    - has_architecture_doc: (pending)
+    - has_docs_dir: (pending)
+    - doc_last_modified: (pending)
+    - code_last_modified: (pending)
+
+[ ] Step 2: Exemption Check
+    - existing_exemption: (pending)
+    - exempt_type_detected: (pending)
+
+[ ] Step 3: Project Type Detection
+    - project_type: (pending)
+    - ml_frameworks: (pending)
+    - has_model_files: (pending)
+
+[ ] Step 4/5: Deep Codebase Analysis (complete ALL applicable sub-checks)
+    For Standard Projects:
+    [ ] 4.1 Architecture Diagram - diagrams_found: (pending), referenced_in_doc: (pending)
+    [ ] 4.2 Software Units - modules_in_code: (pending), modules_in_doc: (pending), missing_from_doc: (pending)
+    [ ] 4.3 SOUP Validation - soup_json_exists: (pending), packages_in_lockfile: (pending), packages_in_soup: (pending), missing: (pending), stale: (pending)
+    [ ] 4.4 Critical Algorithms - algorithms_found: (pending), documented: (pending), undocumented: (pending)
+    [ ] 4.5 Risk Controls - auth_patterns: (pending), validation_patterns: (pending), error_handling: (pending), logging: (pending)
+
+    For ML/DL Projects:
+    [ ] 5.1 Datasets - datasets_found: (pending), documented: (pending)
+    [ ] 5.2 Data Preprocessing - preprocessing_found: (pending), documented: (pending)
+    [ ] 5.3 Data Splits - splits_found: (pending), documented: (pending)
+    [ ] 5.4 Model Architecture - models_found: (pending), documented: (pending)
+    [ ] 5.5 Model Training - training_config_found: (pending), documented: (pending)
+    [ ] 5.6 Model Evaluation - metrics_found: (pending), documented: (pending)
+    [ ] 5.7 Model Deployment - deployment_found: (pending), documented: (pending)
+
+[ ] Step 6: Document Structure Validation
+    - h1_title_correct: (pending)
+    - required_sections_present: (pending)
+    - section_order_correct: (pending)
+    - toc_links_valid: (pending)
+
+[ ] Step 7: Report Generated
+    - all_checks_completed: (pending)
+    - issues_found: (pending)
+=== END CHECKPOINT LOG ===
+```
+
+**COMPLETION REQUIREMENT:** Before generating the final report, you MUST verify that ALL applicable checkpoints show actual values (not "pending"). If any checkpoint is still "pending", go back and complete that analysis step.
+
+**EVIDENCE REQUIREMENT:** For every check, you MUST record:
+
+1. **What was found in docs** - the exact text/claim from architecture.md
+2. **What was found in code** - the actual code evidence (file paths, function names, imports)
+3. **Comparison result** - MATCH, MISMATCH, or MISSING with specific details
+
+A bare "PASS" without evidence is not acceptable. If you cannot provide evidence, the check is incomplete.
+
+**DO NOT SKIP STEPS.** Even if an earlier check seems to suggest no issues, you MUST complete ALL steps. Issues are often only revealed when cross-referencing multiple sources.
+
+## Step 0: Read the Full Architecture Document
+
+**Before any code analysis**, read the entire `docs/architecture.md` (if it exists) and extract every factual claim that needs verification:
+
+```bash
+cat docs/architecture.md 2>/dev/null
+```
+
+Create a **claims inventory** listing every verifiable claim in the document:
+
+- Module names and their stated purposes
+- File paths referenced
+- Dependencies listed
+- Algorithms described
+- Security measures claimed
+- Diagram components shown
+
+This claims inventory becomes your verification checklist for Steps 4-5. Every claim must be checked against actual code.
 
 ## Architecture Document Types
 
@@ -279,8 +363,8 @@ cat pyproject.toml 2>/dev/null | grep -iE "tensorflow|pytorch|torch|keras|scikit
 ```
 
 ```bash
-# Check poetry.lock or requirements for exact versions
-cat poetry.lock requirements.txt 2>/dev/null | grep -iE "^(tensorflow|torch|keras|scikit-learn)==[0-9]" | head -10
+# Check poetry.lock or requirements for ML framework presence
+cat poetry.lock requirements.txt 2>/dev/null | grep -iE "^(tensorflow|torch|keras|scikit-learn)==" | head -10
 ```
 
 **Node.js projects:**
@@ -330,7 +414,7 @@ grep -rl "model\.fit\|model\.train\|DataLoader\|tf\.keras\|torch\.nn\|sklearn\."
 Store:
 
 - `project_type`: "ml_dl" or "standard"
-- `ml_frameworks`: List of detected ML frameworks with versions
+- `ml_frameworks`: List of detected ML frameworks
 - `has_model_files`: true/false
 
 ## Step 4: Deep Codebase Analysis - Standard Projects
@@ -399,66 +483,103 @@ grep -E "^export |^module\.exports" {module}/index.{js,ts} {module}.{js,ts} 2>/d
 head -20 {module}/*.go 2>/dev/null | grep -E "^package |^// |^func [A-Z]"
 ```
 
-**Cross-reference with documentation:**
+**Cross-reference with documentation (MANDATORY - do not skip):**
 
 - Read the "Software units" section from docs/architecture.md
-- Compare listed modules vs discovered modules
-- Flag modules in code but not in docs
-- Flag modules in docs but not in code
-- Check if descriptions match actual functionality
+- Create a two-column comparison: modules listed in docs vs modules found in code
+- For EACH module in docs: verify it exists in code and its description matches actual functionality
+- For EACH module in code: verify it is documented
+- Record the specific mismatches found (not just counts)
 
-### 4.3 Software of Unknown Provenance (SOUP) Deep Analysis
+### 4.3 Software of Unknown Provenance (SOUP) Validation
 
-**Extract complete dependency list with versions:**
+**IMPORTANT:** The source of truth for SOUP data is `soup.json` (not `soup.md`). The `soup.md` file is auto-generated from `soup.json` and must never be edited directly. All validation and changes must target `soup.json`.
+
+**Verify soup.json exists:**
 
 ```bash
-# Python - from lock files (exact versions)
-cat poetry.lock 2>/dev/null | grep -E "^name = |^version = " | paste - - | head -50
-cat Pipfile.lock 2>/dev/null | jq -r '.default, .develop | to_entries[] | "\(.key)==\(.value.version)"' 2>/dev/null |
-  head -50
-pip freeze 2>/dev/null | head -50
+ls -la docs/soup.json soup.json 2>/dev/null || echo "No soup.json found"
+```
+
+**Extract dependency list from lock files for comparison:**
+
+```bash
+# Python
+cat poetry.lock 2>/dev/null | grep -E "^name = " | sed 's/name = "//;s/"//' | head -50
+cat requirements.txt 2>/dev/null | grep -v "^#" | cut -d'=' -f1 | cut -d'>' -f1 | cut -d'<' -f1 | head -50
 ```
 
 ```bash
-# Node.js - from lock files
-cat package-lock.json 2>/dev/null |
-  jq -r '.packages | to_entries[] | select(.key != "") | "\(.key | split("/") | last)@\(.value.version)"' 2>/dev/null |
-  head -50
-cat yarn.lock 2>/dev/null | grep -E "^\"?[a-z@].*:$" -A 1 | grep -E "version" | head -50
+# Node.js
+cat package.json 2>/dev/null | jq -r '.dependencies, .devDependencies | keys[]' 2>/dev/null | head -50
 ```
 
 ```bash
-# Go modules
-cat go.sum 2>/dev/null | awk '{print $1, $2}' | sort -u | head -50
+# Ruby
+cat Gemfile.lock 2>/dev/null | grep -E "^    [a-z]" | awk '{print $1}' | head -50
 ```
 
 ```bash
-# Rust
-cat Cargo.lock 2>/dev/null | grep -E "^name = |^version = " | paste - - | head -50
+# Go
+cat go.mod 2>/dev/null | grep -E "^\t" | awk '{print $1}' | head -50
 ```
 
-**Extract license information:**
+**Validate soup.json content against actual code usage:**
+
+**Step 1: Read soup.json and extract all package entries:**
 
 ```bash
-# For Node.js
-cat package-lock.json 2>/dev/null |
-  jq -r '.packages | to_entries[] | select(.value.license) | "\(.key): \(.value.license)"' 2>/dev/null | head -30
+# Read soup.json to see all documented packages with their Risk Level, Requirements, and Verification Reasoning
+cat docs/soup.json soup.json 2>/dev/null
 ```
+
+**Step 2: For EACH package in soup.json, validate the three fields:**
+
+**You MUST validate EVERY package, not a sample.** For each package, record:
+
+- Package name
+- Stated Requirements vs actual code usage found
+- Stated Risk Level vs expected risk level for this type of package
+- Stated Verification Reasoning vs whether it explains the specific choice
+
+For each package entry, run these commands to verify accuracy:
 
 ```bash
-# Check for license files in vendor/node_modules
-find node_modules -maxdepth 2 -name "LICENSE*" 2>/dev/null | head -20 |
-  xargs -I {} sh -c 'echo "=== {} ===" && head -5 {}'
+# Find how the package is actually used in the codebase
+grep -rn "require.*{package}\|import.*{package}\|from {package}\|use {package}" --include="*.py" --include="*.js" --include="*.ts" --include="*.rb" --include="*.go" --include="*.rs" . 2>/dev/null | grep -v node_modules | grep -v vendor | head -20
 ```
 
-**Cross-reference with documentation:**
+Then validate:
 
-- Read "Software of Unknown Provenance" section
-- Compare documented dependencies vs actual dependencies
-- Flag version mismatches
-- Flag missing dependencies
-- Flag dependencies in docs that no longer exist
-- Check for missing licenses (critical for compliance)
+1. **Requirements field:** Does the stated purpose match the actual usage found above?
+   - BAD: AWS SDK with Requirements saying "image processing"
+   - GOOD: AWS SDK with Requirements saying "Cloud infrastructure API access"
+
+2. **Risk Level:** Is it appropriate for what the package does?
+
+   | Package Type                       | Expected Risk Level |
+   | ---------------------------------- | ------------------- |
+   | Auth, crypto, security             | High                |
+   | Network, HTTP, API clients         | High                |
+   | Database, data storage             | High                |
+   | File system access                 | Medium              |
+   | Logging, monitoring                | Medium              |
+   | UI, formatting, colors             | Low                 |
+   | Dev tools, linters, test utilities | Low                 |
+
+3. **Verification Reasoning:** Does it explain why THIS package was chosen?
+   - BAD: Generic "popular library"
+   - GOOD: "Official AWS SDK maintained by Amazon" or "Only library supporting X protocol"
+
+**Step 3: Check completeness and staleness:**
+
+- All packages in lock files must be in soup.json
+- Packages removed from lock files must be removed from soup.json
+
+**Cross-reference with architecture.md:**
+
+- Verify architecture.md references soup.md (the auto-generated file) and does not duplicate its content
+- Flag any version numbers or dependency tables in architecture.md for removal
 
 ### 4.4 Critical Algorithms Deep Analysis
 
@@ -841,12 +962,27 @@ Verify each link resolves to an actual heading in the document.
 
 ## Step 7: Generate Comprehensive Accuracy Report
 
+**MANDATORY PRE-REPORT VERIFICATION:**
+
+Before generating the report, you MUST:
+
+1. Review your checkpoint log from the start of analysis
+2. Verify ALL applicable checkpoints have actual values (not "pending")
+3. If ANY checkpoint is still pending, STOP and complete that step first
+4. Cross-reference findings: issues found in code analysis MUST appear in the report
+
+**If you skipped any step, the review is incomplete and results will be inconsistent.**
+
 After deep analysis, provide a detailed report:
 
 ### Report Format
 
 ```text
 ## Architecture Documentation Review Report
+
+### Analysis Checkpoint Log
+
+{Include your completed checkpoint log here - ALL values must be filled in, none should say "pending"}
 
 ### Repository Info
 - **Organization:** {org}
@@ -877,12 +1013,15 @@ After deep analysis, provide a detailed report:
 
 #### Software of Unknown Provenance
 - **Status:** {PASS/FAIL/NEEDS UPDATE}
-- **Total dependencies in code:** {n}
-- **Documented dependencies:** {n}
-- **Missing from docs:** {list}
-- **In docs but not in code:** {list}
-- **Version mismatches:** {list}
-- **Missing licenses:** {list}
+- **soup.json exists:** {yes/no}
+- **architecture.md references soup.md:** {yes/no - flag if duplicating content}
+- **Total dependencies in lock files:** {n}
+- **Documented in soup.json:** {n}
+- **Missing from soup.json:** {list}
+- **In soup.json but not in code:** {list}
+- **Inaccurate Requirements fields:** {list packages where stated purpose doesn't match actual code usage}
+- **Misclassified Risk Levels:** {list packages with inappropriate risk level for their function}
+- **Weak Verification Reasoning:** {list packages with generic reasoning like "popular library"}
 
 ### Summary
 - **Sections accurate:** {n}/{total}
@@ -960,18 +1099,48 @@ mkdir -p docs
 
 ## Software of Unknown Provenance
 
-| Package | Version | License | Purpose |
-|---------|---------|---------|---------|
+See [soup.md](soup.md) for the complete list of third-party dependencies.
 
-{For each dependency from lock file:} | {name} | {exact_version} | {license} | {inferred purpose} |
+**Verification:** Cross-reference soup.md entries against actual code usage to ensure accuracy:
 
-### Critical Dependencies
+### Risk Level
 
-{Dependencies that are central to the application's functionality}
+Classify the potential harm if the library has a vulnerability (per IEC 62304):
 
-### Security-Sensitive Dependencies
+| Level | Definition |
+|-------|------------|
+| Low | Cannot lead to harm |
+| Medium | Can lead to reversible harm |
+| High | Can lead to irreversible harm |
 
-{Dependencies handling crypto, auth, network, etc.}
+### Requirements
+
+Answer: "Why do you need this library in your project?"
+
+Examples:
+- "HTTP client for REST API communication"
+- "CLI argument parsing and validation"
+- "YAML/JSON configuration file parsing"
+- "Dependency" (for transitive dependencies only)
+
+### Verification Reasoning
+
+Answer: "Why did you select this library among alternatives?"
+
+Examples:
+- "Industry standard with active maintenance and security updates"
+- "Official SDK provided by the service vendor"
+- "Recommended by framework documentation"
+- "Dependency" (for transitive dependencies only)
+
+### Validation Checks
+
+1. **Accuracy:** Verify each package's Requirements field matches its actual usage in the codebase (e.g., an AWS SDK should not say "image processing")
+2. **Completeness:** All packages in lock files must be in soup.json
+3. **Staleness:** Packages removed from lock files must be removed from soup.json
+4. **Risk Level:** Verify risk classifications are appropriate (e.g., crypto/auth libraries should be High)
+
+**Note:** `soup.md` is auto-generated from `soup.json`. All edits must be made to `soup.json`.
 
 ## Critical algorithms
 
@@ -981,7 +1150,7 @@ mkdir -p docs
 
 **Purpose:** {From docstring or inferred}
 
-**Location:** `{actual/path/to/file}:{line_number}`
+**Location:** `{actual/path/to/file}` in `{ClassName}` or `{function_name}`
 
 **Implementation:**
 {Brief description of how it works}
@@ -1071,7 +1240,7 @@ mkdir -p docs
 | Transformation | Purpose | Implementation |
 |----------------|---------|----------------|
 
-{For each discovered transform:} | {transform_name} | {from docstring} | `{file}:{line}` |
+{For each discovered transform:} | {transform_name} | {from docstring} | `{file}` in `{class/function}` |
 
 ### Data Augmentation
 
@@ -1089,7 +1258,7 @@ mkdir -p docs
 
 ### Split Implementation
 
-**Location:** `{file}:{line}`
+**Location:** `{file}` in `{function_name}`
 
 **Method:** {random/stratified/temporal/custom}
 
@@ -1103,7 +1272,7 @@ mkdir -p docs
 
 **Model Type:** {CNN/RNN/Transformer/etc.}
 
-**Framework:** {PyTorch/TensorFlow/etc.} v{version}
+**Framework:** {PyTorch/TensorFlow/etc.}
 
 ### Architecture Diagram
 
@@ -1118,7 +1287,7 @@ mkdir -p docs
 
 ### Model Configuration
 
-**Location:** `{model_file}:{line}`
+**Location:** `{model_file}` in `{ClassName}`
 
 ~~~python
 {Actual model class signature and key layers}
@@ -1135,12 +1304,12 @@ mkdir -p docs
 
 | Parameter | Value | Source |
 |-----------|-------|--------|
-| Optimizer | {actual optimizer} | `{file}:{line}` |
-| Learning Rate | {actual lr} | `{file}:{line}` |
-| Batch Size | {actual batch_size} | `{file}:{line}` |
-| Epochs | {actual epochs} | `{file}:{line}` |
-| Loss Function | {actual loss} | `{file}:{line}` |
-| LR Scheduler | {if found} | `{file}:{line}` |
+| Optimizer | {actual optimizer} | `{file}` in `{function/class}` |
+| Learning Rate | {actual lr} | `{file}` in `{function/class}` |
+| Batch Size | {actual batch_size} | `{file}` in `{function/class}` |
+| Epochs | {actual epochs} | `{file}` in `{function/class}` |
+| Loss Function | {actual loss} | `{file}` in `{function/class}` |
+| LR Scheduler | {if found} | `{file}` in `{function/class}` |
 
 ### Training Script
 
@@ -1160,7 +1329,7 @@ mkdir -p docs
 
 | Metric | Implementation | Latest Value |
 |--------|----------------|--------------|
-| {metric_name} | `{file}:{line}` | {from results file if exists} |
+| {metric_name} | `{file}` in `{function/class}` | {from results file if exists} |
 
 ### Evaluation Script
 
@@ -1176,21 +1345,9 @@ mkdir -p docs
 
 ## Software of Unknown Provenance
 
-| Package | Version | License | Purpose |
-|---------|---------|---------|---------|
-| {name} | {exact_version} | {license} | {purpose} |
+See [soup.md](soup.md) for the complete list of third-party dependencies including ML frameworks and data processing libraries.
 
-### ML Framework Stack
-
-| Framework | Version | Role |
-|-----------|---------|------|
-| {framework} | {version} | {role} |
-
-### Data Processing Stack
-
-| Package | Version | Role |
-|---------|---------|------|
-| {package} | {version} | {role} |
+**Verification:** Cross-reference soup.json entries against actual code usage. See the Standard Project Template above for Risk Level, Requirements, and Verification Reasoning guidelines. Note that `soup.md` is auto-generated from `soup.json`; all edits must target `soup.json`.
 
 ## Risk controls
 
@@ -1248,8 +1405,9 @@ Before completing, verify:
 - [ ] Table of Contents links all work
 - [ ] All documented modules exist in codebase
 - [ ] All codebase modules are documented
-- [ ] Dependency versions match lock files exactly
-- [ ] All dependencies have licenses documented
+- [ ] soup.json exists and is referenced (not duplicated) in architecture.md
+- [ ] soup.json Requirements fields match actual code usage
+- [ ] soup.json Risk Levels are appropriate for each package's function
 - [ ] File paths in docs point to actual files
 - [ ] For ML/DL: Hyperparameters match actual code
 - [ ] For ML/DL: Model architecture matches implementation
@@ -1269,8 +1427,8 @@ Fix any linting errors before considering the task complete.
 ## Important Rules
 
 1. **Never fabricate information** - Only document what actually exists in the code
-2. **Include file:line references** - Help readers find implementations
-3. **Use exact versions** - From lock files, not approximate versions
+2. **Use stable code references** - Reference classes, methods, and functions instead of line numbers (line numbers change too quickly)
+3. **Never document versions or duplicate SOUP data** - Do not include version numbers or dependency tables in architecture.md. Reference soup.md instead (which is auto-generated from soup.json). Lock files are the source of truth for versions. All SOUP edits must be made to soup.json. If versions or dependency tables are found in architecture.md, flag them for removal.
 4. **Verify all paths** - Every file path must exist
 5. **Never remove existing content** - Only add missing sections or fix inaccuracies
 6. **Preserve custom sections** - Additional H2/H3 sections after required ones should be kept
@@ -1279,3 +1437,6 @@ Fix any linting errors before considering the task complete.
 9. **Document security dependencies** - SOUP handling crypto/auth needs extra attention
 10. **Keep metrics current** - If evaluation results exist, include latest values
 11. **Run linters after changes** - Always run `/co-dev:run-linters` after modifying docs/architecture.md
+12. **Complete ALL steps** - Never skip analysis steps. Each step may reveal issues not visible in other steps
+13. **Output checkpoint log** - Include the completed checkpoint log in your final report to prove all steps were executed
+14. **Never validate against world knowledge alone** - Do NOT use your training data to fact-check version numbers, release dates, library existence, or external claims. If uncertain about something, use web search to verify before flagging. Only validate things that can be cross-referenced against actual files in the repository or verified online.
