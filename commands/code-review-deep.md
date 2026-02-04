@@ -57,10 +57,13 @@ You are a senior staff engineer orchestrating an exhaustive code audit using par
     [ ] Agent 2.14 i18n - applicable: (pending), status: (pending), findings: (pending)
     [ ] Agent 2.17 Backwards Compat - applicable: (pending), status: (pending), findings: (pending)
 
-[ ] Phase 3: Validation
+[ ] Phase 3: Adversarial Validation
     - total_findings_to_validate: (pending)
-    - findings_validated: (pending)
+    - findings_confirmed: (pending)
     - findings_rejected: (pending)
+    - rejection_reasons: (pending) - list top 3 reasons
+    - findings_without_code_quotes: (pending) - auto-rejected
+    - findings_without_repo_check: (pending) - auto-rejected for CI/CD findings
 
 [ ] Phase 4: Report Generation
     - all_phases_complete: (pending)
@@ -90,8 +93,8 @@ This review uses **parallel agents** for speed and thoroughness. Execute phases 
 | ----- | --------------- | ------- |
 | 1 | 3 | Quick scans: tech stack, configs, structure |
 | 2 | 4-19 | Core (security, deps, quality, tests) + conditional (IaC, perf, observability, API, concurrency, AI/ML, compliance, git, migrations, i18n, config, bugs, backwards compat, docs, CI/CD) |
-| 3 | N (per finding) | Validate ALL findings (all severity levels) |
-| 4 | 1 (you) | Aggregate and generate report |
+| 3 | N (max 3 per agent) | **Adversarial validation**: Try to DISPROVE each finding. Reject false positives. |
+| 4 | 1 (you) | Aggregate CONFIRMED findings only and generate report |
 
 ---
 
@@ -546,7 +549,7 @@ If the user chooses option 2, delete the existing `CODE_REVIEW_REPORT.md` and pr
 >
 > 1. **Breaking Changes:** Removed public API/method, changed method signature, changed return types, renamed public classes/functions
 > 2. **Deprecation:** Deprecated APIs without replacement documented, deprecated without removal timeline, using deprecated APIs from dependencies
-> 3. **Versioning:** Version not following SemVer, breaking changes without major version bump, no CHANGELOG or release notes
+> 3. **Versioning:** Version not following SemVer, breaking changes without major version bump
 > 4. **API Contracts:** Changed response schema without versioning, removed fields from responses, changed error codes/formats
 > 5. **Database:** Schema changes breaking old app versions, removed columns still queried by old versions
 > 6. **Migration Path:** No migration guide for breaking changes, no compatibility layer/shim
@@ -596,6 +599,14 @@ If the user chooses option 2, delete the existing `CODE_REVIEW_REPORT.md` and pr
 > - LICENSE - **ONLY check if repo is public** (run: `gh repo view --json isPrivate --jq '.isPrivate'`). If private (returns `true`), do NOT flag missing LICENSE - private repos are proprietary by default.
 > - API docs (OpenAPI/Swagger for APIs)
 >
+> **DO NOT FLAG these files as missing (they are optional):**
+>
+> - CHANGELOG.md - Not required (hard to maintain, git history serves this purpose)
+> - CONTRIBUTING.md as separate file - Contributing section in README is sufficient
+> - SBOM (Software Bill of Materials) - Not required
+> - CODE_OF_CONDUCT.md - Not required
+> - SECURITY.md - Not required (GitHub security policy via UI is sufficient)
+>
 > **Content verification (CRITICAL):**
 >
 > - Check that files have ACTUAL content, not just headers/stubs
@@ -643,27 +654,37 @@ If the user chooses option 2, delete the existing `CODE_REVIEW_REPORT.md` and pr
 >    - Third-party actions not pinned to SHA (INFO - not required but note if using @latest)
 >
 > 3. **Runner & Cost Optimization:**
->    - macOS runners for non-Apple builds (HIGH - 10x cost vs Linux)
+>    - **IMPORTANT: Check repo visibility first:** `gh repo view --json isPrivate --jq '.isPrivate'`
+>    - If **public repo (returns `false`)**: GitHub runners are FREE - do NOT flag macOS/Windows runners as cost issues
+>      - Cross-platform testing in public repos is a POSITIVE (add to positives section)
+>      - Only flag if runners are failing/hanging, not for "unnecessary" platform coverage
+>    - If **private repo (returns `true`)**: macOS runners cost ~10x Linux, flag if not needed for Apple-specific code
 >    - No caching configured for dependencies (MEDIUM)
 >    - No `timeout-minutes` set (MEDIUM - risk of hung jobs)
 >    - Self-hosted runners without security hardening
 >
 > 4. **Dependency Monitoring:**
->    - **CRITICAL: Check BOTH file-based AND repository-level settings before flagging:**
->      - First, check if `dependabot.yml` or `renovate.json` exists in `.github/`
->      - If no config file, check repository settings via GitHub API:
+>    - **⚠️ MANDATORY CHECK - DO NOT SKIP:** Before flagging ANY Dependabot/Renovate issue, you MUST:
+>      1. Check if `dependabot.yml` or `renovate.json` exists in `.github/`
+>      2. **ALWAYS run this API check regardless of step 1 result:**
 >
->        ```bash
->        # Check if Dependabot Security Updates are enabled
->        gh api repos/{owner}/{repo} --jq '.security_and_analysis.dependabot_security_updates.status'
->        ```
+>         ```bash
+>         # Get repo owner and name
+>         REPO_INFO=$(gh repo view --json owner,name --jq '"\(.owner.login)/\(.name)"')
+>         # Check if Dependabot Security Updates are enabled via repo settings
+>         gh api "repos/${REPO_INFO}" --jq '.security_and_analysis.dependabot_security_updates.status // "disabled"'
+>         ```
 >
->      - If returns "enabled", Dependabot Security Updates ARE configured (monitors CVEs and creates security PRs)
->    - **Severity logic:**
->      - Neither dependabot.yml/renovate.json NOR security updates enabled = HIGH (no dependency monitoring at all)
->      - Security updates enabled but no dependabot.yml = INFO (CVE monitoring active, but no routine version updates - this is a valid approach)
+>      3. If the API returns `"enabled"`, Dependabot Security Updates ARE configured at the repository level (monitors CVEs and creates security PRs automatically)
+>      4. **DO NOT flag "No Dependabot/Renovate Configuration" if security updates are enabled** - this is a valid configuration
+>
+>    - **Severity logic (ONLY after completing the mandatory check above):**
+>      - Neither dependabot.yml/renovate.json NOR security updates enabled via API = HIGH (no dependency monitoring at all)
+>      - Security updates enabled via API but no dependabot.yml = **DO NOT FLAG** (CVE monitoring is active - this is the recommended approach for many repos)
 >      - dependabot.yml exists but missing ecosystems = MEDIUM (should cover all: npm, pip, gradle, swift, cocoapods, github-actions, docker)
 >    - No auto-merge for patch updates = LOW
+>
+>    - **Evidence required in findings:** If you flag a Dependabot issue, you MUST include the output of the `gh api` command showing `"disabled"` or `null`. If you cannot show this evidence, the finding is invalid.
 >
 > 5. **Build & Test Configuration:**
 >    - Tests not running in parallel where possible
@@ -678,45 +699,95 @@ If the user chooses option 2, delete the existing `CODE_REVIEW_REPORT.md` and pr
 >    - No deployment gates/checks
 >    - Secrets in workflow files instead of environment secrets
 >
-> Return as JSON: `{pipeline: [{stage, present: bool, severity}], security: [{issue, severity, file, line, fix}], optimization: [{issue, severity, estimated_impact}], dependency_monitoring: {security_updates_enabled: bool, config_file: "dependabot.yml|renovate.json|none", ecosystems: [{ecosystem, monitored: bool, severity}], issues: [{issue, severity}]}, deployment: [{issue, severity}]}`
+> Return as JSON: `{pipeline: [{stage, present: bool, severity}], security: [{issue, severity, file, line, fix}], optimization: [{issue, severity, estimated_impact}], dependency_monitoring: {api_check_output: "enabled|disabled|null", security_updates_enabled: bool, config_file: "dependabot.yml|renovate.json|none", ecosystems: [{ecosystem, monitored: bool, severity}], issues: [{issue, severity}]}, deployment: [{issue, severity}]}`
+>
+> **IMPORTANT:** The `api_check_output` field MUST contain the actual output from `gh api repos/{owner}/{repo} --jq '.security_and_analysis.dependabot_security_updates.status'`. If this field is missing or empty, the dependency_monitoring section is incomplete.
 
 **Wait for all Phase 2 agents to complete before proceeding to Phase 3.**
 
 ---
 
-## PHASE 3: VALIDATION (Launch N Agents in Parallel)
+## PHASE 3: ADVERSARIAL VALIDATION (Launch N Agents in Parallel)
 
-**For EVERY finding from Phase 2 (all severity levels), launch a validation agent:**
+**For EVERY finding from Phase 2, launch a validation agent whose job is to DISPROVE the finding.**
+
+### Why Adversarial?
+
+Phase 2 agents are biased toward finding issues. Phase 3 agents must be biased toward REJECTING findings. A finding only survives if it cannot be reasonably disproven. This eliminates false positives that waste developer time.
 
 ### Validation Agent Template
 
 **Prompt:**
-> Validate this finding:
+> **Your mission: Try to DISPROVE this finding. Assume it's a false positive until proven otherwise.**
 >
-> **Finding:** [description from Phase 2]
+> **Claimed Finding:** [description from Phase 2]
 > **File:** [file path]
 > **Claimed Issue:** [what was flagged]
 >
-> Your job:
+> **You MUST complete ALL of these checks before confirming any finding:**
 >
-> 1. Read the actual code at this location
-> 2. Verify the issue actually exists
-> 3. Check if it's intentional (silenced, documented, or acceptable pattern)
-> 4. Confirm it's not a false positive
+> **1. READ THE ACTUAL CODE (quote it):** Read the file at the specified location. Quote the exact code snippet (5-10 lines of context). If you cannot quote the code, REJECT the finding.
 >
-> Return: `{validated: true/false, confidence: "high/medium/low", reason: "explanation", false_positive_reason: "if applicable"}`
+> **2. CHECK FOR MITIGATING FACTORS:** Is there a wrapper, middleware, or base class that handles this? Is there a configuration file that addresses this? (Check .env, config/, settings). Is there a related file that provides the missing functionality? Is this handled at a different layer (infrastructure, framework, platform)?
+>
+> **3. CHECK FOR EXISTING HANDLING:** Search the codebase for related handling (grep for relevant patterns). Check if the issue is addressed elsewhere in the same file. Check imports - does a library/framework handle this automatically?
+>
+> **4. CHECK REPOSITORY SETTINGS (for CI/CD, security, branch protection findings):** Use `gh api` to check repository-level settings. Use `gh repo view` to check features enabled via UI. Many settings are configured via GitHub UI, not config files.
+>
+> **5. VERIFY THE CONTEXT:** Is this code actually used/reachable? Is this a test file, example, or template that shouldn't be flagged? Is the severity appropriate for the actual risk?
+>
+> **6. APPLY THE "WOULD A SENIOR ENGINEER FLAG THIS?" TEST:** Is this a real issue or pedantic nitpicking? Would fixing this provide meaningful value? Is the recommended fix actually better than the current code?
+>
+> **DECISION CRITERIA:** REJECT if ANY mitigating factor exists. REJECT if the issue is handled elsewhere. REJECT if you cannot quote the actual problematic code. REJECT if repository settings address the issue. REJECT if a senior engineer would not flag this. CONFIRM only if ALL checks fail to disprove the finding.
+>
+> **Return JSON:**
+>
+> ```json
+> {
+>   "decision": "REJECT|CONFIRM",
+>   "code_quoted": "exact code snippet you examined",
+>   "mitigating_factors_checked": ["list of things you checked"],
+>   "mitigating_factors_found": ["any factors that address the issue"],
+>   "related_files_checked": ["files you searched"],
+>   "repo_settings_checked": ["gh commands run and their output"],
+>   "rejection_reason": "why this is a false positive (if REJECT)",
+>   "confirmation_evidence": "specific proof the issue exists (if CONFIRM)"
+> }
+> ```
 
-**Filter criteria - Remove findings that are:**
+### Rejection Criteria (Remove findings that match ANY of these)
 
-- Pre-existing issues outside scope
-- Actually correct code that appears problematic
-- Pedantic nitpicks a senior engineer wouldn't flag
-- Issues a linter would catch (don't verify)
-- Explicitly silenced in code (lint ignore comments)
+| Criterion | Example |
+| --------- | ------- |
+| Handled by framework/library | Express middleware handles auth, React sanitizes by default |
+| Handled by infrastructure | WAF blocks injection, load balancer handles TLS |
+| Handled by repository settings | Dependabot enabled via UI, branch protection via settings |
+| Handled elsewhere in codebase | Base class validates, wrapper sanitizes, config enables |
+| Test/example/template code | Files in `test/`, `examples/`, `templates/`, `__mocks__/` |
+| Intentionally disabled with comment | `// nosec: false positive because...`, documented exception |
+| Pedantic/low-value | Would take 2 hours to fix, saves 2 seconds |
+| Wrong severity | Flagged as HIGH but is actually INFO-level observation |
+| Deprecated/unused code | Code path is never executed, scheduled for removal |
 
-**Only VALIDATED findings with HIGH confidence proceed to the report.**
+### Validation Success Criteria
 
-**ANTI-SHORTCUT RULE:** You MUST NOT skip Phase 3 or batch-approve findings without reading the actual code. Each validation agent must read the specific file and line referenced in the finding. If a validation agent returns without quoting the actual code it checked, its validation is invalid and must be re-run.
+A finding is CONFIRMED only when:
+
+- [ ] Actual code is quoted in the response
+- [ ] All 6 check categories were performed
+- [ ] No mitigating factors were found
+- [ ] Repository settings were checked (for applicable findings)
+- [ ] The agent explicitly states why rejection criteria don't apply
+
+**If the validation response is missing code quotes or check results, the finding is AUTO-REJECTED.**
+
+### Batch Size Limit
+
+To ensure thorough validation:
+
+- Validate maximum 3 findings per agent
+- Complex findings (security, IaC, compliance) get dedicated 1:1 agents
+- If an agent validates more than 3 findings, split and re-run
 
 ---
 
@@ -740,7 +811,8 @@ After all validation agents complete:
 3. **Sort** by severity (Critical → High → Medium → Low → Info)
 4. **Generate** `CODE_REVIEW_REPORT.md` using the output format below
 5. **Include** positive observations from Phase 2 agents
-6. **Include** the completed phase log at the start of the report (proves all phases executed)
+
+**Note:** The Phase Completion Log is for internal tracking during execution. Do NOT include it in the final report.
 
 ---
 
@@ -765,7 +837,10 @@ After all validation agents complete:
 | Users/teams in "bypass list" for branch protection | Intentional - bypass actors are explicitly configured for emergency access |
 | X users can bypass PR reviews | Same as above - these are trusted maintainers with emergency access |
 | Missing LICENSE file in private repos | Private repos are proprietary by default - LICENSE only required for public/open source repos |
-| Missing dependabot.yml when Dependabot Security Updates enabled | Security updates via repo settings (CVE-only) is a valid approach - only monitors vulnerabilities without noise from routine version bumps. Check `gh api repos/{owner}/{repo} --jq '.security_and_analysis.dependabot_security_updates.status'` before flagging |
+| Missing dependabot.yml when Dependabot Security Updates enabled | Security updates via repo settings is a VALID configuration. MUST run `gh api repos/{owner}/{repo} --jq '.security_and_analysis.dependabot_security_updates.status'` - if returns "enabled", DO NOT flag any Dependabot issues |
+| "No Dependabot/Renovate Configuration" without API check evidence | Invalid finding - agent MUST show the `gh api` output proving security updates are disabled before flagging |
+| macOS/Windows runners in public repos | GitHub provides FREE runners for public repos - cross-platform testing is a POSITIVE, not a cost issue. Only flag runner costs for private repos. |
+| "Unnecessary" cross-platform testing in open source | More test coverage is better for open source. This should be noted as a strength, not flagged as waste. |
 
 ---
 
@@ -850,11 +925,15 @@ The review is complete when:
 - [ ] Phase log shows ALL phases complete (no "pending" values)
 - [ ] All core Phase 2 agents returned results
 - [ ] All applicable conditional Phase 2 agents returned results (or marked N/A)
-- [ ] All Phase 3 validation agents completed
+- [ ] All Phase 3 validation agents completed with:
+  - [ ] Code quoted for every CONFIRMED finding
+  - [ ] Mitigating factors checklist completed
+  - [ ] Repository settings checked for CI/CD/security findings
+  - [ ] Rejection rate documented (expect 30-50% rejection for healthy codebase)
+- [ ] Only CONFIRMED findings (not REJECTED) appear in final report
 - [ ] Findings documented with specific counts
 - [ ] Positive observations documented for each applicable category
 - [ ] Health score justified
-- [ ] Phase log included in report
 - [ ] Report generated in correct format
 
 ---
@@ -898,12 +977,6 @@ Never use vague language like "some tests exist" or "a few issues found".
 **Date:** [ISO-8601]
 **Reviewer:** AI Code Review
 **Health Score:** [A|B|C|D|F]
-
----
-
-## Phase Completion Log
-
-{Include completed phase log here - ALL values filled in, proves all phases executed}
 
 ---
 
@@ -966,7 +1039,7 @@ This section highlights what the team is doing well. Good practices should be re
 
 ### DevOps & CI/CD
 
-[Note well-configured pipelines, proper caching, security scanning in place, good deployment practices, infrastructure as code, etc.]
+[Note well-configured pipelines, proper caching, security scanning in place, good deployment practices, infrastructure as code, cross-platform testing matrix (especially valuable for open source), comprehensive test coverage across OS/versions, etc.]
 
 ### Documentation
 

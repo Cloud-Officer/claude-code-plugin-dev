@@ -1,7 +1,7 @@
 ---
 name: query-db
 description: Query databases using natural language via CLI commands. Reads schema context from .claude/DB.md. Supports MySQL, PostgreSQL, MongoDB, Elasticsearch, and Redis.
-allowed-tools: Read, Bash(command:mysql*), Bash(command:psql*), Bash(command:mongosh*), Bash(command:redis-cli*), Bash(command:curl*)
+allowed-tools: Read, Bash(mysql:*), Bash(psql:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(stat:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*)
 ---
 
 ## Purpose

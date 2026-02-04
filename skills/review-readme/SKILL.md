@@ -1,7 +1,7 @@
 ---
 name: review-readme
 description: Review, create, or update README.md to match organizational standards with accurate project-specific content
-allowed-tools: Bash(gh:*), Bash(git:*), Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(jq:*), Bash(awk:*), Bash(sed:*), Bash(echo:*), Read, Write, Edit, Glob, Grep, WebSearch
+allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(stat:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, WebSearch
 ---
 
 # Review README.md

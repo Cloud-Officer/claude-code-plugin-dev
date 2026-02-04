@@ -1,7 +1,7 @@
 ---
 name: analyze-db
 description: Analyze a project and generate a .claude/DB.md file with complete database schema documentation. Auto-detects language/framework. Supports MySQL, PostgreSQL, MongoDB, Elasticsearch, and Redis.
-allowed-tools: Bash(command:php*), Bash(command:python*), Bash(command:ruby*), Bash(command:rails*), Bash(command:go*), Bash(command:npm*), Bash(command:npx*), Bash(command:yarn*), Bash(command:dotnet*), Bash(command:grep*), Bash(command:mkdir*), Bash(command:cat*), Bash(command:mysql*), Bash(command:psql*), Bash(command:mongosh*), Bash(command:redis-cli*), Bash(command:curl*), Read, Write, Glob, Grep
+allowed-tools: Bash(php:*), Bash(python:*), Bash(ruby:*), Bash(rails:*), Bash(go:*), Bash(npm:*), Bash(npx:*), Bash(yarn:*), Bash(dotnet:*), Bash(mysql:*), Bash(psql:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(stat:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Glob, Grep
 ---
 
 ## Purpose
