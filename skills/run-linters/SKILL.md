@@ -1,7 +1,7 @@
 ---
 name: run-linters
 description: Run linters after code changes to verify code quality. Use this skill after completing code modifications to catch and fix any linting issues.
-allowed-tools: Bash(linters:*), Read, Edit
+allowed-tools: Bash(linters:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(stat:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Edit
 ---
 
 # Run Linters
