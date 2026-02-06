@@ -1,12 +1,12 @@
 ---
 name: analyze-db
-description: Analyze a project and generate a .claude/DB.md file with complete database schema documentation. Auto-detects language/framework. Supports MySQL, PostgreSQL, MongoDB, Elasticsearch, and Redis.
+description: Analyze, document, map, or scan the database schema. Use when the user wants to analyze the database, document the database, generate schema docs, map the database, create DB documentation, or inspect the database structure. Generates a docs/DB.md file with complete database schema documentation. Auto-detects language/framework. Supports MySQL, PostgreSQL, MongoDB, Elasticsearch, and Redis.
 allowed-tools: Bash(php:*), Bash(python:*), Bash(ruby:*), Bash(rails:*), Bash(go:*), Bash(npm:*), Bash(npx:*), Bash(yarn:*), Bash(dotnet:*), Bash(mysql:*), Bash(psql:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(stat:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Glob, Grep
 ---
 
 ## Purpose
 
-Analyze this project and generate a `.claude/DB.md` file with **complete database schema documentation** for running queries.
+Analyze this project and generate a `docs/DB.md` file with **complete database schema documentation** for running queries.
 
 **IMPORTANT: Document ALL tables/collections/indices.** Do not filter or skip any tables. Developers need full schema documentation, not just "important" tables.
 
@@ -79,9 +79,9 @@ redis-cli -u "$REDIS_URL" COMMAND
 
 ## Steps
 
-### 0. Check for existing .claude/DB.md
+### 0. Check for existing docs/DB.md
 
-Before starting, check if `.claude/DB.md` already exists.
+Before starting, check if `docs/DB.md` already exists.
 
 **If the file exists:**
 
@@ -380,15 +380,15 @@ Find across all frameworks:
 - Soft delete patterns (`deleted_at`, `is_deleted`)
 - Multi-tenancy patterns (`tenant_id`, `organization_id`)
 
-### 5. Generate .claude/DB.md (Initial Draft)
+### 5. Generate docs/DB.md (Initial Draft)
 
 Create the directory if needed:
 
 ```bash
-mkdir -p .claude
+mkdir -p docs
 ```
 
-Write an initial `.claude/DB.md` with the appropriate template based on detected database type(s).
+Write an initial `docs/DB.md` with the appropriate template based on detected database type(s).
 
 ### 6. Check database connectivity
 
@@ -675,9 +675,9 @@ curl -s "$ES_URL/orders/_search" -H "Content-Type: application/json" -d '{
 }'
 ```
 
-### 9. Update .claude/DB.md with verified data
+### 9. Update docs/DB.md with verified data
 
-Update the `.claude/DB.md` file with the live data gathered:
+Update the `docs/DB.md` file with the live data gathered:
 
 **Add row/document counts** to table/collection listings:
 

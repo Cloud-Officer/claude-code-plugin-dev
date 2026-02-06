@@ -38,7 +38,7 @@ These skills are automatically available to Claude:
 
 | Skill                 | Description                                             |
 | --------------------- | ------------------------------------------------------- |
-| `analyze-db`          | Generate .claude/DB.md with database schema docs        |
+| `analyze-db`          | Generate docs/DB.md with database schema docs           |
 | `create-issue`        | Create GitHub or Jira issues with proper templates      |
 | `create-pr`           | Generate commit message, PR title, and PR body          |
 | `query-db`            | Query databases using natural language via CLI          |
