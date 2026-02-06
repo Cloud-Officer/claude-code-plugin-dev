@@ -8,5 +8,5 @@
   },
   "repository": "https://github.com/cloud-officer/claude-code-plugin-dev",
   "license": "MIT",
-  "keywords": ["code-review", "pr", "linting", "jira", "github", "readme", "architecture", "documentation", "manual"]
+  "keywords": ["code-review", "pr", "pull-request", "linting", "lint", "jira", "github", "issue", "bug", "ticket", "readme", "architecture", "documentation", "manual", "database", "schema", "query", "sql"]
 }

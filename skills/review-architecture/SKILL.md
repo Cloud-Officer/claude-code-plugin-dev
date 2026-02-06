@@ -1,6 +1,6 @@
 ---
 name: review-architecture
-description: Review, create, or update docs/architecture.md to match organizational standards with accurate technical content
+description: Review, create, update, check, write, document, or audit architecture documentation (docs/architecture.md). Use when the user wants to review the architecture, check architecture docs, write architecture docs, document the architecture, or update architecture documentation to match organizational standards with accurate technical content.
 allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(stat:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, WebSearch
 ---
 

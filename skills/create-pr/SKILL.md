@@ -1,6 +1,6 @@
 ---
 name: create-pr
-description: Generate commit message, PR title, and PR body for a pull request. Use when the user wants to create a PR, generate PR content, prepare a pull request, or fill a PR template from code changes.
+description: Create, open, submit, or prepare a pull request (PR). Generates commit message, PR title, and PR body. Use when the user wants to create a PR, open a PR, submit a PR, make a PR, push a PR, send a PR, generate PR content, prepare a pull request, or fill a PR template from code changes.
 allowed-tools: Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(stat:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Bash(DEFAULT_BRANCH=:*), Read, Glob
 ---
 

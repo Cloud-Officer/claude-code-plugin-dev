@@ -1,6 +1,6 @@
 ---
 name: query-db
-description: Query databases using natural language via CLI commands. Reads schema context from .claude/DB.md. Supports MySQL, PostgreSQL, MongoDB, Elasticsearch, and Redis.
+description: Query the database, run a query, look up data, search the database, or check data. Use when the user wants to query the database, run a SQL query, look up data, find data, search for records, check the database, or ask questions about data. Executes queries via CLI commands using natural language. Reads schema context from docs/DB.md. Supports MySQL, PostgreSQL, MongoDB, Elasticsearch, and Redis.
 allowed-tools: Read, Bash(mysql:*), Bash(psql:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(stat:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*)
 ---
 
@@ -109,11 +109,11 @@ redis-cli -u "$REDIS_URL" COMMAND
 
 ### 1. Check for database context file
 
-Check if `.claude/DB.md` exists in the project root.
+Check if `docs/DB.md` exists in the project root.
 
 **If the file does not exist:**
 
-- Tell the user: "No database context found. Run `/analyze-db` first to generate `.claude/DB.md`."
+- Tell the user: "No database context found. Run `/analyze-db` first to generate `docs/DB.md`."
 - Stop here.
 
 **If the file exists:**
@@ -122,7 +122,7 @@ Check if `.claude/DB.md` exists in the project root.
 
 ### 2. Load database context
 
-Read `.claude/DB.md` to understand:
+Read `docs/DB.md` to understand:
 
 - Which database type(s) and CLI command(s) to use
 - Schema/collection/index structures
@@ -132,7 +132,7 @@ Read `.claude/DB.md` to understand:
 
 ### 3. Verify database connectivity
 
-Look for the "CLI Command" section in `.claude/DB.md`. It specifies the command to use for queries.
+Look for the "CLI Command" section in `docs/DB.md`. It specifies the command to use for queries.
 
 **How to check:
 ** Run a simple connectivity test using the CLI tool. If it fails, ask the user to set the required environment variables.
@@ -151,7 +151,7 @@ Look for the "CLI Command" section in `.claude/DB.md`. It specifies the command 
 
 ### 4. Identify the target database
 
-From `.claude/DB.md`, determine which CLI command to use:
+From `docs/DB.md`, determine which CLI command to use:
 
 | Database      | CLI Command | Query Language                    |
 |---------------|-------------|-----------------------------------|
@@ -284,7 +284,7 @@ Run the appropriate CLI command with the generated query.
 
 - Format the output clearly (tables for SQL, formatted JSON for document stores)
 - Add context to help interpret the numbers
-- Translate enum values to human-readable meanings using `.claude/DB.md`
+- Translate enum values to human-readable meanings using `docs/DB.md`
 - Suggest follow-up queries if relevant
 
 ## Database-Specific Notes
@@ -333,7 +333,7 @@ Run the appropriate CLI command with the generated query.
 
 **User**: "How many orders did we get last month?"
 
-1. Read `.claude/DB.md` → MySQL database, orders table
+1. Read `docs/DB.md` → MySQL database, orders table
 2. Show query to user:
    > "I'll run this query to get last month's orders:"
    >
@@ -349,7 +349,7 @@ Run the appropriate CLI command with the generated query.
 
 **User**: "Show me the top 10 products by sales"
 
-1. Read `.claude/DB.md` → MongoDB, orders collection with embedded items
+1. Read `docs/DB.md` → MongoDB, orders collection with embedded items
 2. Show query to user:
    > "I'll run this aggregation to find top products:"
    >
@@ -367,7 +367,7 @@ Run the appropriate CLI command with the generated query.
 
 **User**: "What are today's active users?"
 
-1. Read `.claude/DB.md` → Redis, HyperLogLog at `stats:dau:{date}`
+1. Read `docs/DB.md` → Redis, HyperLogLog at `stats:dau:{date}`
 2. Show command to user:
    > "I'll check the HyperLogLog counter for today:"
    >
