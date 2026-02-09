@@ -1,7 +1,7 @@
 ---
 name: review-architecture
 description: Review, create, update, check, write, document, or audit architecture documentation (docs/architecture.md). Use when the user wants to review the architecture, check architecture docs, write architecture docs, document the architecture, or update architecture documentation to match organizational standards with accurate technical content.
-allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(stat:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, WebSearch
+allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, WebSearch
 ---
 
 # Review Architecture Documentation
@@ -148,9 +148,8 @@ ls -la docs/ 2>/dev/null || echo "No docs directory found"
 
 ```bash
 # Get last modified date of architecture.md vs source code
-stat -f "%Sm" docs/architecture.md 2>/dev/null || stat -c "%y" docs/architecture.md 2>/dev/null || echo "N/A"
-find src lib app pkg internal cmd . -maxdepth 2 -name "*.py" -o -name "*.js" -o -name "*.ts" -o -name "*.go" -o -name "*.rs" 2>/dev/null |
-  head -20 | xargs -I {} stat -f "%Sm {}" {} 2>/dev/null | sort -r | head -5
+git log -1 --format="%ci" -- docs/architecture.md 2>/dev/null || echo "N/A"
+git log -1 --format="%ci" -- src lib app pkg internal cmd 2>/dev/null | head -5
 ```
 
 Store these values:
