@@ -341,6 +341,8 @@ Look for:
 - Foreign key relationships
 - Unique constraints
 
+**IMPORTANT:** ORM entities/models may not cover all tables. Join tables, framework-generated tables (sessions, migrations, jobs, cache), and raw SQL tables may not have model classes. You MUST also enumerate all tables directly from the schema file (e.g., `db/schema.rb`, `schema.prisma`) or the live database in Step 7, then cross-reference to ensure no table is missing from the documentation.
+
 #### For MongoDB
 
 | Framework | Document Location | Schema Definition |
@@ -471,11 +473,15 @@ redis-cli -u "$REDIS_URL" PING
 
 **After outputting instructions:** Ask the user to confirm when they have set the environment variables. Wait for their confirmation before proceeding to step 7.
 
+**If the user declines or cannot provide database credentials:** Skip steps 7 and 8. Proceed directly to step 9 using only the code-based analysis from steps 3-4. The verification status in docs/DB.md MUST reflect this (see verification timestamp formats below).
+
 ---
 
 ### 7. Connect to database and verify schema
 
 Connect via CLI to gather live data and verify the schema analysis.
+
+**CRITICAL: Enumerate ALL tables/collections/indices first.** Before doing anything else in this step, list every table (or collection/index) in the database. Compare this list against what you documented from code in Steps 3-4. Any table present in the database but missing from your documentation MUST be added. Do NOT skip join tables, migration tracking tables, session tables, queue tables, or any other table — every single table must appear in the final documentation.
 
 **Performance safeguards for large tables:**
 
@@ -487,7 +493,7 @@ Connect via CLI to gather live data and verify the schema analysis.
 
 #### For MySQL
 
-**Get table row counts (uses estimates, instant):**
+**List ALL tables and row counts (uses estimates, instant). Every table returned here MUST appear in docs/DB.md:**
 
 ```bash
 mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --password="$MYSQL_PASS" "$MYSQL_DB" -e "
@@ -512,7 +518,7 @@ SELECT MIN(created_at) as earliest, MAX(created_at) as latest FROM orders;"
 
 #### For PostgreSQL
 
-**Get table row counts (uses estimates, instant):**
+**List ALL tables and row counts (uses estimates, instant). Every table returned here MUST appear in docs/DB.md:**
 
 ```bash
 psql -c "SELECT schemaname, relname, n_live_tup FROM pg_stat_user_tables ORDER BY n_live_tup DESC;"
@@ -532,7 +538,7 @@ psql -c "SELECT MIN(created_at) as earliest, MAX(created_at) as latest FROM orde
 
 #### For MongoDB
 
-**Get collection stats:**
+**List ALL collections and document counts. Every collection returned here MUST appear in docs/DB.md:**
 
 ```bash
 mongosh "$MONGODB_URI" --eval "db.getCollectionNames().forEach(c => print(c + ': ' + db[c].estimatedDocumentCount()))"
@@ -560,7 +566,7 @@ mongosh "$MONGODB_URI" --eval "db.collection.findOne()"
 
 #### For Elasticsearch
 
-**Get index stats:**
+**List ALL indices and document counts. Every index returned here MUST appear in docs/DB.md:**
 
 ```bash
 curl -s "$ES_URL/_cat/indices?v&h=index,docs.count,store.size"
@@ -677,7 +683,9 @@ curl -s "$ES_URL/orders/_search" -H "Content-Type: application/json" -d '{
 
 ### 9. Update docs/DB.md with verified data
 
-Update the `docs/DB.md` file with the live data gathered:
+Update the `docs/DB.md` file with the live data gathered.
+
+**Completeness check:** Before writing, verify that every table/collection/index returned by the database in Step 7 has a row in the "All Tables" (or "All Collections" / "All Indices") section. If any are missing, add them now. There must be a 1:1 correspondence between database objects and documented rows.
 
 **Add row/document counts** to table/collection listings:
 
@@ -704,12 +712,22 @@ Update the `docs/DB.md` file with the live data gathered:
 | ----------------- | --------------------- |
 | orders.created_at | 2019-01-15 to present |
 
-**Add verification timestamp** at the top of the file:
+**Add verification timestamp** at the top of the file using the appropriate format:
+
+If database connection was available (steps 7-8 completed):
 
 ```markdown
 # Database Schema Documentation
 
-> **Last verified**: 2024-01-15 via live database connection
+> **Last verified**: YYYY-MM-DD — verified against live database
+```
+
+If NO database connection was available (steps 7-8 skipped):
+
+```markdown
+# Database Schema Documentation
+
+> **Last verified**: YYYY-MM-DD — derived from code analysis only (not verified against live database)
 ```
 
 ---
@@ -719,7 +737,7 @@ Update the `docs/DB.md` file with the live data gathered:
 ```markdown
 # Database Schema Documentation
 
-> **Last verified**: YYYY-MM-DD via live database connection
+> **Last verified**: YYYY-MM-DD — verified against live database / derived from code analysis only (not verified against live database)
 
 ## Database Type
 
@@ -741,9 +759,11 @@ Brief description of what data this system holds.
 
 ## All Tables
 
+<!-- List EVERY table in the database, no exceptions. -->
+
 | Table | Purpose | Key Fields for Filtering/Grouping |
 |-------|---------|-----------------------------------|
-| ... | ... | ... |
+| (one row per table — list ALL of them) | | |
 
 ## Field Mappings & Enums
 
@@ -784,11 +804,14 @@ If applicable, note tenant isolation:
 
 - Filter by `organization_id` or `tenant_id`
 
-## Tables to Ignore
+## Framework / Infrastructure Tables
 
-- Framework migration tables
-- Session/cache tables
-- Job queue tables
+Tables managed by the framework (not domain models). Still included for completeness:
+
+- Migration tracking: `...`
+- Sessions: `...`
+- Job queues: `...`
+- Cache: `...`
 
 ## Common Query Patterns
 
@@ -810,7 +833,7 @@ GROUP BY DATE(created_at);
 ```markdown
 # Database Schema Documentation
 
-> **Last verified**: YYYY-MM-DD via live database connection
+> **Last verified**: YYYY-MM-DD — verified against live database / derived from code analysis only (not verified against live database)
 
 ## Database Type
 
@@ -831,10 +854,11 @@ Brief description of what data this system holds.
 
 ## All Collections
 
+<!-- List EVERY collection in the database, no exceptions. -->
+
 | Collection | Purpose | Key Fields for Filtering/Grouping |
 |------------|---------|-----------------------------------|
-| orders | Customer orders | status, createdAt, customerId |
-| ... | ... | ... |
+| (one row per collection — list ALL of them) | | |
 
 ## Field Mappings & Enums
 
@@ -885,7 +909,7 @@ db.orders.aggregate([
 ```markdown
 # Database Schema Documentation
 
-> **Last verified**: YYYY-MM-DD via live database connection
+> **Last verified**: YYYY-MM-DD — verified against live database / derived from code analysis only (not verified against live database)
 
 ## Database Type
 
@@ -956,7 +980,7 @@ Brief description of what data is indexed.
 ```markdown
 # Database Schema Documentation
 
-> **Last verified**: YYYY-MM-DD via live database connection
+> **Last verified**: YYYY-MM-DD — verified against live database / derived from code analysis only (not verified against live database)
 
 ## Database Type
 
@@ -1067,3 +1091,4 @@ If the project uses multiple databases, create sections for each:
 - If multiple databases are used, include sections for each
 - Document the CLI command to use for queries
 - Identify the framework used for future reference
+- **Document ALL tables/collections/indices without exception.** Every database object must have a row in the documentation. Do not skip join tables, migration tables, session tables, queue tables, cache tables, or any other table — they all go in the "All Tables" section. Group framework/infrastructure tables in their own section if desired, but they must still be listed.

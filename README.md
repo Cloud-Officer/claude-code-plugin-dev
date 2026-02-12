@@ -36,16 +36,16 @@ This plugin provides development workflow automation for Claude Code, including 
 
 These skills are automatically available to Claude:
 
-| Skill                 | Description                                             |
-| --------------------- | ------------------------------------------------------- |
-| `analyze-db`          | Generate docs/DB.md with database schema docs           |
-| `create-issue`        | Create GitHub or Jira issues with proper templates      |
-| `create-pr`           | Generate commit message, PR title, and PR body          |
-| `query-db`            | Query databases using natural language via CLI          |
-| `review-architecture` | Review or create docs/architecture.md                   |
-| `review-manual`       | Review or create docs/manual.md with user documentation |
-| `review-readme`       | Review or create README.md to match standards           |
-| `run-linters`         | Run linters and fix any issues found                    |
+| Skill                 | Description                                                 |
+| --------------------- |-------------------------------------------------------------|
+| `analyze-db`          | Generate docs/DB.md with database schema docs               |
+| `create-issue`        | Create GitHub or Jira issues with proper templates          |
+| `create-pr`           | Generate commit message, PR title, and PR body              |
+| `query-db`            | Query databases using natural language via CLI              |
+| `review-architecture` | Review or create docs/architecture.md                       |
+| `review-user-guide`   | Review or create docs/user-guide.md with user documentation |
+| `review-readme`       | Review or create README.md to match standards               |
+| `run-linters`         | Run linters and fix any issues found                        |
 
 ### Local Development
 
