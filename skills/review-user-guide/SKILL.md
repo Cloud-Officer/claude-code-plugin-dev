@@ -1,12 +1,12 @@
 ---
-name: review-manual
-description: Review, create, update, check, write, or audit the user manual (docs/manual.md). Use when the user wants to write a manual, write user docs, create user documentation, review the manual, check the manual, update user documentation, or document the product for end users.
+name: review-user-guide
+description: Review, create, update, check, write, or audit the user guide (docs/user-guide.md). Use when the user wants to write a user guide, write user docs, create user documentation, review the user guide, check the user guide, update user documentation, or document the product for end users.
 allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, WebSearch
 ---
 
-# Review User Manual Documentation
+# Review User Guide Documentation
 
-Review the `docs/manual.md` file in a repository and create or update it with comprehensive user documentation. This skill analyzes the codebase to document the product from an end-user perspective, covering UI, features, workflows, and usage instructions. Works for all project types and languages.
+Review the `docs/user-guide.md` file in a repository and create or update it with comprehensive user documentation. This skill analyzes the codebase to document the product from an end-user perspective, covering UI, features, workflows, and usage instructions. Works for all project types and languages.
 
 ## CRITICAL: Mandatory Analysis Tracking
 
@@ -20,7 +20,7 @@ Review the `docs/manual.md` file in a repository and create or update it with co
     - organization: (pending)
     - repository: (pending)
     - description: (pending)
-    - has_manual: (pending)
+    - has_user_guide: (pending)
 
 [ ] Step 2: Product Type Detection
     - product_type: (pending) - web_app/cli_tool/api/library/mobile_app/desktop_app/hybrid
@@ -32,8 +32,11 @@ Review the `docs/manual.md` file in a repository and create or update it with co
     [ ] 3.1 Routes/Pages - routes_found: (pending), count: (pending)
     [ ] 3.2 Models/Data - models_found: (pending), count: (pending)
     [ ] 3.3 Forms - forms_found: (pending), count: (pending)
-    [ ] 3.4 UI Components - components_found: (pending), count: (pending)
-    [ ] 3.5 Navigation - nav_elements: (pending)
+    [ ] 3.4 Help Text/UI Guidance - help_texts_found: (pending), count: (pending)
+    [ ] 3.5 Conditional Field Visibility - conditionals_found: (pending), triggers_mapped: (pending)
+    [ ] 3.6 Form Section Structure - sections_found: (pending), count: (pending)
+    [ ] 3.7 UI Components - components_found: (pending), count: (pending)
+    [ ] 3.8 Navigation - nav_elements: (pending)
 
     For CLI Tools:
     [ ] 4.1 Commands - commands_found: (pending), count: (pending)
@@ -55,7 +58,7 @@ Review the `docs/manual.md` file in a repository and create or update it with co
     [ ] 7.1 Screens - screens_found: (pending), count: (pending)
     [ ] 7.2 Navigation - nav_structure: (pending)
 
-[ ] Step 8: Document Structure Validation (if manual.md exists)
+[ ] Step 8: Document Structure Validation (if user-guide.md exists)
     - h1_title_correct: (pending)
     - required_sections_present: (pending)
     - toc_links_valid: (pending)
@@ -73,7 +76,7 @@ Review the `docs/manual.md` file in a repository and create or update it with co
 
 **EVIDENCE REQUIREMENT:** For every check, you MUST record:
 
-1. **What the manual claims** - the exact feature, command, or workflow described
+1. **What the user guide claims** - the exact feature, command, or workflow described
 2. **What the code shows** - the actual evidence (routes, controllers, CLI definitions, API endpoints)
 3. **Comparison result** - MATCH, MISMATCH, or MISSING with specific details
 
@@ -81,12 +84,12 @@ A bare "PASS" without evidence is not acceptable. If you cannot provide evidence
 
 **DO NOT SKIP STEPS.** Even if an earlier check seems to suggest no issues, you MUST complete ALL steps. Issues are often only revealed when cross-referencing multiple sources.
 
-## Manual Document Structure
+## User Guide Document Structure
 
-The manual must have the following H1 title and H2 sections:
+The user guide must have the following H1 title and H2 sections:
 
 ```text
-# User Manual
+# User Guide
 
 ## Table of Contents
 ## Getting Started
@@ -104,7 +107,7 @@ The manual must have the following H1 title and H2 sections:
 ```text
 ## Navigation
 ## Pages
-## Forms & Input
+## Step-by-Step Guides
 ## Workflows
 ```
 
@@ -160,8 +163,8 @@ gh repo view --json owner,name,description
 ```
 
 ```bash
-# Check if docs/manual.md exists
-ls -la docs/manual.md 2>/dev/null || echo "No docs/manual.md found"
+# Check if docs/user-guide.md exists
+ls -la docs/user-guide.md 2>/dev/null || echo "No docs/user-guide.md found"
 ```
 
 ```bash
@@ -174,7 +177,7 @@ Store these values:
 - `organization`: The owner/organization name
 - `repository`: The repository name
 - `description`: Repository description
-- `has_manual`: true/false
+- `has_user_guide`: true/false
 
 ## Step 2: Detect Product Type
 
@@ -354,7 +357,112 @@ grep -rl "<form\|<Form\|useForm\|formik\|react-hook-form" --include="*.tsx" --in
   grep -v node_modules | head -20
 ```
 
-### 3.4 Extract UI Components
+### 3.4 Discover Help Text and UI Guidance
+
+Extract help text, tooltips, placeholders, and section descriptions that guide users when filling forms. This content should be reused in the user guide.
+
+**Rails:**
+
+```bash
+# Find help_text parameters in form views
+grep -rn "help_text:" app/views/ app/helpers/ 2>/dev/null | head -30
+# Find form section descriptions and list_items
+grep -rn "form_section\|description:\|list_items:" app/views/ app/helpers/ 2>/dev/null | head -30
+# Find placeholder text
+grep -rn "placeholder:" app/views/ 2>/dev/null | head -20
+```
+
+**Django:**
+
+```bash
+# Find help_text in forms and models
+grep -rn "help_text=" --include="*.py" . 2>/dev/null | grep -v venv | grep -v migrations | head -30
+# Find widget placeholders
+grep -rn "placeholder" --include="*.py" --include="*.html" . 2>/dev/null | grep -v venv | head -20
+```
+
+**React/Vue/Angular:**
+
+```bash
+# Find help/guidance props in components
+grep -rn "helperText\|tooltip\|placeholder\|description\|hint\|aria-describedby" --include="*.tsx" --include="*.jsx" --include="*.vue" . 2>/dev/null |
+  grep -v node_modules | head -30
+```
+
+**Generic (any framework):**
+
+```bash
+# Find common help text patterns in templates
+grep -rn "help-text\|hint\|tooltip\|aria-describedby\|\.help\b\|\.hint\b" --include="*.html" --include="*.erb" --include="*.hbs" --include="*.pug" . 2>/dev/null | head -20
+```
+
+### 3.5 Discover Conditional Field Visibility
+
+Find fields that show or hide based on user selections. This is critical for guiding users through forms.
+
+**Rails (inline JS / Stimulus):**
+
+```bash
+# Find CSS wrapper classes used for toggling visibility (e.g., hide-*, show-*)
+grep -rn "wrapper_class.*hide-\|wrapper_class.*show-" app/views/ 2>/dev/null | head -20
+# Find JavaScript toggle functions in form views
+grep -rn "style.display\|\.hidden\|\.visible\|toggle\|addEventListener.*change" app/views/ app/javascript/ 2>/dev/null | head -30
+# Find Stimulus show/hide actions
+grep -rn "data-action.*show\|data-action.*hide\|data-action.*toggle\|data-.*target" app/views/ 2>/dev/null | head -20
+```
+
+**React/Vue/Angular:**
+
+```bash
+# Find conditional rendering patterns
+grep -rn "v-if=\|v-show=\|x-show=\|x-if=\|{.*&&.*<\|? <\|condition\|isVisible\|showField\|hidden={" --include="*.tsx" --include="*.jsx" --include="*.vue" . 2>/dev/null |
+  grep -v node_modules | head -30
+```
+
+**Django / Generic JS:**
+
+```bash
+# Find JavaScript show/hide in templates
+grep -rn "\.show()\|\.hide()\|\.toggle()\|display.*none\|display.*block\|classList.*hidden" --include="*.html" --include="*.js" . 2>/dev/null |
+  grep -v node_modules | grep -v venv | head -30
+```
+
+**Map the dependency chain:** For each conditional field found, record:
+
+1. **Trigger field** — which field the user interacts with (e.g., a checkbox or dropdown)
+2. **Trigger condition** — what value or state triggers the change (e.g., "checked", "value is High")
+3. **Affected fields** — which fields appear or disappear
+4. **Visibility logic** — show when condition is true, or hide when condition is true (inverse logic)
+
+### 3.6 Discover Form Section Structure
+
+Find how forms group fields into logical sections with headers and descriptions.
+
+**Rails:**
+
+```bash
+# Find form_section helpers or fieldset groupings
+grep -rn "form_section\|<fieldset\|<legend" app/views/ 2>/dev/null | head -20
+# Extract section titles and descriptions
+grep -A3 "form_section" app/views/ 2>/dev/null | head -40
+```
+
+**React/Vue:**
+
+```bash
+# Find section/fieldset components
+grep -rn "<fieldset\|<FormSection\|<FormGroup\|<Section\|<AccordionItem" --include="*.tsx" --include="*.jsx" --include="*.vue" . 2>/dev/null |
+  grep -v node_modules | head -20
+```
+
+**Django:**
+
+```bash
+# Find fieldset definitions in admin or forms
+grep -rn "fieldsets\|<fieldset\|<legend" --include="*.py" --include="*.html" . 2>/dev/null | grep -v venv | head -20
+```
+
+### 3.7 Extract UI Components
 
 ```bash
 # Find component files
@@ -362,7 +470,7 @@ find . -name "*.tsx" -o -name "*.jsx" -o -name "*.vue" -o -name "*.svelte" 2>/de
   grep -iE "component|page|view|screen" | head -30
 ```
 
-### 3.5 Discover Navigation
+### 3.8 Discover Navigation
 
 ```bash
 # Find navigation components
@@ -550,23 +658,25 @@ grep -rn "Navigator\|createNavigator\|navigation\|router" --include="*.dart" --i
   grep -v node_modules | head -30
 ```
 
-## Step 8: Validate Existing Manual Document
+## Step 8: Validate Existing User Guide Document
 
-If `docs/manual.md` exists, validate its structure.
+If `docs/user-guide.md` exists, validate its structure.
 
 ### Check H1 Title
 
 ```bash
-head -5 docs/manual.md
-grep "^# " docs/manual.md | head -1
+head -5 docs/user-guide.md
+grep "^# " docs/user-guide.md | head -1
 ```
 
-**Expected:** `# User Manual`
+**Expected:** `# User Guide`
+
+Note: If the file was previously named `docs/manual.md`, rename it to `docs/user-guide.md`.
 
 ### Check Required H2 Sections
 
 ```bash
-grep "^## " docs/manual.md
+grep "^## " docs/user-guide.md
 ```
 
 **Must include (in order):**
@@ -585,9 +695,9 @@ grep "^## " docs/manual.md
 
 **You MUST create a two-column comparison table:**
 
-| Documented Feature    | Code Evidence                               |
-| --------------------- | ------------------------------------------- |
-| {feature from manual} | {file:function where it exists, or MISSING} |
+| Documented Feature        | Code Evidence                               |
+|---------------------------|---------------------------------------------|
+| {feature from user guide} | {file:function where it exists, or MISSING} |
 
 For EACH documented feature/page/command:
 
@@ -597,8 +707,14 @@ For EACH documented feature/page/command:
 
 For EACH feature found in code (from Steps 3-7):
 
-1. Check if it is documented in the manual
+1. Check if it is documented in the user guide
 2. Record undocumented features with their code location
+
+For web applications, ALSO verify:
+
+1. **Step-by-step guide format** - Forms are documented as guided walkthroughs, not field tables
+2. **Help text accuracy** - UI help text in the user guide matches the actual help_text in form views
+3. **Conditional visibility** - All fields with conditional show/hide behavior are documented with their trigger conditions
 
 ## Step 9: Generate Comprehensive Report
 
@@ -616,7 +732,7 @@ Before generating the report, you MUST:
 ### Report Format
 
 ```text
-## User Manual Review Report
+## User Guide Review Report
 
 ### Analysis Checkpoint Log
 
@@ -629,7 +745,7 @@ Before generating the report, you MUST:
 - **Document Status:** {exists/missing}
 
 ### Structure Checks
-- [ ] H1 title "# User Manual": {PASS/FAIL}
+- [ ] H1 title "# User Guide": {PASS/FAIL}
 - [ ] Required H2 sections present: {PASS/FAIL}
 - [ ] Table of Contents links valid: {PASS/FAIL}
 
@@ -638,22 +754,30 @@ Before generating the report, you MUST:
 - [ ] All features documented: {PASS/FAIL}
 - [ ] {Project-specific checks}
 
+### Guide Style Checks (Web Applications)
+- [ ] Forms documented as guided walkthroughs (not field tables): {PASS/FAIL}
+- [ ] UI help text incorporated from form views: {PASS/FAIL}
+- [ ] Conditional field visibility documented: {PASS/FAIL}
+- [ ] Form section structure matches UI layout: {PASS/FAIL}
+
 ### Coverage Analysis
 - **Documented features:** {n}
 - **Features in code:** {n}
 - **Undocumented features:** {list}
 - **Documented but removed:** {list}
+- **Conditional fields documented:** {n} of {total}
+- **Help texts incorporated:** {n} of {total}
 
 ### Proposed Changes
 {Show exact changes needed}
 ```
 
-## Step 10: Create or Update Manual Document
+## Step 10: Create or Update User Guide Document
 
 ### Web Application Template
 
 ```markdown
-# User Manual
+# User Guide
 
 ## Table of Contents
 
@@ -661,7 +785,7 @@ Before generating the report, you MUST:
 - [Features](#features)
 - [Navigation](#navigation)
 - [Pages](#pages)
-- [Forms & Input](#forms--input)
+- [Step-by-Step Guides](#step-by-step-guides)
 - [Workflows](#workflows)
 - [Configuration](#configuration)
 - [Troubleshooting](#troubleshooting)
@@ -724,44 +848,66 @@ Before generating the report, you MUST:
 
 **Purpose:** {Inferred from controller/view}
 
-**Screenshot:** {placeholder or existing}
+{Describe what the user sees when they first land on this page — the main content area, key data displayed, and the overall layout.}
 
-#### Page Elements
+#### What You Can Do Here
 
-| Element | Type | Description |
-|---------|------|-------------|
+{For each action, describe it from the user's perspective:}
 
-{For each UI element:} | {name} | {button/input/table/etc} | {description} |
+- **{Action}** — {Description of what happens when the user performs this action, where it leads, and any prerequisites}
 
-#### Actions Available
+{If the page has a status workflow or lifecycle, describe it narratively:}
 
-- {Action 1}: {description}
-- {Action 2}: {description}
+#### {Entity} Status Workflow
 
-## Forms & Input
+{Entity names} progress through the following statuses:
+
+1. **{Status}** — {What this status means and who can set it}
+2. **{Status}** — {Description}
+
+## Step-by-Step Guides
+
+{IMPORTANT: Write this section as a guided walkthrough, NOT as field tables. Use the help text discovered from the UI code (Step 3.4) and the conditional visibility logic (Step 3.5) to write instructions that feel like a knowledgeable colleague walking the user through each form.}
 
 {For each discovered form:}
 
-### {Form Name}
+### {Action Verb + Entity} (e.g., "Creating a New Service", "Filing an Incident Report")
 
-**Location:** {page where form appears}
+Navigate to **{page name}** in the sidebar and click **{action button label}**.
 
-**Purpose:** {inferred from model/controller}
+{For each form section discovered via form_section, fieldset, or logical grouping:}
 
-#### Fields
+#### {Section Title}
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
+{Include the section description/guidance text from the UI code. If the UI has list_items explaining enum options, reproduce them here as a bulleted guide.}
 
-{For each field from model/form:} | {name} | {type} | {yes/no} | {description} |
+{For each field in the section, use numbered steps:}
 
-#### Validation Rules
+1. **{Field Label}** — {Use the actual help_text from the UI code if available. Otherwise write a clear plain-language explanation of what to enter and why. For checkboxes, explain what checking it means.}
+   {If the field is a select/dropdown with enum values, explain the options:}
+   - **{Option 1}:** {Description — use list_items text from UI if available}
+   - **{Option 2}:** {Description}
 
-{Based on model validations}
+{When a field triggers conditional visibility, document it inline:}
 
-#### Submission
+2. **{Trigger Field Label}** — {Help text / explanation of the field.}
 
-{What happens on submit}
+   > When you {check this box / select "Value"}, the following fields appear:
+
+   - **{Conditional Field 1}** — {Help text / explanation}
+   - **{Conditional Field 2}** — {Help text / explanation}
+
+{When a field triggers inverse visibility (hides other fields):}
+
+3. **{Trigger Field Label}** — {Help text / explanation.}
+
+   > When you {check this box / select "Value"}, the {section name} fields below are no longer needed and will be hidden.
+
+{End of form sections}
+
+#### Saving and Next Steps
+
+{What happens when the user clicks Save — where they are redirected, what status the record starts in, and what they should do next.}
 
 ## Workflows
 
@@ -850,7 +996,7 @@ A: {Answer}
 ### CLI Tool Template
 
 ```markdown
-# User Manual
+# User Guide
 
 ## Table of Contents
 
@@ -1005,7 +1151,7 @@ A: {Answer with example}
 ### API Template
 
 ```markdown
-# User Manual
+# User Guide
 
 ## Table of Contents
 
@@ -1154,7 +1300,7 @@ A: {answer with example}
 ### Library Template
 
 ```markdown
-# User Manual
+# User Guide
 
 ## Table of Contents
 
@@ -1251,7 +1397,7 @@ A: {Answer}
 
 ## Step 11: Run Linters
 
-After making changes to docs/manual.md, run the linters skill:
+After making changes to docs/user-guide.md, run the linters skill:
 
 ```text
 /co-dev:run-linters
@@ -1263,7 +1409,7 @@ Fix any linting errors before considering the task complete.
 
 Before completing, verify:
 
-- [ ] H1 title is exactly `# User Manual`
+- [ ] H1 title is exactly `# User Guide`
 - [ ] All required H2 sections present
 - [ ] Table of Contents links work
 - [ ] Getting Started actually gets users started
@@ -1272,6 +1418,9 @@ Before completing, verify:
 - [ ] Examples are tested and working
 - [ ] Configuration options match code
 - [ ] Error messages and troubleshooting are accurate
+- [ ] Step-by-step guides use walkthrough style (not field tables)
+- [ ] Help text from the UI code is incorporated into the guides
+- [ ] Conditional field visibility is documented (which fields appear/disappear and when)
 
 ## Important Rules
 
@@ -1288,3 +1437,6 @@ Before completing, verify:
 11. **Complete ALL steps** - Never skip analysis steps. Each step may reveal features not visible in other steps
 12. **Output checkpoint log** - Include the completed checkpoint log in your final report to prove all steps were executed
 13. **Never validate against world knowledge alone** - Do NOT use your training data to fact-check version numbers, release dates, or external claims. If uncertain about something, use web search to verify before flagging. Only validate things that can be cross-referenced against actual files in the repository or verified online.
+14. **Write guided walkthroughs, not field tables** - For web application forms, NEVER output field tables (Field | Type | Required | Description). Instead, write numbered step-by-step instructions that walk the user through each form section, using the actual help text from the UI code. The tone should feel like a knowledgeable colleague guiding them through the screen.
+15. **Document conditional field visibility** - When a checkbox, dropdown, or other field controls the visibility of other fields, explicitly document this behavior using callout blocks (e.g., "When you check this box, the following fields appear:"). Users need to know that form sections will change based on their selections.
+16. **Reuse UI help text** - Extract and incorporate the actual help text, section descriptions, and list_items from the application's form views. This ensures the user guide matches what users see on screen.
