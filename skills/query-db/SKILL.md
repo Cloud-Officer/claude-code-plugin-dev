@@ -317,11 +317,12 @@ Only export when the user explicitly asks for CSV, file export, or chart data.
 **CSV Export:**
 
 | Database | Command |
-|----------|---------|
+| --- | --- |
 | MySQL | Add `-B` (batch/tab-separated) and pipe through `tr '\t' ','` for CSV |
 | PostgreSQL | Add `-A -F ','` for CSV output |
 
 Example (MySQL):
+
 ```bash
 mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --password="$MYSQL_PASS" "$MYSQL_DB" -B -e "QUERY" | tr '\t' ','
 ```
@@ -329,6 +330,7 @@ mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --password="$MYSQL_PASS
 **Chart-ready JSON:**
 
 When the user wants chart data, structure the output as:
+
 ```json
 {
   "title": "Description of the data",
@@ -396,7 +398,7 @@ Before executing any query, scan for write/mutate keywords. Match these as **SQL
 Read table/collection row counts from the "Large Table Warnings" or "All Tables" section in `docs/DB.md`. Apply these rules:
 
 | Table Size | Action |
-|-----------|--------|
+| --- | --- |
 | < 1M rows | LIMIT optional (add if no aggregation) |
 | 1M–10M rows | Inject `LIMIT 1000`; warn user about table size |
 | > 10M rows | Inject `LIMIT 100`; require date range filter if table has a date field |
@@ -409,7 +411,7 @@ Read table/collection row counts from the "Large Table Warnings" or "All Tables"
 Prepend or append timeout settings to prevent runaway queries:
 
 | Database | Timeout Setting |
-|----------|----------------|
+| --- | --- |
 | MySQL | Prepend `SET SESSION MAX_EXECUTION_TIME=30000;` before the query |
 | PostgreSQL | Prepend `SET statement_timeout = '30s';` before the query |
 | MongoDB | Append `.maxTimeMS(30000)` to `find()` or `aggregate()` calls |
