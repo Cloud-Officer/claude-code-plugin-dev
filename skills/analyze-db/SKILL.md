@@ -381,6 +381,7 @@ Find across all frameworks:
 - Comments and docstrings explaining field meanings
 - Soft delete patterns (`deleted_at`, `is_deleted`)
 - Multi-tenancy patterns (`tenant_id`, `organization_id`)
+- **BI dashboards, report generators, and analytics endpoints** — capture common business questions (e.g., "how many buyers this month?", "revenue by country?") and record which tables, joins, and filters are used. These become the "Common Business Questions" section in the output.
 
 ### 5. Generate docs/DB.md (Initial Draft)
 
@@ -687,6 +688,10 @@ Update the `docs/DB.md` file with the live data gathered.
 
 **Completeness check:** Before writing, verify that every table/collection/index returned by the database in Step 7 has a row in the "All Tables" (or "All Collections" / "All Indices") section. If any are missing, add them now. There must be a 1:1 correspondence between database objects and documented rows.
 
+**Large Table Warnings:** For tables with >1M rows, add a row to the "Large Table Warnings" section. For tables with >10M rows, mark them as "VERY LARGE — always filter by date/indexed column" and list the specific indexed columns to filter on.
+
+**Common Business Questions:** Scan the codebase for BI dashboards, report generators, analytics endpoints, and recurring query patterns. Document these as common business questions with the correct tables, joins, and filters. This helps future query-db users avoid common mistakes.
+
 **Add row/document counts** to table/collection listings:
 
 | Table  | Purpose         | Rows  | Key Fields         |
@@ -813,6 +818,34 @@ Tables managed by the framework (not domain models). Still included for complete
 - Job queues: `...`
 - Cache: `...`
 
+## Large Table Warnings
+
+<!-- For tables >1M rows, add a warning row. For >10M rows, mark "VERY LARGE — always filter by date/indexed column". -->
+
+| Table | Rows | Required Safeguards |
+|-------|------|---------------------|
+| (list tables with >1M rows — add specific safeguards for each) | | |
+
+## Query Anti-Patterns
+
+Common mistakes that cause slow or incorrect queries:
+
+| # | Anti-Pattern | Why It's Bad | Do Instead |
+|---|-------------|--------------|------------|
+| 1 | `SELECT * FROM large_table` without WHERE | Full table scan on millions of rows | Always filter by indexed column or date range |
+| 2 | `COUNT(*)` on large tables without date filter | Scans entire table; can take minutes | Add `WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)` |
+| 3 | Unfiltered JOIN between two large tables | Creates cartesian-like explosion | Add date range filters on both sides of the JOIN |
+| 4 | `GROUP BY` on non-indexed columns of large tables | Full scan + temp table sort | Use indexed columns or filter to reduce dataset first |
+| 5 | Using application tables instead of BI/analytics tables | Soft deletes cause undercounting; slower queries | Check if a denormalized analytics table exists |
+
+## Common Business Questions
+
+<!-- Capture common BI/analytics questions and the correct way to answer them. Look for report generators, dashboard endpoints, and analytics code in the codebase. -->
+
+| # | Question | Tables Involved | Key Filters |
+|---|----------|----------------|-------------|
+| (document common questions found in analytics code, dashboards, or report generators) | | | |
+
 ## Common Query Patterns
 
 ### Daily Order Summary
@@ -888,6 +921,14 @@ Brief description of what data this system holds.
 
 List important indexes for query optimization.
 
+## Query Anti-Patterns
+
+| # | Anti-Pattern | Why It's Bad | Do Instead |
+|---|-------------|--------------|------------|
+| 1 | `db.collection.find({})` without limit | Returns all documents; can exhaust memory | Always add `.limit()` or use `$match` in aggregation |
+| 2 | `$lookup` between two large collections | Effectively an unindexed nested loop join | Filter both collections first with `$match`, ensure foreign field is indexed |
+| 3 | Large `allowDiskUse` aggregations without `$match` | Scans entire collection to disk | Add `$match` as first pipeline stage |
+
 ## Common Aggregation Patterns
 
 ### Daily Revenue
@@ -953,6 +994,14 @@ Brief description of what data is indexed.
 | Index | Nested Field | Structure |
 |-------|--------------|-----------|
 | orders | items | Array of order line items |
+
+## Query Anti-Patterns
+
+| # | Anti-Pattern | Why It's Bad | Do Instead |
+|---|-------------|--------------|------------|
+| 1 | Large `size` value (>10000) | Heap pressure, slow response | Use `scroll` or `search_after` for pagination |
+| 2 | Deep pagination with `from` + `size` | ES limits `from + size` to 10000 by default | Use `search_after` for deep pagination |
+| 3 | `match_all` without `size: 0` on large indices | Returns all documents | Use `size: 0` for aggregation-only queries |
 
 ## Common Query Patterns
 
@@ -1030,6 +1079,13 @@ Brief description of what data is stored.
 |---------|-----|-------|
 | `cache:*` | 3600 | 1 hour cache |
 | `session:*` | 86400 | 24 hour sessions |
+
+## Query Anti-Patterns
+
+| # | Anti-Pattern | Why It's Bad | Do Instead |
+|---|-------------|--------------|------------|
+| 1 | `KEYS *` in production | Blocks Redis (single-threaded) for seconds on large databases | Use `SCAN 0 MATCH pattern COUNT 100` for iteration |
+| 2 | `FLUSHDB` / `FLUSHALL` without confirmation | Deletes all data instantly | Use targeted `DEL` or `UNLINK` for specific keys |
 
 ## Common Query Patterns
 
