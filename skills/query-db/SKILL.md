@@ -161,6 +161,21 @@ From `docs/DB.md`, determine which CLI command to use:
 | Elasticsearch | `curl`      | Elasticsearch DSL (JSON)          |
 | Redis         | `redis-cli` | Redis commands                    |
 
+### 4b. Prefer MySQL MCP over CLI (when available)
+
+If the target database is **MySQL**, check whether a MySQL MCP tool is available (e.g., `mcp__mysql-bi__mysql_query` or similar `mcp__*__mysql_query` tool).
+
+**If a MySQL MCP tool is available — use it instead of the CLI.** Benefits:
+
+- **Write operations blocked at server level** — no need to scan for write keywords
+- **Built-in query timeout** (typically 30s) — no need to prepend `SET SESSION MAX_EXECUTION_TIME`
+- **Connection pooling and rate limiting** — safer for production databases
+- **Structured output** — cleaner results without CLI formatting quirks
+
+Generate a plain SQL query (no CLI wrapper needed) and execute it via the MCP tool. The Safety Guardrails (Automatic LIMIT Injection, showing the query first) still apply.
+
+**If no MySQL MCP tool is available — fall back to the CLI** approach described in Step 6.
+
 ### 5. Understand the question
 
 Parse what the user is asking for:
@@ -252,7 +267,9 @@ redis-cli -u "$REDIS_URL" MGET cache:product:1 cache:product:2 cache:product:3
 
 ### 7. Show the query to the user
 
-**Always display the query before executing it.** This reassures the user and allows them to:
+**NEVER execute a query without showing it to the user first.** This is mandatory, not optional.
+
+Display the query and allow the user to:
 
 - Verify the query logic is correct
 - Catch potential issues before execution
@@ -260,13 +277,18 @@ redis-cli -u "$REDIS_URL" MGET cache:product:1 cache:product:2 cache:product:3
 
 Format: Show the query in a code block with the appropriate language tag (sql, javascript, json, or redis).
 
+**For large tables (>1M rows):** Add an estimated impact note below the query, e.g., "Note: `order` table has ~5.5M rows. This query filters by `created_at` date range and uses LIMIT 1000."
+
 Example output:
 
 > "I'll run this query to get last month's order count:"
 >
 > ```sql
+> SET SESSION MAX_EXECUTION_TIME=30000;
 > SELECT COUNT(*) as total_orders FROM orders WHERE created_at >= '2024-01-01';
 > ```
+>
+> *Note: `orders` table has ~5.5M rows. Query is filtered by date range.*
 
 ### 8. Execute via CLI
 
@@ -284,8 +306,40 @@ Run the appropriate CLI command with the generated query.
 
 - Format the output clearly (tables for SQL, formatted JSON for document stores)
 - Add context to help interpret the numbers
-- Translate enum values to human-readable meanings using `docs/DB.md`
+- **Translate enum values**: Look up the "Field Mappings & Enums" section in `docs/DB.md` to convert raw values to human-readable meanings. This is especially important for numeric enums (e.g., `order.state`: `0` = `NEW`, `1` = `COMPLETED`). Never show raw numeric enum values without translation.
+- **Use business definitions**: Check the "Business Definitions" section in `docs/DB.md` for terms like "Buyer", "CHP User", "Revenue" to ensure correct interpretation
 - Suggest follow-up queries if relevant
+
+### 10. Export results (when requested)
+
+Only export when the user explicitly asks for CSV, file export, or chart data.
+
+**CSV Export:**
+
+| Database | Command |
+| --- | --- |
+| MySQL | Add `-B` (batch/tab-separated) and pipe through `tr '\t' ','` for CSV |
+| PostgreSQL | Add `-A -F ','` for CSV output |
+
+Example (MySQL):
+
+```bash
+mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --password="$MYSQL_PASS" "$MYSQL_DB" -B -e "QUERY" | tr '\t' ','
+```
+
+**Chart-ready JSON:**
+
+When the user wants chart data, structure the output as:
+
+```json
+{
+  "title": "Description of the data",
+  "labels": ["Label1", "Label2", "..."],
+  "datasets": [
+    { "name": "Series Name", "values": [1, 2, 3] }
+  ]
+}
+```
 
 ## Database-Specific Notes
 
@@ -320,6 +374,51 @@ Run the appropriate CLI command with the generated query.
 - No joins; data must be denormalized or fetched in multiple calls
 - Use SCAN instead of KEYS in production
 - Sorted sets are great for time-series / leaderboards
+
+## Safety Guardrails
+
+### Write Operation Blocking
+
+Before executing any query, scan for write/mutate keywords. Match these as **SQL statements**, not as column names (e.g., `delete_log` or `update_count` are fine as column names).
+
+**SQL (MySQL/PostgreSQL):** `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`, `CREATE`, `REPLACE`
+**MongoDB:** `insertOne`, `insertMany`, `updateOne`, `updateMany`, `deleteOne`, `deleteMany`, `drop`, `replaceOne`
+**Elasticsearch:** `_delete_by_query`, `_update_by_query`, `PUT` (index creation/mapping)
+**Redis:** `DEL`, `FLUSHDB`, `FLUSHALL`, `SET`, `HSET`, `LPUSH`, `SADD`, `ZADD`
+
+**If a write operation is detected:**
+
+1. **Stop** — do not execute the query
+2. **Show** the query to the user
+3. **Explain** the impact (what will be modified, how many rows/documents affected)
+4. **Ask** for explicit confirmation before proceeding
+
+### Automatic LIMIT Injection
+
+Read table/collection row counts from the "Large Table Warnings" or "All Tables" section in `docs/DB.md`. Apply these rules:
+
+| Table Size | Action |
+| --- | --- |
+| < 1M rows | LIMIT optional (add if no aggregation) |
+| 1M–10M rows | Inject `LIMIT 1000`; warn user about table size |
+| > 10M rows | Inject `LIMIT 100`; require date range filter if table has a date field |
+| > 50M rows | **Refuse** query without date range filter; explain why |
+
+**Exception:** Do NOT inject LIMIT on aggregation queries (`COUNT`, `SUM`, `AVG`, `GROUP BY`, MongoDB `$group`, ES `aggs`). Instead, add date-range filters to narrow the source data.
+
+### Query Timeout
+
+Prepend or append timeout settings to prevent runaway queries:
+
+| Database | Timeout Setting |
+| --- | --- |
+| MySQL | Prepend `SET SESSION MAX_EXECUTION_TIME=30000;` before the query |
+| PostgreSQL | Prepend `SET statement_timeout = '30s';` before the query |
+| MongoDB | Append `.maxTimeMS(30000)` to `find()` or `aggregate()` calls |
+| Elasticsearch | Add `"timeout": "30s"` to the query body |
+| Redis | No server-side query timeout; commands are single-threaded and fast. Use `--pipe-timeout` on `redis-cli` for network timeouts |
+
+**If a timeout occurs:** Inform the user the query timed out, suggest narrower date range filters or additional WHERE conditions, and offer to retry with a more restrictive query.
 
 ## Rules
 
