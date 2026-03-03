@@ -14,7 +14,17 @@ Claude Code plugin for development workflow automation.
 
 ## Introduction
 
-This plugin provides development workflow automation for Claude Code, including issue tracking integration (GitHub Issues and Jira), automated code reviews, PR generation, and linting.
+This plugin provides development workflow automation for Claude Code.
+
+### Features
+
+* Issue tracking integration (GitHub Issues and Jira)
+* Automated deep code reviews using parallel agents
+* PR generation with commit messages
+* Linting and code quality checks
+* Database schema documentation and natural language querying
+* Project documentation review (README, architecture, user guide)
+* Sprint work summaries grouped by repository
 
 ## Installation
 
@@ -46,6 +56,7 @@ These skills are automatically available to Claude:
 | `review-user-guide`   | Review or create docs/user-guide.md with user documentation |
 | `review-readme`       | Review or create README.md to match standards               |
 | `run-linters`         | Run linters and fix any issues found                        |
+| `sprint-summary`      | Summarize sprint items grouped by repo in ~3-day blocks     |
 
 ### Local Development
 
