@@ -37,7 +37,8 @@ Review the main README.md file in a repository and create or update it to match 
 
 [ ] Step 3: Structure Validation
     - h1_title_format: (pending) - expected vs actual
-    - required_h2_sections: (pending) - list found vs expected
+    - required_h2_sections: (pending) - list found vs expected (ONLY 5 allowed)
+    - extra_h2_sections: (pending) - list any H2 not in required set (must be demoted to H3)
     - section_order: (pending) - correct/incorrect
 
 [ ] Step 4: Introduction Section
@@ -92,7 +93,7 @@ A bare "PASS" without evidence is not acceptable. If you cannot provide evidence
 
 ## Required README Structure
 
-The README.md must have the following H2 sections in this exact order (additional H2/H3+ sections may follow):
+The README.md must have **exactly** these H2 sections in this exact order — no more, no fewer:
 
 ```text
 ## Table of Contents
@@ -101,6 +102,8 @@ The README.md must have the following H2 sections in this exact order (additiona
 ## Usage
 ## Contributing
 ```
+
+**STRICT RULE — No Additional H2 Sections:** These 5 sections are the ONLY allowed H2-level headings. All other content MUST be placed as H3+ subsections under the most relevant existing H2 section. In most cases, additional content belongs under `## Usage` (e.g., Configuration, API Reference, Examples, Environment Variables, Deployment, Docker, CI/CD, Testing, Troubleshooting). When reviewing or creating a README, if you encounter H2 sections that are not in the list above (e.g., `## Configuration`, `## API`, `## Deployment`, `## Testing`), they must be converted to H3 subsections under the appropriate parent H2 — typically `## Usage`.
 
 ## Step 1: Gather Repository Information
 
@@ -258,7 +261,7 @@ Verify the README contains these H2 sections in order:
 grep "^## " README.md
 ```
 
-**Expected output must start with:**
+**Expected output must be exactly:**
 
 ```text
 ## Table of Contents
@@ -268,7 +271,7 @@ grep "^## " README.md
 ## Contributing
 ```
 
-Additional H2 sections may appear after `## Contributing`.
+**No other H2 sections are allowed.** If additional H2 headings exist (e.g., `## Configuration`, `## API`, `## Deployment`, `## Testing`, `## Docker`, `## Troubleshooting`), flag them as issues and convert them to H3 subsections under the appropriate required H2 — typically `## Usage`.
 
 ## Step 4: Verify and Update Introduction Section
 
@@ -673,7 +676,8 @@ After analysis, provide a comprehensive report:
 
 ### Structure Checks
 - [ ] H1 title format: {PASS/FAIL}
-- [ ] Required H2 sections: {PASS/FAIL}
+- [ ] Required H2 sections present: {PASS/FAIL}
+- [ ] No extra H2 sections: {PASS/FAIL} - {list any extra H2 that need demotion to H3}
 - [ ] Section order: {PASS/FAIL}
 
 ### Content Accuracy Checks
@@ -702,7 +706,7 @@ After analysis, provide a comprehensive report:
 Before completing, verify:
 
 - [ ] H1 title matches expected format (with or without build badge)
-- [ ] All required H2 sections present in correct order
+- [ ] Exactly 5 H2 sections present in correct order (no extra H2 sections)
 - [ ] Introduction accurately describes the project
 - [ ] Installation instructions match actual project setup
 - [ ] Usage examples reflect real commands/APIs
@@ -724,7 +728,7 @@ Fix any linting errors before considering the task complete.
 1. **Never fabricate information** - Only document what actually exists in the code
 2. **Verify before documenting** - Check that commands/APIs exist before adding them
 3. **Never remove existing content** - Only add missing sections or fix inaccuracies
-4. **Preserve custom sections** - Additional H2/H3 sections after the required ones should be kept
+4. **Demote extra H2 sections** - Any H2 section not in the 5 required sections (Table of Contents, Introduction, Installation, Usage, Contributing) must be converted to an H3 subsection under the appropriate parent H2 (typically Usage). Preserve the content but fix the heading level
 5. **Ask before modifying** - Always show proposed changes and get user approval
 6. **Use exact formatting** - The build badge URL format must match exactly for CI validation
 7. **Keep examples simple** - Show the most common use cases, not every option
