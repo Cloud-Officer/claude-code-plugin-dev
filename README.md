@@ -26,6 +26,17 @@ This plugin provides development workflow automation for Claude Code.
 * Project documentation review (README, architecture, user guide)
 * Sprint work summaries grouped by repository
 * Translation asset management via Loco (localise.biz) API
+* Firebase Crashlytics crash analysis via BigQuery
+
+## Prerequisites
+
+Some skills require external CLI tools to be installed and authenticated:
+
+| Skill | Requires | Setup |
+| --- | --- | --- |
+| `crashlytics` | [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) (`bq` CLI) | `gcloud auth application-default login` and set `BQ_*` env vars |
+| `query-db` / `analyze-db` | Database CLI (`mysql`, `psql`, `mongosh`, `redis-cli`, or `curl` for Elasticsearch) | Install the relevant client and set connection env vars |
+| `loco` | `curl`, `jq` | Set `LOCO_API_KEY_*` env vars |
 
 ## Installation
 
@@ -58,6 +69,7 @@ These skills are automatically available to Claude:
 | `review-readme`       | Review or create README.md to match standards               |
 | `run-linters`         | Run linters and fix any issues found                        |
 | `loco`                | Manage Loco translation assets (create, delete, scan)       |
+| `crashlytics`         | Query Firebase Crashlytics crash data from BigQuery         |
 | `sprint-summary`      | Summarize sprint items grouped by repo in ~3-day blocks     |
 
 ### Local Development
