@@ -28,7 +28,9 @@ This plugin provides development workflow automation for Claude Code.
 * Translation asset management via Loco (localise.biz) API
 * Firebase Crashlytics crash analysis via BigQuery
 
-## Prerequisites
+## Installation
+
+### Prerequisites
 
 Some skills require external CLI tools to be installed and authenticated:
 
@@ -37,8 +39,6 @@ Some skills require external CLI tools to be installed and authenticated:
 | `crashlytics` | [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) (`bq` CLI) | `gcloud auth application-default login` and set `BQ_*` env vars |
 | `query-db` / `analyze-db` | Database CLI (`mysql`, `psql`, `mongosh`, `redis-cli`, or `curl` for Elasticsearch) | Install the relevant client and set connection env vars |
 | `loco` | `curl`, `jq` | Set `LOCO_API_KEY_*` env vars |
-
-## Installation
 
 ```bash
 /plugin marketplace add cloud-officer/claude-code-plugin-dev
