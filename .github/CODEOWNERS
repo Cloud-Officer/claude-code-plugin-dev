@@ -6,5 +6,5 @@
 
 .github/                 @ydesgagn
 .gitignore               @ydesgagn
-.markdownlint.yml        @ydesgagn
+.markdownlint-cli2.yaml  @ydesgagn
 .yamllint.yml            @ydesgagn
