@@ -1,7 +1,7 @@
 ---
 name: analyze-db
-description: Analyze, document, map, or scan the database schema. Use when the user wants to analyze the database, document the database, generate schema docs, map the database, create DB documentation, or inspect the database structure. Generates a docs/DB.md file with complete database schema documentation. Auto-detects language/framework. Supports MySQL, PostgreSQL, MongoDB, Elasticsearch, and Redis.
-allowed-tools: Bash(php:*), Bash(python:*), Bash(ruby:*), Bash(rails:*), Bash(go:*), Bash(npm:*), Bash(npx:*), Bash(yarn:*), Bash(dotnet:*), Bash(mysql:*), Bash(psql:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Glob, Grep
+description: Analyze, document, map, or scan the database schema. Use when the user wants to analyze the database, document the database, generate schema docs, map the database, create DB documentation, or inspect the database structure. Generates a docs/DB.md file with complete database schema documentation. Auto-detects language/framework. Supports MySQL, PostgreSQL, MongoDB, Elasticsearch, Redis, and BigQuery.
+allowed-tools: Bash(php:*), Bash(python:*), Bash(ruby:*), Bash(rails:*), Bash(go:*), Bash(npm:*), Bash(npx:*), Bash(yarn:*), Bash(dotnet:*), Bash(mysql:*), Bash(psql:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Glob, Grep
 ---
 
 ## Purpose
@@ -43,6 +43,11 @@ This skill assumes database connection environment variables are already set. Th
 
 - `REDIS_URL` - Redis connection URL (e.g., `redis://localhost:6379`)
 
+### BigQuery
+
+- `BQ_PROJECT` - GCP project ID
+- `BQ_DATASETS` - Comma-separated list of BigQuery datasets (e.g., `archive_2023,archive_2024,archive_2025`)
+
 ## CLI Command Reference
 
 Use these exact command formats:
@@ -75,6 +80,20 @@ curl -s "$ES_URL/index/_endpoint" -H "Content-Type: application/json" -d 'JSON_B
 
 ```bash
 redis-cli -u "$REDIS_URL" COMMAND
+```
+
+### BigQuery
+
+```bash
+bq query --use_legacy_sql=false --format=prettyjson --project_id="$BQ_PROJECT" "STANDARD_SQL_QUERY"
+```
+
+```bash
+bq ls --project_id="$BQ_PROJECT" "$DATASET"
+```
+
+```bash
+bq show --schema --project_id="$BQ_PROJECT" "$DATASET.table_name"
 ```
 
 ## Steps
@@ -317,6 +336,12 @@ Based on framework detection, identify which databases are used:
 - Cache/session configuration
 - Key pattern definitions in code
 
+**BigQuery:**
+
+- `BQ_PROJECT` and `BQ_DATASETS` environment variables set
+- BigQuery client dependencies (e.g., `google-cloud-bigquery` in Python, `@google-cloud/bigquery` in Node.js)
+- BigQuery connection configuration in code
+
 ### 3. Extract schema information
 
 #### For SQL ORMs
@@ -472,6 +497,21 @@ redis-cli -u "$REDIS_URL" PING
 
 ---
 
+#### BigQuery CLI Test
+
+```bash
+bq query --use_legacy_sql=false --project_id="$BQ_PROJECT" "SELECT 1"
+```
+
+**Required environment variables:**
+
+- `BQ_PROJECT` - GCP project ID
+- `BQ_DATASETS` - Comma-separated list of datasets
+
+**If this fails:** Tell the user to run `gcloud auth application-default login` and `gcloud auth application-default set-quota-project $BQ_PROJECT`.
+
+---
+
 **After outputting instructions:** Ask the user to confirm when they have set the environment variables. Wait for their confirmation before proceeding to step 7.
 
 **If the user declines or cannot provide database credentials:** Skip steps 7 and 8. Proceed directly to step 9 using only the code-based analysis from steps 3-4. The verification status in docs/DB.md MUST reflect this (see verification timestamp formats below).
@@ -599,6 +639,37 @@ redis-cli -u "$REDIS_URL" SCAN 0 MATCH "user:*" COUNT 10
 redis-cli -u "$REDIS_URL" TTL key_name
 ```
 
+#### For BigQuery
+
+**List ALL datasets (from BQ_DATASETS env var). Every dataset listed MUST be documented:**
+
+```bash
+for ds in $(echo "$BQ_DATASETS" | tr ',' ' '); do
+  echo "=== Dataset: $ds ==="
+  bq ls --project_id="$BQ_PROJECT" "$ds"
+done
+```
+
+**Get table schema:**
+
+```bash
+bq show --schema --format=prettyjson --project_id="$BQ_PROJECT" "$DATASET.table_name"
+```
+
+**Get table info (row count, size, partitioning):**
+
+```bash
+bq show --project_id="$BQ_PROJECT" "$DATASET.table_name"
+```
+
+**Get date ranges:**
+
+```bash
+bq query --use_legacy_sql=false --project_id="$BQ_PROJECT" "
+SELECT MIN(created_at) as earliest, MAX(created_at) as latest
+FROM \`$BQ_PROJECT.$DATASET.orders\`"
+```
+
 ### 8. Sample enum/status field values
 
 For each enum or status field identified, query the actual values and their distribution.
@@ -680,6 +751,29 @@ curl -s "$ES_URL/orders/_search" -H "Content-Type: application/json" -d '{
     }
   }
 }'
+```
+
+#### BigQuery
+
+**For enum sampling (always use LIMIT or APPROX functions to control cost):**
+
+```bash
+bq query --use_legacy_sql=false --project_id="$BQ_PROJECT" "
+SELECT status, COUNT(*) as count
+FROM \`$BQ_PROJECT.$DATASET.orders\`
+GROUP BY status
+ORDER BY count DESC
+LIMIT 20;"
+```
+
+**For very large tables — use APPROX_COUNT_DISTINCT or sample:**
+
+```bash
+bq query --use_legacy_sql=false --project_id="$BQ_PROJECT" "
+SELECT status, APPROX_COUNT_DISTINCT(id) as approx_count
+FROM \`$BQ_PROJECT.$DATASET.orders\`
+GROUP BY status
+ORDER BY approx_count DESC;"
 ```
 
 ### 9. Update docs/DB.md with verified data
@@ -1100,6 +1194,138 @@ ZREVRANGE orders:user:123 0 9 WITHSCORES
 
 ~~~redis
 PFCOUNT stats:dau:2024-01-15
+~~~
+```
+
+---
+
+## Template for BigQuery
+
+```markdown
+# Database Schema Documentation
+
+> **Last verified**: YYYY-MM-DD — verified against live BigQuery / derived from code analysis only (not verified against live database)
+
+## Database Type
+
+BigQuery
+
+## CLI Command
+
+<!-- Used by query-db skill -->
+`bq query --use_legacy_sql=false --format=prettyjson --project_id="$BQ_PROJECT"`
+
+## Datasets
+
+| Dataset | Period | Description |
+|---------|--------|-------------|
+| archive_2023 | 2023-01-01 to 2023-12-31 | Year 2023 archived data |
+| archive_2024 | 2024-01-01 to 2024-12-31 | Year 2024 archived data |
+| archive_2025 | 2025-01-01 to 2025-12-31 | Year 2025 archived data |
+
+## All Tables (per dataset)
+
+<!-- Datasets share the same table structure. List each table once; note if specific datasets differ. -->
+
+| Table | Purpose | Key Fields for Filtering/Grouping |
+|-------|---------|-----------------------------------|
+| (one row per table — list ALL of them) | | |
+
+## Field Mappings & Enums
+
+| Dataset.Table.Field | Value | Meaning |
+|---------------------|-------|---------|
+| *.orders.status | 0 | Pending |
+| ... | ... | ... |
+
+## Relationships
+
+- `orders.user_id → users.id`
+- `order_items.order_id → orders.id`
+
+## Date/Time Fields
+
+| Table.Field | Purpose | Notes |
+|-------------|---------|-------|
+| orders.created_at | Order creation | TIMESTAMP type — use TIMESTAMP functions |
+
+## Money/Numeric Fields
+
+| Table.Field | Unit | Notes |
+|-------------|------|-------|
+| orders.total | cents | Divide by 100 for display |
+
+## Partitioning & Clustering
+
+| Dataset.Table | Partition Column | Clustering Columns | Notes |
+|---------------|-----------------|-------------------|-------|
+| *.orders | created_at | status, user_id | Always filter on created_at to reduce bytes scanned |
+
+## Cross-Dataset Query Pattern
+
+When querying across years, use UNION ALL:
+
+~~~sql
+WITH all_orders AS (
+  SELECT * FROM \`project.archive_2024.orders\`
+  UNION ALL
+  SELECT * FROM \`project.archive_2025.orders\`
+)
+SELECT DATE(created_at) as day, COUNT(*) as total
+FROM all_orders
+WHERE created_at >= '2024-06-01'
+GROUP BY day
+ORDER BY day DESC;
+~~~
+
+## Query Anti-Patterns
+
+| # | Anti-Pattern | Why It's Bad | Do Instead |
+|---|-------------|--------------|------------|
+| 1 | Missing partition filter | Full table scan — expensive (billed by bytes scanned) | Always filter on partition column |
+| 2 | `SELECT *` on wide tables | Scans all columns — BigQuery is columnar | Select only needed columns |
+| 3 | `UNION ALL` across all datasets without date filter | Scans every year's data | Only include datasets relevant to the date range |
+| 4 | Using `LIMIT` to reduce cost | LIMIT does NOT reduce bytes scanned | Use `WHERE` filters on partitioned/clustered columns |
+| 5 | Not using `--dry_run` for large queries | No cost visibility before execution | Run `--dry_run` first to estimate bytes scanned |
+
+## Cost Estimation
+
+Before running queries on large tables, use `--dry_run`:
+
+~~~bash
+bq query --use_legacy_sql=false --dry_run --project_id="$BQ_PROJECT" "QUERY"
+~~~
+
+BigQuery pricing: ~$5/TB scanned. Use `--maximum_bytes_billed=1000000000` (1 GB) to cap cost.
+
+## Common Query Patterns
+
+### Daily Summary (Single Year)
+
+~~~sql
+SELECT DATE(created_at) as day, COUNT(*) as orders, SUM(total)/100 as revenue
+FROM \`project.archive_2025.orders\`
+WHERE created_at >= '2025-01-01'
+GROUP BY day
+ORDER BY day DESC;
+~~~
+
+### Cross-Year Comparison
+
+~~~sql
+WITH all_orders AS (
+  SELECT * FROM \`project.archive_2024.orders\`
+  UNION ALL
+  SELECT * FROM \`project.archive_2025.orders\`
+)
+SELECT
+  EXTRACT(YEAR FROM created_at) as year,
+  EXTRACT(MONTH FROM created_at) as month,
+  COUNT(*) as orders,
+  SUM(total)/100 as revenue
+FROM all_orders
+GROUP BY year, month
+ORDER BY year, month;
 ~~~
 ```
 

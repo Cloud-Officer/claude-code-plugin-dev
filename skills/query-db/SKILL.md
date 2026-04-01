@@ -1,7 +1,7 @@
 ---
 name: query-db
-description: Query the database, run a query, look up data, search the database, or check data. Use when the user wants to query the database, run a SQL query, look up data, find data, search for records, check the database, or ask questions about data. Executes queries via CLI commands using natural language. Reads schema context from docs/DB.md. Supports MySQL, PostgreSQL, MongoDB, Elasticsearch, and Redis.
-allowed-tools: Read, Bash(mysql:*), Bash(psql:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*)
+description: Query the database, run a query, look up data, search the database, or check data. Use when the user wants to query the database, run a SQL query, look up data, find data, search for records, check the database, or ask questions about data. Executes queries via CLI commands using natural language. Reads schema context from docs/DB.md. Supports MySQL, PostgreSQL, MongoDB, Elasticsearch, Redis, and BigQuery.
+allowed-tools: Read, Bash(mysql:*), Bash(psql:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*)
 ---
 
 ## Purpose
@@ -40,6 +40,11 @@ This skill assumes database connection environment variables are already set:
 ### Redis
 
 - `REDIS_URL` - Redis connection URL (e.g., `redis://localhost:6379`)
+
+### BigQuery
+
+- `BQ_PROJECT` - GCP project ID
+- `BQ_DATASETS` - Comma-separated list of BigQuery datasets (e.g., `archive_2023,archive_2024,archive_2025`)
 
 ## CLI Command Reference
 
@@ -105,6 +110,20 @@ redis-cli -u "$REDIS_URL" COMMAND
 - `-u URL` - Connect using URL
 - `--no-raw` - Force formatted output
 
+### BigQuery
+
+```bash
+bq query --use_legacy_sql=false --format=prettyjson --project_id="$BQ_PROJECT" "STANDARD_SQL_QUERY"
+```
+
+**Useful flags:**
+
+- `--use_legacy_sql=false` - Use Standard SQL (always use this)
+- `--format=prettyjson` - JSON output (also: `csv`, `pretty`, `sparse`)
+- `--max_rows=1000` - Limit displayed rows
+- `--dry_run` - Estimate bytes scanned without running (use for cost estimation)
+- `--project_id` - Target GCP project
+
 ## Steps
 
 ### 1. Check for database context file
@@ -160,6 +179,7 @@ From `docs/DB.md`, determine which CLI command to use:
 | MongoDB       | `mongosh`   | JavaScript / Aggregation pipeline |
 | Elasticsearch | `curl`      | Elasticsearch DSL (JSON)          |
 | Redis         | `redis-cli` | Redis commands                    |
+| BigQuery      | `bq`        | Standard SQL                      |
 
 ### 4b. Prefer MySQL MCP over CLI (when available)
 
@@ -175,6 +195,28 @@ If the target database is **MySQL**, check whether a MySQL MCP tool is available
 Generate a plain SQL query (no CLI wrapper needed) and execute it via the MCP tool. The Safety Guardrails (Automatic LIMIT Injection, showing the query first) still apply.
 
 **If no MySQL MCP tool is available — fall back to the CLI** approach described in Step 6.
+
+### 4c. Multi-dataset queries for BigQuery
+
+If the target database is **BigQuery** and the user's question spans multiple years or datasets:
+
+1. Parse `$BQ_DATASETS` (comma-separated) to get the list of available datasets
+2. Identify which datasets are relevant to the query's date range
+3. Generate a `UNION ALL` query across the relevant datasets:
+
+```sql
+SELECT * FROM `project.archive_2023.orders` WHERE created_at >= '2023-01-01'
+UNION ALL
+SELECT * FROM `project.archive_2024.orders` WHERE created_at >= '2024-01-01'
+UNION ALL
+SELECT * FROM `project.archive_2025.orders`
+```
+
+**Important:**
+
+- Always use backtick-quoted fully-qualified table names: `` `project.dataset.table` ``
+- Only include datasets relevant to the requested time range — do not query all datasets if the user asks about a single year
+- If the user doesn't specify a time range, ask which years to include before running a cross-dataset query
 
 ### 5. Understand the question
 
@@ -265,6 +307,35 @@ redis-cli -u "$REDIS_URL" SCAN 0 MATCH "user:*" COUNT 100
 redis-cli -u "$REDIS_URL" MGET cache:product:1 cache:product:2 cache:product:3
 ```
 
+#### For BigQuery
+
+```bash
+bq query --use_legacy_sql=false --format=pretty --project_id="$BQ_PROJECT" "
+SELECT DATE(created_at) as day, COUNT(*) as orders, SUM(total)/100 as revenue
+FROM \`$BQ_PROJECT.archive_2025.orders\`
+WHERE created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+GROUP BY day
+ORDER BY day DESC
+LIMIT 100;"
+```
+
+**Multi-dataset example:**
+
+```bash
+bq query --use_legacy_sql=false --format=pretty --project_id="$BQ_PROJECT" "
+WITH all_orders AS (
+  SELECT * FROM \`$BQ_PROJECT.archive_2024.orders\`
+  UNION ALL
+  SELECT * FROM \`$BQ_PROJECT.archive_2025.orders\`
+)
+SELECT DATE(created_at) as day, COUNT(*) as orders, SUM(total)/100 as revenue
+FROM all_orders
+WHERE created_at >= '2024-06-01'
+GROUP BY day
+ORDER BY day DESC
+LIMIT 100;"
+```
+
 ### 7. Show the query to the user
 
 **NEVER execute a query without showing it to the user first.** This is mandatory, not optional.
@@ -320,11 +391,18 @@ Only export when the user explicitly asks for CSV, file export, or chart data.
 | --- | --- |
 | MySQL | Add `-B` (batch/tab-separated) and pipe through `tr '\t' ','` for CSV |
 | PostgreSQL | Add `-A -F ','` for CSV output |
+| BigQuery | Use `--format=csv` flag on `bq query` |
 
 Example (MySQL):
 
 ```bash
 mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --password="$MYSQL_PASS" "$MYSQL_DB" -B -e "QUERY" | tr '\t' ','
+```
+
+Example (BigQuery):
+
+```bash
+bq query --use_legacy_sql=false --format=csv --project_id="$BQ_PROJECT" "QUERY"
 ```
 
 **Chart-ready JSON:**
@@ -375,6 +453,18 @@ When the user wants chart data, structure the output as:
 - Use SCAN instead of KEYS in production
 - Sorted sets are great for time-series / leaderboards
 
+### BigQuery
+
+- Always use **Standard SQL** (`--use_legacy_sql=false`)
+- Table names must be backtick-quoted and fully qualified: `` `project.dataset.table` ``
+- Use `UNNEST()` for repeated (array) fields
+- Use `TIMESTAMP` functions for date operations: `TIMESTAMP_SUB()`, `TIMESTAMP_TRUNC()`, `TIMESTAMP_DIFF()`
+- For `DATE` columns, use `DATE_SUB()`, `DATE_TRUNC()`, `DATE_DIFF()`
+- Partitioned tables: always filter on the partition column (usually `_PARTITIONTIME` or a date column) to reduce bytes scanned
+- BigQuery charges by bytes scanned — use `--dry_run` before running expensive queries
+- `LIMIT` does NOT reduce bytes scanned — only `WHERE` filters on partitioned/clustered columns do
+- Escape backticks in bash with `\`` when inside double-quoted strings
+
 ## Safety Guardrails
 
 ### Write Operation Blocking
@@ -385,6 +475,7 @@ Before executing any query, scan for write/mutate keywords. Match these as **SQL
 **MongoDB:** `insertOne`, `insertMany`, `updateOne`, `updateMany`, `deleteOne`, `deleteMany`, `drop`, `replaceOne`
 **Elasticsearch:** `_delete_by_query`, `_update_by_query`, `PUT` (index creation/mapping)
 **Redis:** `DEL`, `FLUSHDB`, `FLUSHALL`, `SET`, `HSET`, `LPUSH`, `SADD`, `ZADD`
+**BigQuery:** `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`, `CREATE`, `MERGE`
 
 **If a write operation is detected:**
 
@@ -406,6 +497,13 @@ Read table/collection row counts from the "Large Table Warnings" or "All Tables"
 
 **Exception:** Do NOT inject LIMIT on aggregation queries (`COUNT`, `SUM`, `AVG`, `GROUP BY`, MongoDB `$group`, ES `aggs`). Instead, add date-range filters to narrow the source data.
 
+**BigQuery exception:** BigQuery tables are billed by bytes scanned, not row count. Instead of LIMIT injection (which doesn't reduce cost), always:
+
+1. Run `--dry_run` first to estimate bytes scanned
+2. If >1 GB estimated, warn the user with the estimated cost (~$5/TB)
+3. Ensure queries filter on partitioned/clustered columns
+4. For multi-dataset queries, only include datasets relevant to the requested time range
+
 ### Query Timeout
 
 Prepend or append timeout settings to prevent runaway queries:
@@ -417,6 +515,7 @@ Prepend or append timeout settings to prevent runaway queries:
 | MongoDB | Append `.maxTimeMS(30000)` to `find()` or `aggregate()` calls |
 | Elasticsearch | Add `"timeout": "30s"` to the query body |
 | Redis | No server-side query timeout; commands are single-threaded and fast. Use `--pipe-timeout` on `redis-cli` for network timeouts |
+| BigQuery | Add `--maximum_bytes_billed=1000000000` (1 GB) to the `bq query` command to cap cost. Adjust based on user needs. |
 
 **If a timeout occurs:** Inform the user the query timed out, suggest narrower date range filters or additional WHERE conditions, and offer to retry with a more restrictive query.
 
