@@ -1,12 +1,28 @@
 ---
 name: analyze-db
-description: Analyze, document, map, or scan the database schema. Use when the user wants to analyze the database, document the database, generate schema docs, map the database, create DB documentation, or inspect the database structure. Generates a docs/DB.md file with complete database schema documentation. Auto-detects language/framework. Supports MySQL, PostgreSQL, MongoDB, Elasticsearch, Redis, and BigQuery.
-allowed-tools: Bash(php:*), Bash(python:*), Bash(ruby:*), Bash(rails:*), Bash(go:*), Bash(npm:*), Bash(npx:*), Bash(yarn:*), Bash(dotnet:*), Bash(mysql:*), Bash(psql:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Glob, Grep
+description: Analyze, document, map, or scan the database schema. Use when the user wants to analyze the database, document the database, generate schema docs, map the database, create DB documentation, or inspect the database structure. Generates a docs/DB.md file with complete database schema documentation. Auto-detects language/framework. Supports MySQL, PostgreSQL, SQLite, MongoDB, Elasticsearch, Redis, and BigQuery.
+allowed-tools: Bash(php:*), Bash(python:*), Bash(ruby:*), Bash(rails:*), Bash(go:*), Bash(npm:*), Bash(npx:*), Bash(yarn:*), Bash(dotnet:*), Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Glob, Grep, mcp__postgres__query, mcp__postgres__list_tables, mcp__postgres__describe_table, mcp__postgres__list_schemas, mcp__mysql__mysql_query, mcp__mongodb__find, mcp__mongodb__aggregate, mcp__mongodb__listDatabases, mcp__mongodb__listCollections, mcp__mongodb__collectionSchema, mcp__redis__health_check, mcp__redis__get, mcp__redis__hash, mcp__redis__json, mcp__bigquery__*
 ---
 
 ## Purpose
 
 Analyze this project and generate a `docs/DB.md` file with **complete database schema documentation** for running queries.
+
+## MCP Tools with Fallbacks
+
+This skill uses database MCP tools when available and falls back to CLI commands if they are unavailable or return errors.
+
+| Database | MCP Tools | CLI Fallback |
+| --- | --- | --- |
+| PostgreSQL | `mcp__postgres__list_tables`, `describe_table`, `list_schemas`, `query` | `psql` |
+| MySQL | `mcp__mysql__mysql_query` | `mysql` |
+| MongoDB | `mcp__mongodb__listDatabases`, `listCollections`, `collectionSchema`, `find` | `mongosh` |
+| Redis | `mcp__redis__health_check`, `get`, `hash`, `json` | `redis-cli` |
+| SQLite | No MCP — CLI only | `sqlite3` |
+| BigQuery | `mcp__bigquery__query`, `list_tables`, `get_table_schema` | `bq` |
+| Elasticsearch | No MCP — CLI only | `curl` |
+
+**Prefer MCP tools** when available — they handle connection management and provide structured output. For schema analysis, MCP tools like `mcp__postgres__list_tables` and `mcp__postgres__describe_table` are especially useful. If MCP tools return errors, fall back to the CLI.
 
 **IMPORTANT: Document ALL tables/collections/indices.** Do not filter or skip any tables. Developers need full schema documentation, not just "important" tables.
 

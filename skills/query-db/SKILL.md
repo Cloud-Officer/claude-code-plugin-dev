@@ -1,12 +1,28 @@
 ---
 name: query-db
-description: Query the database, run a query, look up data, search the database, or check data. Use when the user wants to query the database, run a SQL query, look up data, find data, search for records, check the database, or ask questions about data. Executes queries via CLI commands using natural language. Reads schema context from docs/DB.md. Supports MySQL, PostgreSQL, MongoDB, Elasticsearch, Redis, and BigQuery.
-allowed-tools: Read, Bash(mysql:*), Bash(psql:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*)
+description: Query the database, run a query, look up data, search the database, or check data. Use when the user wants to query the database, run a SQL query, look up data, find data, search for records, check the database, or ask questions about data. Executes queries via CLI commands using natural language. Reads schema context from docs/DB.md. Supports MySQL, PostgreSQL, SQLite, MongoDB, Elasticsearch, Redis, and BigQuery.
+allowed-tools: Read, Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), mcp__postgres__query, mcp__postgres__list_tables, mcp__postgres__describe_table, mcp__postgres__list_schemas, mcp__mysql__mysql_query, mcp__mongodb__find, mcp__mongodb__aggregate, mcp__mongodb__listDatabases, mcp__mongodb__listCollections, mcp__mongodb__collectionSchema, mcp__redis__set, mcp__redis__get, mcp__redis__list, mcp__redis__hash, mcp__redis__sorted_set, mcp__redis__stream, mcp__redis__json, mcp__redis__health_check, mcp__bigquery__*
 ---
 
 ## Purpose
 
-Answer questions about data by generating and running queries against the database using CLI commands. Works for developers, analysts, and anyone who needs to query the database.
+Answer questions about data by generating and running queries against the database using CLI commands or MCP tools. Works for developers, analysts, and anyone who needs to query the database.
+
+## MCP Tools with Fallbacks
+
+This skill uses database MCP tools when available and falls back to CLI commands if they are unavailable or return errors.
+
+| Database | MCP Tools | CLI Fallback | Env Vars (inherited from shell) |
+| --- | --- | --- | --- |
+| PostgreSQL | `mcp__postgres__query`, `list_tables`, `describe_table` | `psql` | `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` |
+| MySQL | `mcp__mysql__mysql_query` | `mysql` | `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE` |
+| MongoDB | `mcp__mongodb__find`, `aggregate`, `listCollections` | `mongosh` | `MDB_MCP_CONNECTION_STRING` or `MONGODB_URI` |
+| Redis | `mcp__redis__get`, `hash`, `sorted_set`, `json`, etc. | `redis-cli` | `REDIS_HOST`, `REDIS_PORT`, `REDIS_PWD` or `REDIS_URL` |
+| SQLite | No MCP — CLI only | `sqlite3` | `SQLITE_DB` |
+| BigQuery | `mcp__bigquery__query`, `list_tables`, `get_table_schema` | `bq` | `BQ_PROJECT`, `BQ_DATASETS` |
+| Elasticsearch | No MCP — CLI only | `curl` | `ES_URL`, `ES_API_KEY` |
+
+**Prefer MCP tools** when available — they handle connection management and provide structured output. If MCP tools return errors (tool not found, connection refused), fall back to the CLI. Database connection env vars must be set in the user's shell for both MCP servers and CLI tools to work.
 
 ## Environment Variables
 
@@ -27,6 +43,10 @@ This skill assumes database connection environment variables are already set:
 - `PGUSER` - Database user
 - `PGPASSWORD` - Database password
 - `PGDATABASE` - Database name
+
+### SQLite
+
+- `SQLITE_DB` - Path to the SQLite database file (e.g., `./db/development.sqlite3`)
 
 ### MongoDB
 
@@ -75,6 +95,22 @@ psql -c "SQL_QUERY"
 - `-t` - Tuples only (no headers or footers)
 - `-A` - Unaligned output (no padding)
 - `-F ","` - Set field separator (e.g., for CSV)
+
+### SQLite
+
+```bash
+sqlite3 "$SQLITE_DB" "SQL_QUERY"
+```
+
+**Useful flags:**
+
+- `"query"` - Execute query and exit
+- `-header` - Show column headers
+- `-csv` - CSV output format
+- `-json` - JSON output format
+- `-column` - Column-aligned output
+- `.tables` - List all tables (interactive command)
+- `.schema TABLE` - Show CREATE statement for a table
 
 ### MongoDB
 
@@ -162,6 +198,7 @@ Look for the "CLI Command" section in `docs/DB.md`. It specifies the command to 
 |---------------|---------------------------------------------------------------------------------------------------------------|
 | MySQL         | `mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --password="$MYSQL_PASS" "$MYSQL_DB" -e "SELECT 1"` |
 | PostgreSQL    | `psql -c "SELECT 1"`                                                                                          |
+| SQLite        | `sqlite3 "$SQLITE_DB" "SELECT 1"`                                                                             |
 | MongoDB       | `mongosh "$MONGODB_URI" --eval "db.runCommand({ping: 1})"`                                                    |
 | Elasticsearch | `curl -s "$ES_URL/_cluster/health"`                                                                           |
 | Redis         | `redis-cli -u "$REDIS_URL" PING`                                                                              |
@@ -176,25 +213,31 @@ From `docs/DB.md`, determine which CLI command to use:
 |---------------|-------------|-----------------------------------|
 | MySQL         | `mysql`     | SQL                               |
 | PostgreSQL    | `psql`      | SQL                               |
+| SQLite        | `sqlite3`   | SQL                               |
 | MongoDB       | `mongosh`   | JavaScript / Aggregation pipeline |
 | Elasticsearch | `curl`      | Elasticsearch DSL (JSON)          |
 | Redis         | `redis-cli` | Redis commands                    |
 | BigQuery      | `bq`        | Standard SQL                      |
 
-### 4b. Prefer MySQL MCP over CLI (when available)
+### 4b. Prefer Database MCP tools over CLI (when available)
 
-If the target database is **MySQL**, check whether a MySQL MCP tool is available (e.g., `mcp__mysql-bi__mysql_query` or similar `mcp__*__mysql_query` tool).
+For PostgreSQL, MySQL, MongoDB, and Redis, check whether MCP tools are available. **If MCP tools are available — use them instead of the CLI.** Benefits:
 
-**If a MySQL MCP tool is available — use it instead of the CLI.** Benefits:
-
-- **Write operations blocked at server level** — no need to scan for write keywords
-- **Built-in query timeout** (typically 30s) — no need to prepend `SET SESSION MAX_EXECUTION_TIME`
-- **Connection pooling and rate limiting** — safer for production databases
 - **Structured output** — cleaner results without CLI formatting quirks
+- **Connection management** — handled by the MCP server
+- **No shell escaping** — queries are passed as structured parameters
 
-Generate a plain SQL query (no CLI wrapper needed) and execute it via the MCP tool. The Safety Guardrails (Automatic LIMIT Injection, showing the query first) still apply.
+| Database | MCP Tool | CLI Fallback |
+| --- | --- | --- |
+| PostgreSQL | `mcp__postgres__query` | `psql -c "SQL"` |
+| MySQL | `mcp__mysql__mysql_query` | `mysql -h ... -e "SQL"` |
+| MongoDB | `mcp__mongodb__find`, `mcp__mongodb__aggregate` | `mongosh --eval "JS"` |
+| Redis | `mcp__redis__get`, `mcp__redis__hash`, `mcp__redis__sorted_set`, `mcp__redis__json`, etc. | `redis-cli -u ... COMMAND` |
+| BigQuery | `mcp__bigquery__query` | `bq query --use_legacy_sql=false "SQL"` |
 
-**If no MySQL MCP tool is available — fall back to the CLI** approach described in Step 6.
+**If MCP tools are not available (tool not found errors), fall back to the CLI** approach described in Step 6. The Safety Guardrails (Automatic LIMIT Injection, showing the query first) still apply regardless of method.
+
+**Note:** Elasticsearch has no MCP server — always use `curl` CLI for Elasticsearch.
 
 ### 4c. Multi-dataset queries for BigQuery
 
@@ -247,6 +290,18 @@ psql -c "
 SELECT DATE(created_at) as day, COUNT(*) as orders, SUM(total)/100 as revenue
 FROM orders
 WHERE created_at >= NOW() - INTERVAL '30 days'
+GROUP BY DATE(created_at)
+ORDER BY day DESC
+LIMIT 100;"
+```
+
+#### For SQLite
+
+```bash
+sqlite3 "$SQLITE_DB" "
+SELECT DATE(created_at) as day, COUNT(*) as orders, SUM(total)/100.0 as revenue
+FROM orders
+WHERE created_at >= DATE('now', '-30 days')
 GROUP BY DATE(created_at)
 ORDER BY day DESC
 LIMIT 100;"
@@ -369,6 +424,7 @@ Run the appropriate CLI command with the generated query.
 
 - **MySQL**: Use `-e "query"` for single queries, or `-N` to skip column headers, `-B` for batch mode (tab-separated)
 - **PostgreSQL**: Use `-c "query"` for single queries, `-t` for tuples only (no headers), `-A` for unaligned output
+- **SQLite**: Use `"query"` as second argument, `-header` for column headers, `-csv` or `-json` for output format
 - **MongoDB**: Use `--eval "code"` for JavaScript execution, `--quiet` to suppress connection messages
 - **Elasticsearch**: Use `curl` with `-s` (silent) and pipe to `jq` for formatting
 - **Redis**: Commands are executed directly with `redis-cli`
@@ -391,6 +447,7 @@ Only export when the user explicitly asks for CSV, file export, or chart data.
 | --- | --- |
 | MySQL | Add `-B` (batch/tab-separated) and pipe through `tr '\t' ','` for CSV |
 | PostgreSQL | Add `-A -F ','` for CSV output |
+| SQLite | Use `-header -csv` flags |
 | BigQuery | Use `--format=csv` flag on `bq query` |
 
 Example (MySQL):
@@ -429,6 +486,16 @@ When the user wants chart data, structure the output as:
 | Date subtraction  | `DATE_SUB(NOW(), INTERVAL 30 DAY)` | `NOW() - INTERVAL '30 days'` |
 | String concat     | `CONCAT(a, b)`                     | `a \|\| b`                   |
 | LIMIT with offset | `LIMIT 10, 20`                     | `LIMIT 20 OFFSET 10`         |
+
+### SQLite
+
+- Uses `DATE('now', '-30 days')` for date arithmetic (not `NOW()` or `INTERVAL`)
+- No built-in `DATE_FORMAT` — use `strftime('%Y-%m-%d', col)`
+- Division is integer by default — use `SUM(total)/100.0` (not `/100`) for decimal results
+- No `TRUNCATE` — use `DELETE FROM table`
+- Boolean values are `0`/`1` (no `TRUE`/`FALSE`)
+- `LIKE` is case-insensitive by default
+- No user/password auth — access is file-based
 
 ### MongoDB
 
@@ -471,7 +538,7 @@ When the user wants chart data, structure the output as:
 
 Before executing any query, scan for write/mutate keywords. Match these as **SQL statements**, not as column names (e.g., `delete_log` or `update_count` are fine as column names).
 
-**SQL (MySQL/PostgreSQL):** `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`, `CREATE`, `REPLACE`
+**SQL (MySQL/PostgreSQL/SQLite):** `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`, `CREATE`, `REPLACE`
 **MongoDB:** `insertOne`, `insertMany`, `updateOne`, `updateMany`, `deleteOne`, `deleteMany`, `drop`, `replaceOne`
 **Elasticsearch:** `_delete_by_query`, `_update_by_query`, `PUT` (index creation/mapping)
 **Redis:** `DEL`, `FLUSHDB`, `FLUSHALL`, `SET`, `HSET`, `LPUSH`, `SADD`, `ZADD`
@@ -512,6 +579,7 @@ Prepend or append timeout settings to prevent runaway queries:
 | --- | --- |
 | MySQL | Prepend `SET SESSION MAX_EXECUTION_TIME=30000;` before the query |
 | PostgreSQL | Prepend `SET statement_timeout = '30s';` before the query |
+| SQLite | No server-side timeout; SQLite is file-based and typically fast. Use `LIMIT` to constrain large result sets |
 | MongoDB | Append `.maxTimeMS(30000)` to `find()` or `aggregate()` calls |
 | Elasticsearch | Add `"timeout": "30s"` to the query body |
 | Redis | No server-side query timeout; commands are single-threaded and fast. Use `--pipe-timeout` on `redis-cli` for network timeouts |

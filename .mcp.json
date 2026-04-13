@@ -1,0 +1,51 @@
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"]
+    },
+    "fetch": {
+      "command": "uvx",
+      "args": ["mcp-server-fetch"]
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"]
+    },
+    "mysql": {
+      "command": "npx",
+      "args": ["-y", "@benborla/mcp-server-mysql"]
+    },
+    "mongodb": {
+      "command": "npx",
+      "args": ["-y", "mongodb-mcp-server"]
+    },
+    "redis": {
+      "command": "uvx",
+      "args": ["redis-mcp-server"]
+    },
+    "aws": {
+      "command": "uvx",
+      "args": [
+        "mcp-proxy-for-aws@latest",
+        "https://aws-mcp.us-east-1.api.aws/mcp"
+      ]
+    },
+    "appstore": {
+      "command": "asc-mcp",
+      "args": ["--workers", "apps,builds,versions,reviews,beta_groups,iap"]
+    },
+    "playstore": {
+      "command": "npx",
+      "args": ["-y", "github:Kirill812/GPlay_reviews_MCP_server"]
+    },
+    "gcloud": {
+      "command": "npx",
+      "args": ["-y", "@google-cloud/gcloud-mcp"]
+    }
+  }
+}

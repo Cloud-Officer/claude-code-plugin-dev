@@ -1,7 +1,7 @@
 ---
 name: review-readme
 description: Review, create, update, check, fix, improve, write, or audit README.md. Use when the user wants to review the README, check the README, fix the README, write a README, improve the README, or update the README to match organizational standards with accurate project-specific content.
-allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, WebSearch
+allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, WebSearch, mcp__github__search_repositories, mcp__github__get_file_contents, mcp__fetch__fetch, mcp__context7__resolve-library-id, mcp__context7__query-docs
 ---
 
 # Review README.md
@@ -105,12 +105,30 @@ The README.md must have **exactly** these H2 sections in this exact order — no
 
 **STRICT RULE — No Additional H2 Sections:** These 5 sections are the ONLY allowed H2-level headings. All other content MUST be placed as H3+ subsections under the most relevant existing H2 section. In most cases, additional content belongs under `## Usage` (e.g., Configuration, API Reference, Examples, Environment Variables, Deployment, Docker, CI/CD, Testing, Troubleshooting). When reviewing or creating a README, if you encounter H2 sections that are not in the list above (e.g., `## Configuration`, `## API`, `## Deployment`, `## Testing`), they must be converted to H3 subsections under the appropriate parent H2 — typically `## Usage`.
 
+## MCP Tools with Fallbacks
+
+This skill uses MCP tools when available and falls back gracefully if they are unavailable or return errors.
+
+### GitHub Access
+
+**Prefer MCP tools** (`mcp__github__*`) when available. If MCP tools are not available (tool not found errors), **fall back to the `gh` CLI**.
+
+| Operation | MCP Tool | CLI Fallback |
+| --- | --- | --- |
+| Get repo metadata | `mcp__github__search_repositories` with owner/name | `gh repo view --json owner,name,visibility,licenseInfo,description` |
+| Get file contents | `mcp__github__get_file_contents` | `cat <file>` |
+| Get repo owner/name | Parse from `git remote get-url origin` | `gh repo view --json owner,name` |
+
+### Library Documentation (Context7)
+
+Use `mcp__context7__resolve-library-id` then `mcp__context7__query-docs` to look up current documentation for libraries and frameworks found in the project. If Context7 is unavailable or returns errors (quota exceeded, timeouts), **fall back to `WebSearch`** and then `mcp__fetch__fetch` to retrieve documentation from official sources. Do not let Context7 failures block the review.
+
 ## Step 1: Gather Repository Information
 
 Run these commands to collect repository metadata:
 
 ```bash
-# Get organization and repository name
+# Get organization and repository name (fallback if MCP tools unavailable)
 gh repo view --json owner,name,visibility,licenseInfo,description
 ```
 

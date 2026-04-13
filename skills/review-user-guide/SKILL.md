@@ -1,7 +1,7 @@
 ---
 name: review-user-guide
 description: Review, create, update, check, write, or audit the user guide (docs/user-guide.md). Use when the user wants to write a user guide, write user docs, create user documentation, review the user guide, check the user guide, update user documentation, or document the product for end users.
-allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, WebSearch
+allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, WebSearch, mcp__github__search_repositories, mcp__github__get_file_contents, mcp__fetch__fetch, mcp__context7__resolve-library-id, mcp__context7__query-docs
 ---
 
 # Review User Guide Documentation
@@ -155,10 +155,28 @@ The user guide must have the following H1 title and H2 sections:
 ## Features
 ```
 
+## MCP Tools with Fallbacks
+
+This skill uses MCP tools when available and falls back gracefully if they are unavailable or return errors.
+
+### GitHub Access
+
+**Prefer MCP tools** (`mcp__github__*`) when available. If MCP tools are not available (tool not found errors), **fall back to the `gh` CLI**.
+
+| Operation | MCP Tool | CLI Fallback |
+| --- | --- | --- |
+| Get repo metadata | `mcp__github__search_repositories` with owner/name | `gh repo view --json owner,name,description` |
+| Get file contents | `mcp__github__get_file_contents` | `cat <file>` |
+| Get repo owner/name | Parse from `git remote get-url origin` | `gh repo view --json owner,name` |
+
+### Library Documentation (Context7)
+
+Use `mcp__context7__resolve-library-id` then `mcp__context7__query-docs` to look up current documentation for libraries and frameworks found in the project. If Context7 is unavailable or returns errors (quota exceeded, timeouts), **fall back to `WebSearch`** and then `mcp__fetch__fetch` to retrieve documentation from official sources. Do not let Context7 failures block the review.
+
 ## Step 1: Gather Repository Information
 
 ```bash
-# Get organization and repository name
+# Get organization and repository name (fallback if MCP tools unavailable)
 gh repo view --json owner,name,description
 ```
 

@@ -1,6 +1,6 @@
 {
   "name": "co-dev",
-  "description": "Cloud Officer development workflow tools for PR management, issue tracking, and code quality",
+  "description": "Cloud Officer development workflow tools for PR management, issue tracking, code quality, cloud infrastructure (AWS, GCP), deployment (Vercel, Heroku), payments (Stripe, PayPal), observability (New Relic), design (Figma), app stores (App Store Connect, Google Play), and database management",
   "version": "1.0.0",
   "author": {
     "name": "Cloud Officer",
@@ -8,5 +8,5 @@
   },
   "repository": "https://github.com/cloud-officer/claude-code-plugin-dev",
   "license": "MIT",
-  "keywords": ["code-review", "pr", "pull-request", "linting", "lint", "jira", "github", "issue", "bug", "ticket", "readme", "architecture", "documentation", "user-guide", "database", "schema", "query", "sql", "sprint", "summary", "report", "loco", "translation", "i18n", "crashlytics", "firebase", "bigquery", "crashes"]
+  "keywords": ["code-review", "pr", "pull-request", "linting", "lint", "jira", "github", "issue", "bug", "ticket", "readme", "architecture", "documentation", "user-guide", "database", "schema", "query", "sql", "sprint", "summary", "report", "loco", "translation", "i18n", "crashlytics", "firebase", "bigquery", "crashes", "figma", "design", "ui", "slack", "messaging", "vercel", "deployment", "stripe", "payment", "paypal", "invoice", "aws", "cloud", "ec2", "s3", "lambda", "gcloud", "gcp", "compute", "cloud-run", "newrelic", "observability", "monitoring", "alerts", "heroku", "dyno", "appstore", "testflight", "ios", "playstore", "android", "reviews", "postgresql", "mysql", "mongodb", "redis", "sqlite"]
 }
