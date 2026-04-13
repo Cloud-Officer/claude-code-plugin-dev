@@ -1,5 +1,24 @@
 # Deep Code Review (Parallel Agent Strategy)
 
+## MCP Tools with Fallbacks
+
+This command uses MCP tools when available and falls back gracefully if they are unavailable or return errors. Agents inherit MCP tool access.
+
+### GitHub Access
+
+**Prefer MCP tools** (`mcp__github__*`) when available. If MCP tools are not available (tool not found errors), **fall back to the `gh` CLI**.
+
+| Operation | MCP Tool | CLI Fallback |
+| --- | --- | --- |
+| Check issues enabled | `mcp__github__list_issues` (if it succeeds, issues are enabled) | `gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'` |
+| Check repo visibility | `mcp__github__search_repositories` with owner/name | `gh repo view --json isPrivate --jq '.isPrivate'` |
+| Get repo owner/name | Parse from `git remote get-url origin` | `gh repo view --json owner,name` |
+| Check repo settings | No MCP equivalent — use `gh api` | `gh api "repos/{owner}/{repo}" --jq '...'` |
+
+### Library Documentation (Context7)
+
+Agents can use `mcp__context7__resolve-library-id` then `mcp__context7__query-docs` to look up current documentation for libraries and frameworks when validating code patterns or best practices. If Context7 is unavailable or returns errors (quota exceeded, timeouts), agents should fall back to `WebSearch` or skip the library doc check. Do not let Context7 failures block the review.
+
 You are a senior staff engineer orchestrating an exhaustive code audit using parallel agents. Be thorough, specific, quantitative, and educational.
 
 **IMPORTANT: Balance criticism with recognition.** A good code review acknowledges what the team is doing well, not just what needs improvement. Actively look for and document positive patterns, good architectural decisions, and best practices being followed. The report should feel constructive and encouraging, not purely negative.

@@ -1,12 +1,37 @@
 ---
 name: create-issue
 description: Create, open, file, or report an issue, bug, or ticket in GitHub or Jira. Use when the user wants to open an issue, file a bug, report a bug, create a ticket, log an issue, or submit a bug report. Automatically detects if GitHub issues are enabled; if so creates a GitHub issue, otherwise creates a Jira issue.
-allowed-tools: Bash(gh:*), Bash(jira:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write
+allowed-tools: Bash(gh:*), Bash(jira:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, mcp__github__create_issue, mcp__github__list_issues, mcp__github__search_issues, mcp__github__get_issue, mcp__github__add_issue_comment, mcp__atlassian__createJiraIssue, mcp__atlassian__getJiraIssueTypeMetaWithFields, mcp__atlassian__getJiraProjectIssueTypesMetadata, mcp__atlassian__getVisibleJiraProjects
 ---
 
 # Create Issue
 
 Create an issue in the appropriate tracker (GitHub Issues or Jira).
+
+## MCP Tools with Fallbacks
+
+This skill uses MCP tools when available and falls back gracefully if they are unavailable or return errors.
+
+### GitHub Access
+
+**Prefer MCP tools** (`mcp__github__*`) when available. If MCP tools are not available (tool not found errors), **fall back to the `gh` CLI**.
+
+| Operation | MCP Tool | CLI Fallback |
+| --- | --- | --- |
+| Check issues enabled | `mcp__github__list_issues` (if it succeeds, issues are enabled) | `gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'` |
+| Create issue | `mcp__github__create_issue` | `gh issue create --title "..." --body-file issue-body.md --label "..."` |
+| Get repo owner/name | Parse from `git remote get-url origin` | `gh repo view --json owner,name` |
+
+### Jira Access
+
+**Prefer MCP tools** (`mcp__atlassian__*`) when available. If MCP tools are not available (tool not found errors), **fall back to the `jira` CLI**.
+
+| Operation | MCP Tool | CLI Fallback |
+| --- | --- | --- |
+| Create issue | `mcp__atlassian__createJiraIssue` | `jira issue create --no-input --type "..." --priority "..." --summary "..."` |
+| Get issue type metadata | `mcp__atlassian__getJiraIssueTypeMetaWithFields` | N/A (not needed with CLI) |
+| Get project issue types | `mcp__atlassian__getJiraProjectIssueTypesMetadata` | N/A (not needed with CLI) |
+| List projects | `mcp__atlassian__getVisibleJiraProjects` | N/A (not needed with CLI) |
 
 ## Step 1: Detect Issue Tracker
 
@@ -53,7 +78,7 @@ Add `--assignee "<username>"` if user specified an assignee.
 
 ## Jira Issues
 
-If GitHub issues are disabled, use `jira issue create`.
+If GitHub issues are disabled, create a Jira issue. **Prefer `mcp__atlassian__createJiraIssue`** when available, fall back to `jira issue create` CLI.
 
 ### Step 2a: Write issue body to `issue-body.md`
 

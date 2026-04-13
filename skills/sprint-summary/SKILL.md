@@ -1,12 +1,28 @@
 ---
 name: sprint-summary
 description: Summarize sprint work items grouped by repo and ~3-day blocks. Use when the user wants a sprint summary, sprint report, sprint overview, work summary, sprint breakdown, or wants to see what work is planned in a sprint. Fetches tasks and bugs from Jira (excludes stories), estimates effort from descriptions, and groups items into approximately 3-day work blocks per repository.
-allowed-tools: Bash(jira:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(echo:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(xargs:*), Read, Write
+allowed-tools: Bash(jira:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(echo:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(xargs:*), Read, Write, mcp__atlassian__searchJiraIssuesUsingJql, mcp__atlassian__getJiraIssue, mcp__atlassian__editJiraIssue, mcp__atlassian__addWorklogToJiraIssue
 ---
 
 # Sprint Summary
 
 Generate a sprint work summary grouped by repository with items organized into approximately 3-day work blocks.
+
+## MCP Tools with Fallbacks
+
+This skill uses MCP tools when available and falls back gracefully if they are unavailable or return errors.
+
+### Jira Access
+
+**Prefer MCP tools** (`mcp__atlassian__*`) when available. If MCP tools are not available (tool not found errors), **fall back to the `jira` CLI**.
+
+| Operation | MCP Tool | CLI Fallback |
+| --- | --- | --- |
+| Search sprint issues | `mcp__atlassian__searchJiraIssuesUsingJql` with `sprint = <ID>` | `jira sprint list <ID> --raw` |
+| Get issue details | `mcp__atlassian__getJiraIssue` | `jira issue view <KEY> --raw` |
+| Update estimate | `mcp__atlassian__editJiraIssue` | `jira issue edit <KEY> --no-input -o "Original Estimate=<HOURS>h"` |
+
+**Note:** When using MCP tools, use JQL queries to filter sprint issues: `sprint = <SPRINT_ID> AND issuetype in (Task, Bug) AND status not in (Done, Closed, Resolved, "Ready to Test", "In QA", Testing)`.
 
 ## Step 1: Identify Sprint
 

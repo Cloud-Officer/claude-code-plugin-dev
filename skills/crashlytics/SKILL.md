@@ -1,12 +1,24 @@
 ---
 name: crashlytics
 description: Query, list, analyze, or investigate Firebase Crashlytics crash data. Use when the user wants to check crashes, list top crashes, investigate a crash, get stack traces, view crash trends, analyze crash data, or find crash issues. Queries Crashlytics data exported to BigQuery via the bq CLI. Supports Android, iOS, and tvOS.
-allowed-tools: Bash(bq:*), Read, Grep, Glob, Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*)
+allowed-tools: Bash(bq:*), Read, Grep, Glob, Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), mcp__bigquery__*
 ---
 
 ## Purpose
 
 Query Firebase Crashlytics crash data exported to BigQuery. List top crashes, investigate specific issues, retrieve stack traces, and help identify fixes. Supports Android, iOS, and tvOS platforms.
+
+## MCP Tools with Fallbacks
+
+**Prefer BigQuery MCP tools** (`mcp__bigquery__*`) when available for executing queries. If MCP tools are not available (tool not found errors), **fall back to the `bq` CLI**.
+
+| Operation | MCP Tool | CLI Fallback |
+| --- | --- | --- |
+| Run SQL query | `mcp__bigquery__query` | `bq query --use_legacy_sql=false --format=prettyjson "SQL"` |
+| List tables | `mcp__bigquery__list_tables` | `bq ls --format=json $BQ_PROJECT:$BQ_CRASHLYTICS_DATASET` |
+| Get table schema | `mcp__bigquery__get_table_schema` | `bq show --format=json $BQ_PROJECT:$BQ_CRASHLYTICS_DATASET.TABLE` |
+
+**Note:** Both methods require GCP authentication. The MCP server uses Application Default Credentials; the `bq` CLI uses `gcloud auth application-default login`.
 
 ## Environment Variables
 
