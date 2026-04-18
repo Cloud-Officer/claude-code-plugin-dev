@@ -121,3 +121,39 @@ Do NOT add these patterns to bypass linting:
 ```
 
 If you encounter an issue that seems unfixable, explain the problem to the user and ask how they want to proceed.
+
+## Shell Script Linting Rules (SL0001, SL0002)
+
+When fixing shell script lint errors (e.g., from `shellcheck` or custom shell linters), apply these rules:
+
+### SL0001: Variables must use braces
+
+Always wrap shell variables in `${}` braces. This prevents ambiguity and word-splitting bugs.
+
+```bash
+# Bad
+echo "$HOME/.local/bin:$PATH"
+if [ "$CURRENT_BRANCH" != "$MASTER_BRANCH" ]; then
+
+# Good
+echo "${HOME}/.local/bin:${PATH}"
+if [ "${CURRENT_BRANCH}" != "${MASTER_BRANCH}" ]; then
+```
+
+### SL0002: Use `==` instead of `=` for string comparison
+
+In `[` and `[[` test expressions, use `==` for string equality, not `=`.
+
+```bash
+# Bad
+if [ "${CONFIGURATION}" = "Debug" ]; then
+
+# Good
+if [ "${CONFIGURATION}" == "Debug" ]; then
+```
+
+### General Shell Script Fixes
+
+- **Quote all variable expansions** — `"${VAR}"` not `$VAR`
+- **Use `[[` over `[` when possible** — safer, supports `&&`, `||`, pattern matching
+- **Use `$(command)` over backticks** — `` `command` `` is deprecated
