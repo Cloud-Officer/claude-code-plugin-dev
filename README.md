@@ -217,6 +217,50 @@ Some skills require additional CLI tools:
 /plugin install co-dev@cloud-officer
 ```
 
+#### Recommended Permissions
+
+This plugin bundles several MCP servers. By default, Claude Code will prompt for permission each time an MCP tool is called. To auto-approve these tools, add the following entries to the `permissions.allow` array in your `~/.claude/settings.json`:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "mcp__appstore__*",
+      "mcp__aws__*",
+      "mcp__context7__*",
+      "mcp__fetch__*",
+      "mcp__gcloud__*",
+      "mcp__github__*",
+      "mcp__mongodb__*",
+      "mcp__mysql__*",
+      "mcp__playstore__*",
+      "mcp__postgres__*",
+      "mcp__redis__*"
+    ]
+  }
+}
+```
+
+If you also use remote MCP servers (see [Remote MCP Servers](#remote-mcp-servers-optional)), add their patterns too:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "mcp__atlassian__*",
+      "mcp__bigquery__*",
+      "mcp__figma__*",
+      "mcp__newrelic__*",
+      "mcp__paypal__*",
+      "mcp__stripe__*",
+      "mcp__vercel__*"
+    ]
+  }
+}
+```
+
+**Note:** These entries merge with your existing `allow` list — you don't need to replace it. Only add entries for the MCP servers you actually use.
+
 ## Usage
 
 ### Commands
