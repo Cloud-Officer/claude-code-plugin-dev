@@ -212,12 +212,14 @@ Some skills require additional CLI tools:
 | `newrelic` (fallback) | [New Relic CLI](https://github.com/newrelic/newrelic-cli) | `brew install newrelic-cli && newrelic profile add` |
 | `heroku` (fallback) | [Heroku CLI](https://devcenter.heroku.com/articles/heroku-cli) | `brew install heroku && heroku login` |
 
+### Install Plugin
+
 ```bash
 /plugin marketplace add cloud-officer/claude-code-plugin-dev
 /plugin install co-dev@cloud-officer
 ```
 
-#### Recommended Permissions
+### Recommended Permissions
 
 This plugin bundles several MCP servers. By default, Claude Code will prompt for permission each time an MCP tool is called. To auto-approve these tools, add the following entries to the `permissions.allow` array in your `~/.claude/settings.json`:
 
