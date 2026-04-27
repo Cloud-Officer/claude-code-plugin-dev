@@ -8,5 +8,124 @@
   },
   "repository": "https://github.com/cloud-officer/claude-code-plugin-dev",
   "license": "MIT",
-  "keywords": ["code-review", "pr", "pull-request", "linting", "lint", "jira", "github", "issue", "bug", "ticket", "readme", "architecture", "documentation", "user-guide", "database", "schema", "query", "sql", "sprint", "summary", "report", "loco", "translation", "i18n", "crashlytics", "firebase", "bigquery", "crashes", "figma", "design", "ui", "vercel", "deployment", "stripe", "payment", "paypal", "invoice", "aws", "cloud", "ec2", "s3", "lambda", "gcloud", "gcp", "compute", "cloud-run", "newrelic", "observability", "monitoring", "alerts", "heroku", "dyno", "appstore", "testflight", "ios", "playstore", "android", "reviews", "postgresql", "mysql", "mongodb", "redis", "sqlite"]
+  "keywords": ["code-review", "pr", "pull-request", "linting", "lint", "jira", "github", "issue", "bug", "ticket", "readme", "architecture", "documentation", "user-guide", "database", "schema", "query", "sql", "sprint", "summary", "report", "loco", "translation", "i18n", "crashlytics", "firebase", "bigquery", "crashes", "figma", "design", "ui", "vercel", "deployment", "stripe", "payment", "paypal", "invoice", "aws", "cloud", "ec2", "s3", "lambda", "gcloud", "gcp", "compute", "cloud-run", "newrelic", "observability", "monitoring", "alerts", "heroku", "dyno", "appstore", "testflight", "ios", "playstore", "android", "reviews", "postgresql", "mysql", "mongodb", "redis", "sqlite", "typescript", "javascript", "python", "lsp", "pyright", "chrome", "devtools"],
+  "lspServers": {
+    "typescript": {
+      "command": "typescript-language-server",
+      "args": ["--stdio"],
+      "extensionToLanguage": {
+        ".ts": "typescript",
+        ".tsx": "typescriptreact",
+        ".js": "javascript",
+        ".jsx": "javascriptreact",
+        ".mts": "typescript",
+        ".cts": "typescript",
+        ".mjs": "javascript",
+        ".cjs": "javascript"
+      }
+    },
+    "pyright": {
+      "command": "pyright-langserver",
+      "args": ["--stdio"],
+      "extensionToLanguage": {
+        ".py": "python",
+        ".pyi": "python"
+      }
+    },
+    "ruby": {
+      "command": "ruby-lsp",
+      "args": [],
+      "extensionToLanguage": {
+        ".rb": "ruby",
+        ".rake": "ruby",
+        ".gemspec": "ruby",
+        ".ru": "ruby"
+      }
+    },
+    "gopls": {
+      "command": "gopls",
+      "args": ["serve"],
+      "extensionToLanguage": {
+        ".go": "go"
+      }
+    },
+    "bash": {
+      "command": "bash-language-server",
+      "args": ["start"],
+      "extensionToLanguage": {
+        ".sh": "shellscript",
+        ".bash": "shellscript",
+        ".zsh": "shellscript"
+      }
+    },
+    "rust-analyzer": {
+      "command": "rust-analyzer",
+      "args": [],
+      "extensionToLanguage": {
+        ".rs": "rust"
+      }
+    },
+    "yaml": {
+      "command": "yaml-language-server",
+      "args": ["--stdio"],
+      "extensionToLanguage": {
+        ".yml": "yaml",
+        ".yaml": "yaml"
+      }
+    },
+    "sourcekit-lsp": {
+      "command": "sourcekit-lsp",
+      "args": [],
+      "extensionToLanguage": {
+        ".swift": "swift"
+      }
+    },
+    "intelephense": {
+      "command": "intelephense",
+      "args": ["--stdio"],
+      "extensionToLanguage": {
+        ".php": "php"
+      }
+    },
+    "kotlin": {
+      "command": "kotlin-lsp",
+      "args": [],
+      "extensionToLanguage": {
+        ".kt": "kotlin",
+        ".kts": "kotlin"
+      }
+    },
+    "jdtls": {
+      "command": "jdtls",
+      "args": [],
+      "extensionToLanguage": {
+        ".java": "java"
+      }
+    },
+    "clangd": {
+      "command": "clangd",
+      "args": ["--background-index"],
+      "extensionToLanguage": {
+        ".c": "c",
+        ".h": "c",
+        ".cpp": "cpp",
+        ".cc": "cpp",
+        ".cxx": "cpp",
+        ".hpp": "cpp",
+        ".hh": "cpp",
+        ".hxx": "cpp",
+        ".m": "objective-c",
+        ".mm": "objective-cpp"
+      }
+    },
+    "perlnavigator": {
+      "command": "perlnavigator",
+      "args": ["--stdio"],
+      "extensionToLanguage": {
+        ".pl": "perl",
+        ".pm": "perl",
+        ".t": "perl"
+      }
+    }
+  }
 }

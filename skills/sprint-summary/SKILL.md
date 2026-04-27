@@ -1,7 +1,7 @@
 ---
 name: sprint-summary
 description: Summarize sprint work items grouped by repo and ~3-day blocks. Use when the user wants a sprint summary, sprint report, sprint overview, work summary, sprint breakdown, or wants to see what work is planned in a sprint. Fetches tasks and bugs from Jira (excludes stories), estimates effort from descriptions, and groups items into approximately 3-day work blocks per repository.
-allowed-tools: Bash(jira:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(echo:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(xargs:*), Read, Write, mcp__atlassian__searchJiraIssuesUsingJql, mcp__atlassian__getJiraIssue, mcp__atlassian__editJiraIssue, mcp__atlassian__addWorklogToJiraIssue
+allowed-tools: Bash(jira:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(echo:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(xargs:*), Read, Write, mcp__atlassian__searchJiraIssuesUsingJql, mcp__atlassian__getJiraIssue, mcp__atlassian__editJiraIssue
 ---
 
 # Sprint Summary
@@ -34,11 +34,17 @@ This skill uses MCP tools when available and falls back gracefully if they are u
 
    If multiple active sprints exist, ask the user which one to use.
 
-2. **Extract the Jira server URL** for building browse links:
+2. **Extract the Jira server URL** for building browse links — prefer the env var, fall back to the jira-cli config (path varies by platform):
 
    ```bash
-   grep '^server:' ~/.config/.jira/.config.yml | awk '{print $2}'
+   JIRA_SERVER="${JIRA_URL:-$(grep -h '^server:' \
+     ~/.config/.jira/.config.yml \
+     ~/.jira/.config.yml \
+     "${XDG_CONFIG_HOME:-$HOME/.config}/.jira/.config.yml" \
+     2>/dev/null | head -n1 | awk '{print $2}')}"
    ```
+
+   If `$JIRA_SERVER` is empty, ask the user for the Jira base URL.
 
 ## Step 2: Fetch Sprint Items
 

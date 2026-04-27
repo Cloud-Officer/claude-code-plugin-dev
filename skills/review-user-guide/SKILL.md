@@ -1,7 +1,7 @@
 ---
 name: review-user-guide
 description: Review, create, update, check, write, or audit the user guide (docs/user-guide.md). Use when the user wants to write a user guide, write user docs, create user documentation, review the user guide, check the user guide, update user documentation, or document the product for end users.
-allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, WebSearch, mcp__github__search_repositories, mcp__github__get_file_contents, mcp__fetch__fetch, mcp__context7__resolve-library-id, mcp__context7__query-docs
+allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, WebSearch, mcp__github__get_file_contents, mcp__fetch__fetch, mcp__context7__resolve-library-id, mcp__context7__query-docs
 ---
 
 # Review User Guide Documentation
@@ -165,7 +165,7 @@ This skill uses MCP tools when available and falls back gracefully if they are u
 
 | Operation | MCP Tool | CLI Fallback |
 | --- | --- | --- |
-| Get repo metadata | `mcp__github__search_repositories` with owner/name | `gh repo view --json owner,name,description` |
+| Get repo metadata | `mcp__github__get_file_contents` (path: `/`) for top-level structure; for richer metadata use the CLI fallback | `gh repo view --json owner,name,description` |
 | Get file contents | `mcp__github__get_file_contents` | `cat <file>` |
 | Get repo owner/name | Parse from `git remote get-url origin` | `gh repo view --json owner,name` |
 

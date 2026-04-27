@@ -12,6 +12,18 @@
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp"]
     },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp",
+        "--user-data-dir=${PLAYWRIGHT_PROFILE:-${HOME}/.playwright-mcp-default}"
+      ]
+    },
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest"]
+    },
     "postgres": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-postgres"]

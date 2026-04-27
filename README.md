@@ -6,9 +6,16 @@ Claude Code plugin for development workflow automation.
 
 * [Introduction](#introduction)
 * [Installation](#installation)
+  * [Quick Start](#quick-start)
+  * [Configure Remote MCPs (optional)](#configure-remote-mcps-optional)
+  * [Complementary Plugins (optional)](#complementary-plugins-optional)
+  * [Configure Environment Variables](#configure-environment-variables)
+  * [Multi-Account Setups (direnv)](#multi-account-setups-direnv)
+  * [Recommended Permissions](#recommended-permissions)
 * [Usage](#usage)
   * [Commands](#commands)
   * [Skills](#skills)
+  * [Language Servers (LSPs)](#language-servers-lsps)
   * [Local Development](#local-development)
 * [Contributing](#contributing)
 
@@ -39,189 +46,209 @@ This plugin provides development workflow automation for Claude Code.
 
 ## Installation
 
-### Prerequisites
+### Quick Start
 
-#### GitHub Integration
+The plugin bundles MCP servers that need `node` (for `npx`) and `uv` (for
+`uvx`). Most skills also use a CLI as a fallback when the MCP isn't available. Install the **core
+** for everyone, then only the optional CLIs for the skills you actually use.
 
-This plugin includes a bundled [GitHub MCP server](https://github.com/modelcontextprotocol/servers/tree/main/src/github) for structured GitHub access. Skills that interact with GitHub (issues, PRs, repo metadata) will prefer MCP tools when available and automatically fall back to the [`gh` CLI](https://cli.github.com/) if the MCP server is unavailable.
-
-| Method | Requirement | Setup |
-| --- | --- | --- |
-| GitHub MCP (preferred) | `GITHUB_PERSONAL_ACCESS_TOKEN` env var | [Create a PAT](https://github.com/settings/tokens) with `repo` scope and export it |
-| `gh` CLI (fallback) | [GitHub CLI](https://cli.github.com/) | `gh auth login` |
-
-**Note:** At least one method must be configured for GitHub-dependent skills to work (`create-issue`, `review-readme`, `review-architecture`, `review-user-guide`, `work-issue`, `code-review-deep`).
-
-#### Web Fetch
-
-This plugin includes a bundled [Fetch MCP server](https://github.com/modelcontextprotocol/servers/tree/main/src/fetch) that lets skills retrieve and read web page content. It converts HTML to markdown for easier analysis. Used by documentation review skills (`review-readme`, `review-architecture`, `review-user-guide`) to verify external links and references.
-
-| Requirement | Setup |
-| --- | --- |
-| [uv](https://docs.astral.sh/uv/getting-started/installation/) | `curl -LsSf https://astral.sh/uv/install.sh \| sh` or `brew install uv` |
-
-**Note:** No additional configuration needed. The fetch server runs automatically via `uvx` when the plugin is enabled.
-
-#### Library Documentation (Context7)
-
-This plugin includes a bundled [Context7 MCP server](https://github.com/upstash/context7) that provides up-to-date, version-specific documentation for libraries and frameworks. Used by documentation review skills (`review-readme`, `review-architecture`, `review-user-guide`) and `code-review-deep` to verify API usage and best practices against current library docs.
-
-**Note:** No configuration needed. The Context7 server runs automatically via `npx` when the plugin is enabled.
-
-#### Jira Integration (optional)
-
-Skills that interact with Jira (issues, sprints, transitions) will prefer the Atlassian MCP when available and automatically fall back to the [`jira` CLI](https://github.com/ankitpokhrel/jira-cli).
-
-| Method | Requirement | Setup |
-| --- | --- | --- |
-| Atlassian MCP (preferred) | Atlassian Cloud account | See [Remote MCP Servers](#remote-mcp-servers-optional) below |
-| `jira` CLI (fallback) | [Jira CLI](https://github.com/ankitpokhrel/jira-cli) | `jira init` |
-
-**Note:** At least one method must be configured for Jira-dependent skills to work (`create-issue`, `work-issue`, `sprint-summary`).
-
-#### AWS Integration (optional)
-
-This plugin includes a bundled [AWS MCP server](https://docs.aws.amazon.com/aws-mcp/latest/userguide/what-is-mcp-server.html) for managing AWS infrastructure, searching documentation, and executing AWS API calls.
-
-| Requirement | Setup |
-| --- | --- |
-| AWS account + [uv](https://docs.astral.sh/uv/getting-started/installation/) | Configure AWS credentials via `aws configure` and set `AWS_PROFILE` to select the profile, or use env vars (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`) |
-
-#### Google Cloud Integration (optional)
-
-This plugin includes a bundled [gcloud MCP server](https://github.com/googleapis/gcloud-mcp) for managing all Google Cloud services (Compute Engine, Cloud Run, Cloud SQL, GKE, Cloud Storage, IAM, Pub/Sub, etc.). The `gcloud` skill provides general GCP management, while `crashlytics`, `query-db`, and `analyze-db` skills use BigQuery with `bq` CLI fallback.
-
-| Method | Requirement | Setup |
-| --- | --- | --- |
-| gcloud MCP (preferred) | [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) | `gcloud auth login && gcloud config set project <project-id>`. Set `CLOUDSDK_ACTIVE_CONFIG_NAME` to select a named configuration |
-| `gcloud` CLI (fallback) | Same | Same |
-| BigQuery MCP | GCP auth | See [Remote MCP Servers](#remote-mcp-servers-optional) below |
-| `bq` CLI (fallback) | Same | `gcloud auth application-default login` |
-
-#### App Store Connect Integration (optional)
-
-This plugin includes a bundled [asc-mcp](https://github.com/zelentsov-dev/asc-mcp) server for managing iOS/macOS apps on App Store Connect — builds, TestFlight, customer reviews, in-app purchases, and subscriptions. Provides ~60 tools (apps, builds, versions, reviews, beta groups, IAPs).
-
-**Prerequisites:**
-
-1. Install [Mint](https://github.com/yonaskolb/Mint) (Swift package manager) and add it to your PATH:
-
-   ```bash
-   brew install mint
-   ```
-
-   Add `~/.mint/bin` to your PATH in `~/.zshrc` (Mint installs binaries there):
-
-   ```bash
-   export PATH="$HOME/.mint/bin:$PATH"
-   ```
-
-2. Install asc-mcp:
-
-   ```bash
-   mint install zelentsov-dev/asc-mcp
-   ```
-
-3. Create an App Store Connect API key:
-   * Go to [App Store Connect > Users and Access > Integrations > App Store Connect API](https://appstoreconnect.apple.com/access/integrations/api)
-   * Generate a new key and download the `.p8` file
-
-4. Set environment variables:
-
-   ```bash
-   export ASC_KEY_ID="your-key-id"
-   export ASC_ISSUER_ID="your-issuer-id"
-   export ASC_PRIVATE_KEY_PATH="/path/to/AuthKey_XXXXXXXX.p8"
-   ```
-
-**Note:** If `asc-mcp` is not installed, this MCP server will silently fail and other tools remain unaffected.
-
-#### Google Play Reviews Integration (optional)
-
-This plugin includes a bundled [GPlay Reviews MCP server](https://github.com/Kirill812/GPlay_reviews_MCP_server) for fetching and analyzing Google Play Store reviews — filter by rating, date, language, and device, and post or update replies.
-
-**Prerequisites:**
-
-1. Create a Google Cloud service account:
-   * Go to [Google Cloud Console > IAM & Admin > Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts)
-   * Create a service account and download the JSON credentials file
-   * Enable the [Google Play Developer API](https://console.cloud.google.com/apis/library/androidpublisher.googleapis.com)
-   * Grant the service account access in [Google Play Console > Users and permissions](https://play.google.com/console/developers)
-
-2. Set environment variables:
-
-   ```bash
-   export GOOGLE_PLAY_CREDENTIALS_PATH="/path/to/service-account.json"
-   ```
-
-**Note:** If credentials are not configured, this MCP server will silently fail and other tools remain unaffected.
-
-#### Remote MCP Servers (optional)
-
-Claude Code plugins can only bundle local (stdio) MCP servers. The following remote MCP servers use OAuth authentication and must be added by the user. Run these commands once to configure them:
+#### macOS (Homebrew)
 
 ```bash
-# Design
-claude mcp add figma --transport http https://mcp.figma.com/mcp
-
-# Project management
-claude mcp add atlassian --transport http https://mcp.atlassian.com/v1/mcp
-
-# Deployment
-claude mcp add vercel --transport http https://mcp.vercel.com
-
-# Payments
-claude mcp add stripe --transport http https://mcp.stripe.com
-claude mcp add paypal --transport http https://mcp.paypal.com/http
-
-# Observability
-claude mcp add newrelic --transport http https://mcp.newrelic.com/mcp/
-
-# Google Cloud (BigQuery)
-claude mcp add bigquery --transport http https://bigquery.googleapis.com/mcp
+# Core (required)
+brew install node uv gh jq
 ```
 
-Each server will prompt for OAuth authentication on first use. Only add the servers you need — skills will fall back to CLI tools if a remote MCP server is unavailable.
+In Claude Code:
 
-#### Database Integration (optional)
-
-This plugin includes bundled MCP servers for [PostgreSQL](https://www.npmjs.com/package/@modelcontextprotocol/server-postgres), [MySQL](https://github.com/benborla/mcp-server-mysql), [MongoDB](https://www.mongodb.com/docs/mcp-server/), and [Redis](https://redis.io/docs/latest/integrate/redis-mcp/). The `query-db` and `analyze-db` skills will prefer MCP tools when available and fall back to CLI clients if the MCP servers are unavailable.
-
-| Database | MCP Server | Env Vars (set in your shell) | CLI Fallback |
-| --- | --- | --- | --- |
-| PostgreSQL | `@modelcontextprotocol/server-postgres` | `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` | `psql` |
-| MySQL | `@benborla/mcp-server-mysql` | `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE` | `mysql` |
-| MongoDB | `mongodb-mcp-server` | `MDB_MCP_CONNECTION_STRING` | `mongosh` |
-| Redis | `redis-mcp-server` | `REDIS_HOST`, `REDIS_PORT`, `REDIS_PWD` or `REDIS_URL` | `redis-cli` |
-
-**Note:** MCP servers inherit connection env vars from your shell — no credentials are stored in the plugin. BigQuery has a remote MCP server (see [Remote MCP Servers](#remote-mcp-servers-optional) above). SQLite and Elasticsearch have no MCP servers and always use CLI (`sqlite3`, `curl`). For SQLite, set `SQLITE_DB` to the path of your database file.
-
-#### Other Prerequisites
-
-Some skills require additional CLI tools:
-
-| Skill | Requires | Setup |
-| --- | --- | --- |
-| `crashlytics` | [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) (`bq` CLI) | `gcloud auth application-default login` and set `BQ_*` env vars |
-| `query-db` / `analyze-db` | BigQuery CLI (`bq`) or Elasticsearch (`curl`) | Install the relevant client and set connection env vars |
-| `loco` | `curl`, `jq` | Set `LOCO_API_KEY_*` env vars |
-| `vercel` (fallback) | [Vercel CLI](https://vercel.com/docs/cli) | `npm i -g vercel && vercel login` |
-| `stripe` (fallback) | [Stripe CLI](https://docs.stripe.com/stripe-cli) | `brew install stripe/stripe-cli/stripe && stripe login` |
-| `aws` (fallback) | [AWS CLI](https://aws.amazon.com/cli/) | `aws configure` |
-| `gcloud` (fallback) | [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) | `gcloud auth login` |
-| `newrelic` (fallback) | [New Relic CLI](https://github.com/newrelic/newrelic-cli) | `brew install newrelic-cli && newrelic profile add` |
-| `heroku` (fallback) | [Heroku CLI](https://devcenter.heroku.com/articles/heroku-cli) | `brew install heroku && heroku login` |
-
-### Install Plugin
-
-```bash
+```text
 /plugin marketplace add cloud-officer/claude-code-plugin-dev
 /plugin install co-dev@cloud-officer
 ```
 
+After install:
+
+```bash
+# Browser automation (Playwright MCP) — first run only
+npx playwright install chromium
+```
+
+Optional service CLIs — install only what you need (each maps to a skill in the [Skills](#skills) table below):
+
+```bash
+brew install awscli google-cloud-sdk heroku newrelic-cli # cloud
+brew install stripe/stripe-cli/stripe # stripe
+brew tap ankitpokhrel/jira-cli && brew install jira-cli # jira
+brew install mint && mint install zelentsov-dev/asc-mcp # iOS App Store Connect
+npm i -g vercel # vercel
+```
+
+Language servers (LSPs) — only what you write. The plugin declares LSPs for many languages, but each binary needs to be on your PATH for that language to activate:
+
+```bash
+# JavaScript/TypeScript (covers .ts/.tsx/.js/.jsx/.mts/.cts/.mjs/.cjs)
+npm i -g typescript typescript-language-server
+
+# Python (covers .py/.pyi)
+brew install pyright
+
+# Ruby (covers .rb/.rake/.gemspec/.ru)
+gem install ruby-lsp
+
+# Go (covers .go)
+go install golang.org/x/tools/gopls@latest
+
+# Bash/shell (covers .sh/.bash/.zsh)
+npm i -g bash-language-server
+
+# Rust (covers .rs)
+rustup component add rust-analyzer
+
+# YAML (covers .yml/.yaml; provides GitHub Actions/k8s schema validation)
+npm i -g yaml-language-server
+
+# Swift (covers .swift) — bundled with Xcode, no install needed if Xcode is installed
+
+# PHP (covers .php)
+npm i -g intelephense
+
+# Kotlin (covers .kt/.kts) — JetBrains' official LSP, requires Java 17+
+brew install JetBrains/utils/kotlin-lsp
+
+# Java (covers .java)
+brew install jdtls
+
+# C/C++/Objective-C (covers .c/.cpp/.h/.hpp/.m/.mm) — bundled with llvm
+brew install llvm
+
+# Perl (covers .pl/.pm/.t)
+npm i -g perlnavigator-server
+```
+
+Each LSP is **inert until matching files exist
+** — you only pay startup cost in repos that actually have those file types.
+
+#### Linux (Debian/Ubuntu)
+
+```bash
+# Core (required)
+sudo apt update && sudo apt install -y curl jq git nodejs npm
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# gh: https://github.com/cli/cli/blob/trunk/docs/install_linux.md
+```
+
+In Claude Code:
+
+```text
+/plugin marketplace add cloud-officer/claude-code-plugin-dev
+/plugin install co-dev@cloud-officer
+```
+
+After install:
+
+```bash
+npx playwright install chromium
+```
+
+Optional service CLIs: each tool ships its own Linux installer — see official docs for `aws`, `gcloud`, `heroku`,
+`stripe`, `vercel`, `newrelic`, `jira-cli`. App Store Connect is macOS-only.
+
+Language servers (LSPs): the `npm`, `gem`, `go install`, `rustup`, and
+`cpan` install commands listed under the macOS section are cross-platform. Use your distro's package manager for
+`clangd` (often `clang-tools` or `llvm`) and `pyright` (or
+`pip install pyright`). Swift LSP requires Xcode (macOS only).
+
+#### Windows (Scoop)
+
+```powershell
+# Core (required)
+scoop install nodejs uv gh jq
+```
+
+In Claude Code:
+
+```text
+/plugin marketplace add cloud-officer/claude-code-plugin-dev
+/plugin install co-dev@cloud-officer
+```
+
+After install:
+
+```powershell
+npx playwright install chromium
+```
+
+Optional service CLIs: install via `scoop`, `winget`, or each tool's installer. App Store Connect is macOS-only.
+
+Language servers (LSPs): the `npm`, `gem`, `go install`, `rustup`, and
+`cpan` install commands listed under the macOS section work on Windows under their respective toolchains. Use
+`scoop install llvm` for `clangd`. Swift LSP is macOS-only (requires Xcode).
+
+### Configure Remote MCPs (optional)
+
+Some skills use remote MCP servers (OAuth, no local install). Add only the ones you'll use:
+
+```bash
+claude mcp add atlassian --transport http https://mcp.atlassian.com/v1/mcp
+claude mcp add bigquery --transport http https://bigquery.googleapis.com/mcp
+claude mcp add figma --transport http https://mcp.figma.com/mcp
+claude mcp add newrelic --transport http https://mcp.newrelic.com/mcp/
+claude mcp add paypal --transport http https://mcp.paypal.com/http
+claude mcp add stripe --transport http https://mcp.stripe.com
+claude mcp add vercel --transport http https://mcp.vercel.com
+```
+
+Each prompts for OAuth on first use. Skills that need a remote MCP fall back to a CLI when one exists — see the **Setup
+** column in the [Skills](#skills) table for which skill needs which.
+
+### Complementary Plugins (optional)
+
+These official plugins from the `claude-plugins-official` marketplace pair well with
+`co-dev`. They're independent — install only the ones relevant to your work. The
+`claude-plugins-official` marketplace is auto-installed by Claude Code, so no `marketplace add` step is needed.
+
+| Plugin                 | What it adds                                                                                                                        | Install                                                        |
+|------------------------|-------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------|
+| `plugin-dev`           | Toolkit for developing Claude Code plugins — 7 skills (hooks, MCP, structure, settings, commands, agents, skills) + validators      | `/plugin install plugin-dev@claude-plugins-official`           |
+| `claude-md-management` | Audit and revise CLAUDE.md files based on session learnings                                                                         | `/plugin install claude-md-management@claude-plugins-official` |
+| `claude-code-setup`    | Analyze a codebase and recommend Claude Code automations to add                                                                     | `/plugin install claude-code-setup@claude-plugins-official`    |
+| `skill-creator`        | Guided skill creation workflow (overlaps with `plugin-dev`'s skill-development skill — pick one)                                    | `/plugin install skill-creator@claude-plugins-official`        |
+| `code-simplifier`      | Refactor recently-modified code for clarity, DRY, and consistency                                                                   | `/plugin install code-simplifier@claude-plugins-official`      |
+| `code-review`          | Lean automated PR review with confidence scoring (alternative to `co-dev`'s `/code-review-deep`, which is broader and not PR-bound) | `/plugin install code-review@claude-plugins-official`          |
+| `security-guidance`    | Proactive security hints via PreToolUse hooks (complements `code-review-deep`'s reactive audit)                                     | `/plugin install security-guidance@claude-plugins-official`    |
+| `frontend-design`      | Opinionated patterns for production-grade frontend interfaces                                                                       | `/plugin install frontend-design@claude-plugins-official`      |
+| `superpowers`          | Brainstorming and subagent-driven workflows                                                                                         | `/plugin install superpowers@claude-plugins-official`          |
+| `agent-sdk-dev`        | Toolkit for building apps on the Anthropic **Agent SDK** (a different stack from Claude Code plugins)                               | `/plugin install agent-sdk-dev@claude-plugins-official`        |
+
+### Configure Environment Variables
+
+All credentials are read from **environment variables
+** — they are never stored in the plugin. Each skill's required vars are listed in the **Setup
+** column of the [Skills](#skills) table below.
+
+For switching between accounts/projects per directory, see the [Multi-Account Setups](#multi-account-setups-direnv) section.
+
+### Multi-Account Setups (direnv)
+
+Every account-bound MCP server in this plugin reads its credentials from environment variables — no credentials are stored in
+`.mcp.json`. This makes [direnv](https://direnv.net/) a natural fit for switching between accounts (different AWS profiles, separate Postgres instances, multiple GitHub orgs, etc.) by setting per-directory env vars in an
+`.envrc` file.
+
+**Important caveat:** Claude Code spawns MCP servers **once, at startup
+**, and they inherit the shell environment at that moment. The implication:
+
+* ✓ Works: `cd ~/project-a && claude` — MCPs pick up project-a's env vars from `.envrc`. Quit,
+  `cd ~/project-b && claude` — MCPs pick up project-b's env vars.
+* ✗ Does not work: starting Claude Code in one project, then
+  `cd`-ing to another mid-session. The already-running MCP servers keep the original env vars and continue talking to the original account.
+
+**Bottom line:
+** to switch accounts, quit Claude Code and relaunch it from the target directory. direnv handles the rest.
+
 ### Recommended Permissions
 
-This plugin bundles several MCP servers. By default, Claude Code will prompt for permission each time an MCP tool is called. To auto-approve these tools, add the following entries to the `permissions.allow` array in your `~/.claude/settings.json`:
+This plugin bundles several MCP servers. By default, Claude Code will prompt for permission each time an MCP tool is called. To auto-approve these tools, add the following entries to the
+`permissions.allow` array in your `~/.claude/settings.json`:
 
 ```json
 {
@@ -229,6 +256,7 @@ This plugin bundles several MCP servers. By default, Claude Code will prompt for
     "allow": [
       "mcp__appstore__*",
       "mcp__aws__*",
+      "mcp__chrome-devtools__*",
       "mcp__context7__*",
       "mcp__fetch__*",
       "mcp__gcloud__*",
@@ -236,6 +264,7 @@ This plugin bundles several MCP servers. By default, Claude Code will prompt for
       "mcp__mongodb__*",
       "mcp__mysql__*",
       "mcp__playstore__*",
+      "mcp__playwright__*",
       "mcp__postgres__*",
       "mcp__redis__*"
     ]
@@ -243,7 +272,7 @@ This plugin bundles several MCP servers. By default, Claude Code will prompt for
 }
 ```
 
-If you also use remote MCP servers (see [Remote MCP Servers](#remote-mcp-servers-optional)), add their patterns too:
+If you also use remote MCP servers (see [Configure Remote MCPs](#configure-remote-mcps-optional)), add their patterns too:
 
 ```json
 {
@@ -261,44 +290,88 @@ If you also use remote MCP servers (see [Remote MCP Servers](#remote-mcp-servers
 }
 ```
 
-**Note:** These entries merge with your existing `allow` list — you don't need to replace it. Only add entries for the MCP servers you actually use.
+**Note:** These entries merge with your existing
+`allow` list — you don't need to replace it. Only add entries for the MCP servers you actually use.
 
 ## Usage
 
 ### Commands
 
 | Command                         | Description                                            |
-| ------------------------------- | ------------------------------------------------------ |
+|---------------------------------|--------------------------------------------------------|
 | `/co-dev:work-issue <issue-id>` | Work on a GitHub or Jira issue (bug, feature, or task) |
 | `/co-dev:code-review-deep`      | Deep code review using parallel agent strategy         |
 
 ### Skills
 
-These skills are automatically available to Claude:
+These skills are automatically available to Claude. The **Setup
+** column lists what you need to configure for each — env vars, one-time auth commands, or remote MCP additions. Skills with no setup work out of the box.
 
-| Skill                 | Description                                                  |
-| --------------------- | ------------------------------------------------------------ |
-| `analyze-db`          | Generate docs/DB.md with database schema docs                |
-| `appstore`            | Manage App Store Connect (builds, TestFlight, reviews, IAPs) |
-| `aws`                 | Manage AWS infrastructure and services                       |
-| `create-issue`        | Create GitHub or Jira issues with proper templates           |
-| `create-pr`           | Generate commit message, PR title, and PR body               |
-| `crashlytics`         | Query Firebase Crashlytics crash data from BigQuery          |
-| `gcloud`              | Manage Google Cloud infrastructure and services              |
-| `heroku`              | Manage Heroku apps, dynos, logs, and databases               |
-| `loco`                | Manage Loco translation assets (create, delete, scan)        |
-| `newrelic`            | Query New Relic observability data, alerts, and logs         |
-| `paypal`              | Manage PayPal invoices, payments, and disputes               |
-| `playstore`           | Fetch, analyze, and respond to Google Play reviews           |
-| `query-db`            | Query databases using natural language via CLI               |
-| `review-architecture` | Review or create docs/architecture.md                        |
-| `review-design`       | Compare UI code against Figma designs (Android, iOS, web)    |
-| `review-readme`       | Review or create README.md to match standards                |
-| `review-user-guide`   | Review or create docs/user-guide.md with user documentation  |
-| `run-linters`         | Run linters and fix any issues found                         |
-| `sprint-summary`      | Summarize sprint items grouped by repo in ~3-day blocks      |
-| `stripe`              | Manage Stripe payments, customers, and subscriptions         |
-| `vercel`              | Manage Vercel deployments and projects                       |
+| Skill                 | Description                                                  | Setup                                                                                                                                                                                                                                               |
+|-----------------------|--------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `analyze-db`          | Generate docs/DB.md with database schema docs                | DB-specific env vars — see `query-db` row                                                                                                                                                                                                           |
+| `appstore`            | Manage App Store Connect (builds, TestFlight, reviews, IAPs) | macOS-only. `mint install zelentsov-dev/asc-mcp`. Env: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY_PATH` (path to `.p8`). [Create API key](https://appstoreconnect.apple.com/access/integrations/api)                                           |
+| `aws`                 | Manage AWS infrastructure and services                       | `aws configure`, or env: `AWS_PROFILE` *(or)* `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` + `AWS_REGION`                                                                                                                                          |
+| `create-issue`        | Create GitHub or Jira issues with proper templates           | GitHub: `GITHUB_PERSONAL_ACCESS_TOKEN` *(or)* `gh auth login`. Jira: atlassian remote MCP *(or)* `jira init`                                                                                                                                        |
+| `create-pr`           | Generate commit message, PR title, and PR body               | None — uses local `git`                                                                                                                                                                                                                             |
+| `crashlytics`         | Query Firebase Crashlytics crash data from BigQuery          | bigquery remote MCP *(or)* `gcloud auth application-default login`. Env: `BQ_PROJECT`, `BQ_CRASHLYTICS_DATASET`                                                                                                                                     |
+| `gcloud`              | Manage Google Cloud infrastructure and services              | `gcloud auth login && gcloud config set project <id>`. Optional: `CLOUDSDK_ACTIVE_CONFIG_NAME` for named configs                                                                                                                                    |
+| `heroku`              | Manage Heroku apps, dynos, logs, and databases               | `heroku login`                                                                                                                                                                                                                                      |
+| `loco`                | Manage Loco translation assets (create, delete, scan)        | Env: `LOCO_API_KEY` *(or)* per-project `LOCO_API_KEY_<PROJECT>` (e.g. `LOCO_API_KEY_IOS`)                                                                                                                                                           |
+| `newrelic`            | Query New Relic observability data, alerts, and logs         | newrelic remote MCP *(or)* `newrelic profile add --name default --apiKey NRAK-... --accountId ...`                                                                                                                                                  |
+| `paypal`              | Manage PayPal invoices, payments, and disputes               | paypal remote MCP **(required — no CLI fallback)**                                                                                                                                                                                                  |
+| `playstore`           | Fetch, analyze, and respond to Google Play reviews           | Env: `GOOGLE_PLAY_CREDENTIALS_PATH` (path to service-account JSON; needs Google Play Developer API + Play Console access)                                                                                                                           |
+| `query-db`            | Query databases using natural language via CLI               | Per DB: PG (`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`) · MySQL (`MYSQL_*`) · Mongo (`MDB_MCP_CONNECTION_STRING`) · Redis (`REDIS_URL`) · SQLite (`SQLITE_DB`) · BigQuery (`BQ_PROJECT`, `BQ_DATASETS`) · ES (`ES_URL`, `ES_API_KEY`) |
+| `review-architecture` | Review or create docs/architecture.md                        | None — uses bundled `fetch` + `context7` MCPs                                                                                                                                                                                                       |
+| `review-design`       | Compare UI code against Figma designs (Android, iOS, web)    | figma remote MCP **(required — no CLI fallback)**                                                                                                                                                                                                   |
+| `review-readme`       | Review or create README.md to match standards                | None — uses bundled `fetch` + `context7` MCPs                                                                                                                                                                                                       |
+| `review-user-guide`   | Review or create docs/user-guide.md with user documentation  | None — uses bundled `fetch` + `context7` MCPs                                                                                                                                                                                                       |
+| `run-linters`         | Run linters and fix any issues found                         | None — runs project linters already configured in the repo                                                                                                                                                                                          |
+| `sprint-summary`      | Summarize sprint items grouped by repo in ~3-day blocks      | atlassian remote MCP *(or)* `jira init`                                                                                                                                                                                                             |
+| `stripe`              | Manage Stripe payments, customers, and subscriptions         | stripe remote MCP *(or)* `stripe login`                                                                                                                                                                                                             |
+| `vercel`              | Manage Vercel deployments and projects                       | vercel remote MCP *(or)* `vercel login`                                                                                                                                                                                                             |
+| `weekly-dev-report`   | Weekly dev activity report from Jira sprint + GitHub         | atlassian remote MCP *(or)* `jira init`. GitHub: `gh auth login`. Optional env: `WEEKLY_DEV_REPORT_TO` (required for `--send`), `WEEKLY_DEV_REPORT_CC`, `GITHUB_USERNAME_MAP`                                                                       |
+
+### Language Servers (LSPs)
+
+The plugin declares LSPs for 13 languages. Each is **idle until you open a matching file** in your workspace — opening
+`app.ts` activates the TypeScript LSP, opening `lib.go` activates
+`gopls`, etc. No LSP runs in a repo that doesn't have matching file extensions.
+
+**Why they matter:** an active LSP gives Claude **real type information
+** from your installed dependencies — function signatures, references, type definitions, completions — instead of inferring from source code. This is what stops Claude from hallucinating method names on third-party libraries or guessing the shape of a return type. Any skill that touches code (
+`code-review-deep`, `run-linters`, `work-issue`,
+`create-pr`, the deep-analysis agents) becomes meaningfully more accurate.
+
+**Activation rules:**
+
+* LSPs spawn on demand when matching file extensions exist in the workspace, and stop when Claude Code exits.
+* If the LSP binary is not on your
+  `PATH`, that language silently falls back to source-only analysis — the rest of the plugin is unaffected.
+* Each LSP communicates over stdio with Claude Code's LSP host; you don't interact with them directly.
+* They are **independent of the bundled MCP servers
+  ** — different protocol, different lifecycle, different purpose. MCPs give Claude tools (e.g., "search GitHub", "query a database"). LSPs give Claude knowledge of your code.
+
+**Bundled LSPs:**
+
+| Language               | LSP binary                           | File extensions                                                       |
+|------------------------|--------------------------------------|-----------------------------------------------------------------------|
+| TypeScript /JavaScript | `typescript-language-server`         | `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts`, `.mjs`, `.cjs`          |
+| Python                 | `pyright-langserver`                 | `.py`, `.pyi`                                                         |
+| Ruby                   | `ruby-lsp`                           | `.rb`, `.rake`, `.gemspec`, `.ru`                                     |
+| Go                     | `gopls`                              | `.go`                                                                 |
+| Bash                   | `bash-language-server`               | `.sh`, `.bash`, `.zsh`                                                |
+| Rust                   | `rust-analyzer`                      | `.rs`                                                                 |
+| YAML                   | `yaml-language-server`               | `.yml`, `.yaml` (provides GitHub Actions / k8s schema validation)     |
+| Swift                  | `sourcekit-lsp` (bundled with Xcode) | `.swift`                                                              |
+| PHP                    | `intelephense`                       | `.php`                                                                |
+| Kotlin                 | `kotlin-lsp` (JetBrains, pre-alpha)  | `.kt`, `.kts` — JVM-only Gradle/Maven projects; KMP not yet supported |
+| Java                   | `jdtls`                              | `.java`                                                               |
+| C / C++ / Objective-C  | `clangd`                             | `.c`, `.cpp`, `.cc`, `.cxx`, `.h`, `.hpp`, `.hh`, `.hxx`, `.m`, `.mm` |
+| Perl                   | `perlnavigator`                      | `.pl`, `.pm`, `.t`                                                    |
+
+Install commands per LSP are in the [macOS Quick Start](#macos-homebrew) section. **Install only the LSPs for languages
+you actually write** — each one adds a small startup cost only when its file types appear in a workspace.
 
 ### Local Development
 
@@ -324,5 +397,4 @@ Pull requests are the best way to propose changes to the codebase. We actively w
 4. Make sure your code lints.
 5. Issue that pull request!
 
-When you submit code changes, your submissions are understood to be under the same [License](LICENSE) that covers the
-project. Feel free to contact the maintainers if that's a concern.
+When you submit code changes, your submissions are understood to be under the same [License](LICENSE) that covers the project. Feel free to contact the maintainers if that's a concern.
