@@ -106,18 +106,42 @@ Steps 4–6 and 8 are gated by Issue Type (detected above). The gating column on
 
    **If no Figma links are found or Figma MCP is unavailable, skip this step.**
 
-3. **Prepare repository** (all types)
+3. **Prepare an isolated worktree** (all types)
+
+   This step uses `git worktree` instead of `git checkout -b`. Worktrees give each issue its own working directory, so any uncommitted work in the user's main checkout is left untouched and multiple issues can be in flight in parallel.
 
    ```bash
    DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
+   REPO_ROOT=$(git rev-parse --show-toplevel)
+   cd "$REPO_ROOT"
    git fetch --all
-   git checkout $DEFAULT_BRANCH
-   git pull origin $DEFAULT_BRANCH
+   ```
+
+   Decide the branch name from the issue tracker:
+
+   - GitHub: `BRANCH=issue-$ARGUMENTS`
+   - Jira: `BRANCH=$ARGUMENTS` (uppercase — matches the Jira key)
+
+   Ensure `.worktrees/` is gitignored in the target repo. If it isn't, add and commit the change before creating the worktree (otherwise the worktree contents would pollute `git status`):
+
+   ```bash
+   if ! git check-ignore -q .worktrees 2>/dev/null; then
+     echo ".worktrees/" >> .gitignore
+     git add .gitignore && git commit -m "Ignore .worktrees/ directory"
+   fi
+   ```
+
+   Create the worktree on a new branch based on the **latest** default branch (not the user's current `HEAD`):
+
+   ```bash
+   git worktree add ".worktrees/$BRANCH" -b "$BRANCH" "origin/$DEFAULT_BRANCH"
+   cd ".worktrees/$BRANCH"
    git submodule update --init --recursive
    ```
 
-   - GitHub: `git checkout -b issue-$ARGUMENTS`
-   - Jira: `git checkout -b $ARGUMENTS` (uppercase)
+   All subsequent steps (exploration, edits, commit, push, PR) run from inside `.worktrees/$BRANCH`. The user's main checkout is untouched.
+
+   **Note for Claude Code users:** `claude --worktree <name>` provides a similar isolated-workspace flow at the harness level. This command intentionally manages the worktree itself so the workflow is portable across CLI invocations.
 
 4. **Codebase exploration** (Feature: required · Task: if non-trivial · Bug: skip)
 
@@ -212,9 +236,19 @@ Steps 4–6 and 8 are gated by Issue Type (detected above). The gating column on
 
 11. **Cleanup** (all types)
 
-    ```bash
-    git checkout $DEFAULT_BRANCH
-    ```
+    Two options — ask the user which they want, defaulting to **keep** so they can inspect or continue iterating:
+
+    - **Keep the worktree** (default): just `cd "$REPO_ROOT"` to return to the main checkout. The worktree at `.worktrees/$BRANCH` stays put for follow-up work.
+    - **Remove the worktree** (if the PR has merged or the work is abandoned):
+
+      ```bash
+      cd "$REPO_ROOT"
+      git worktree remove ".worktrees/$BRANCH"
+      # If the worktree has uncommitted changes, `git worktree remove` will refuse.
+      # Confirm with the user before forcing: `git worktree remove --force ".worktrees/$BRANCH"`
+      ```
+
+    The local branch is preserved either way. Delete it explicitly with `git branch -D "$BRANCH"` once the PR is merged.
 
 ## Rules
 
