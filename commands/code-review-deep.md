@@ -1,3 +1,9 @@
+---
+description: Exhaustive multi-phase code audit using parallel agents (security, deps, quality, infra, etc.)
+argument-hint: "[scope]"
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(jq:*), Bash(awk:*), Bash(cat:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(ls:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, Agent, AskUserQuestion, WebSearch, WebFetch, mcp__github__*, mcp__context7__*
+---
+
 # Deep Code Review (Parallel Agent Strategy)
 
 ## MCP Tools with Fallbacks
@@ -11,7 +17,7 @@ This command uses MCP tools when available and falls back gracefully if they are
 | Operation | MCP Tool | CLI Fallback |
 | --- | --- | --- |
 | Check issues enabled | `mcp__github__list_issues` (if it succeeds, issues are enabled) | `gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'` |
-| Check repo visibility | `mcp__github__search_repositories` with owner/name | `gh repo view --json isPrivate --jq '.isPrivate'` |
+| Check repo visibility | `gh repo view --json isPrivate` (no MCP equivalent — `search_repositories` is for searching, not metadata) | `gh repo view --json isPrivate --jq '.isPrivate'` |
 | Get repo owner/name | Parse from `git remote get-url origin` | `gh repo view --json owner,name` |
 | Check repo settings | No MCP equivalent — use `gh api` | `gh api "repos/{owner}/{repo}" --jq '...'` |
 
@@ -63,6 +69,7 @@ You are a senior staff engineer orchestrating an exhaustive code audit using par
     [ ] Agent 2.16 Bug Patterns - status: (pending), findings: (pending)
     [ ] Agent 2.18 Documentation - status: (pending), findings: (pending)
     [ ] Agent 2.19 CI/CD - status: (pending), findings: (pending)
+    [ ] Agent 2.20 Comment Quality - status: (pending), findings: (pending)
 
     Conditional Agents (mark N/A if not applicable):
     [ ] Agent 2.5 IaC - applicable: (pending), status: (pending), findings: (pending)
@@ -84,6 +91,13 @@ You are a senior staff engineer orchestrating an exhaustive code audit using par
     - findings_without_code_quotes: (pending) - auto-rejected
     - findings_without_repo_check: (pending) - auto-rejected for CI/CD findings
 
+[ ] Phase 3.5: Confidence Filter
+    - threshold_used: (pending) - default 80, or user-specified value
+    - findings_above_threshold: (pending)
+    - findings_filtered_by_confidence: (pending)
+    - critical_kept_below_threshold: (pending) - critical findings kept under the 50–80 exception
+    - confidence_distribution: (pending) - count at 25/50/75/100
+
 [ ] Phase 4: Report Generation
     - all_phases_complete: (pending)
     - health_score: (pending)
@@ -97,8 +111,9 @@ You are a senior staff engineer orchestrating an exhaustive code audit using par
 1. **Phase 1 MUST complete before Phase 2** - All 3 agents must return results
 2. **Phase 2 agents determined by Phase 1** - Mark conditional agents as N/A if not applicable
 3. **ALL Phase 2 agents must complete before Phase 3** - Do not skip agents
-4. **Phase 3 must validate ALL findings** - Not just a sample
-5. **Phase 4 report must include the completed phase log** - Proves all phases executed
+4. **Phase 3 must validate ALL findings** - Not just a sample. Every CONFIRMED finding must include a confidence score.
+5. **Phase 3.5 must apply the confidence filter** - Cannot generate the report from raw Phase 3 output
+6. **Phase 4 report must include the completed phase log** - Proves all phases executed
 
 **DO NOT SKIP PHASES OR AGENTS.** Even if early phases suggest no issues in an area, run ALL applicable agents. Issues are often only revealed through thorough analysis.
 
@@ -111,9 +126,10 @@ This review uses **parallel agents** for speed and thoroughness. Execute phases 
 | Phase | Parallel Agents | Purpose |
 | ----- | --------------- | ------- |
 | 1 | 3 | Quick scans: tech stack, configs, structure |
-| 2 | 4-19 | Core (security, deps, quality, tests) + conditional (IaC, perf, observability, API, concurrency, AI/ML, compliance, git, migrations, i18n, config, bugs, backwards compat, docs, CI/CD) |
-| 3 | N (max 3 per agent) | **Adversarial validation**: Try to DISPROVE each finding. Reject false positives. |
-| 4 | 1 (you) | Aggregate CONFIRMED findings only and generate report |
+| 2 | 4-20 | Core (security, deps, quality, tests, comments) + conditional (IaC, perf, observability, API, concurrency, AI/ML, compliance, git, migrations, i18n, config, bugs, backwards compat, docs, CI/CD) |
+| 3 | N (max 3 per agent) | **Adversarial validation**: Try to DISPROVE each finding + score 0–100 confidence on CONFIRMs |
+| 3.5 | 0 (you) | **Confidence filter**: drop CONFIRMED findings below threshold (default 80, Critical exception ≥50) |
+| 4 | 1 (you) | Aggregate kept findings, list filtered ones in an appendix, and generate report |
 
 ---
 
@@ -241,14 +257,22 @@ If the user chooses option 2, delete the existing `CODE_REVIEW_REPORT.md` and pr
 ### Agent 2.4: Testing Assessment
 
 **Prompt:**
-> Assess test coverage in this codebase:
+> Assess test coverage AND test quality. Focus on **behavioral coverage** (would tests catch real regressions?) over line coverage.
 >
 > 1. **Coverage:** For each service/repository/viewmodel/controller, check if corresponding test file exists. Calculate percentage.
 > 2. **Quality:** Flag tests without assertions, tests with sleep/delays, tests with logic (if/loops).
 > 3. **Types:** Check presence of unit, integration, E2E, contract, security tests.
 > 4. **Flaky Indicators:** Flag use of current date/time, random without seed, order-dependent tests.
+> 5. **Behavioral coverage gaps** — rate each gap on a 1–10 criticality scale (10 = could cause data loss, security incident, or system failure; 1 = minor):
+>    - **Negative tests missing:** validation logic with no test that *bad input is rejected*
+>    - **Error-path tests missing:** catch blocks, error returns, timeout handlers without coverage
+>    - **Boundary edge cases:** empty input, max size, zero, negative, off-by-one inputs
+>    - **Async/concurrent behavior untested:** race conditions, ordering guarantees, retry/timeout logic
+> 6. **Implementation coupling smell:**
+>    - Tests asserting on private methods, internal data structures, or exact log strings (break on legitimate refactors)
+>    - Tests that mirror implementation 1:1 instead of asserting on behavior contracts
 >
-> Return as JSON: `{coverage: {services: "X/Y (Z%)", viewmodels: "X/Y (Z%)", missing: [files]}, anti_patterns: [{type, file, count}], test_types: {unit: bool, integration: bool, e2e: bool}}`
+> Return as JSON: `{coverage: {services: "X/Y (Z%)", viewmodels: "X/Y (Z%)", missing: [files]}, anti_patterns: [{type, file, count}], test_types: {unit: bool, integration: bool, e2e: bool}, behavioral_gaps: [{type, description, file, criticality_1_to_10}], coupling_smells: [{description, file, line}]}`
 
 ### Agent 2.5: Infrastructure as Code Review (If IaC detected in Phase 1)
 
@@ -549,6 +573,11 @@ If the user chooses option 2, delete the existing `CODE_REVIEW_REPORT.md` and pr
 >    - Error swallowing (log and continue without recovery)
 >    - Missing error context when rethrowing
 >    - Panic/crash for recoverable errors
+>    - **Returning null/undefined/default values on error WITHOUT logging** — hides the failure entirely; flag every occurrence
+>    - **Optional chaining (`?.`) used as error suppression** — different from null-safety; flag when it skips operations that should have surfaced an error
+>    - **Production fallback to mock/stub/fake implementations** — architectural smell; production code should never silently fall back to test doubles
+>    - **Retry exhaustion without informing the user** — final failure after all retries must surface to the caller
+>    - **Generic non-actionable user-facing error messages** — "Something went wrong" with no context and no next step
 > 7. **Error Propagation:** Errors not bubbling with context, sensitive data in error messages, missing correlation IDs
 >
 > Return as JSON: `{null_bugs: [{issue, severity, file, line}], bounds_bugs: [{issue, severity, file}], arithmetic_bugs: [{issue, severity, file}], resource_bugs: [{issue, severity, file}], state_bugs: [{issue, severity, file}], error_handling: {silent_failures: {count, files}, strategy_issues: [{issue, severity}]}, error_propagation: [{issue, severity}]}`
@@ -722,6 +751,29 @@ If the user chooses option 2, delete the existing `CODE_REVIEW_REPORT.md` and pr
 >
 > **IMPORTANT:** The `api_check_output` field MUST contain the actual output from `gh api repos/{owner}/{repo} --jq '.security_and_analysis.dependabot_security_updates.status'`. If this field is missing or empty, the dependency_monitoring section is incomplete.
 
+### Agent 2.20: Code Comment Quality Review (Always run)
+
+**Prompt:**
+> Review **in-code comments** (inline `//`, `#`, `/* */`, docstrings) for accuracy and long-term value. Project-level docs (README, architecture.md) are covered by Agent 2.18 — do not duplicate.
+>
+> **Check for:**
+>
+> 1. **Factual inaccuracy:** Function signatures don't match documented parameters/return types. Described behavior contradicts actual code. Referenced types/functions/variables that no longer exist or are misused.
+> 2. **Outdated references:** Comments referring to renamed/refactored code. Examples in comments that don't match current implementation. Performance/complexity claims no longer accurate.
+> 3. **Stale TODOs and FIXMEs:** Items that may already have been silently addressed (cross-check against current code). TODOs without owner, ticket reference, or date.
+> 4. **Restating obvious code:** `// increment counter` above `counter++`. Comments describing WHAT instead of WHY. Flag for removal.
+> 5. **Misleading or ambiguous language:** Phrases that could be interpreted multiple ways. Assumptions stated as fact that may no longer hold.
+> 6. **Missing critical context (selective, not exhaustive):** Non-obvious side effects, hidden invariants, business-logic rationale, workarounds for specific bugs — flag where absent on complex code, not on every function.
+>
+> **DO NOT FLAG:**
+>
+> - Standard license headers
+> - Generated code with auto-comments
+> - Comments correctly explaining the WHY of non-obvious code
+> - Type-system doc comments required by tooling (TSDoc, Rustdoc, KDoc) when factually accurate
+>
+> Return as JSON: `{inaccurate: [{file, line, comment, actual_code, severity}], outdated: [{file, line, issue}], stale_todos: [{file, line, todo, likely_addressed: bool}], restating_obvious: [{file, line, suggestion}], misleading: [{file, line, ambiguity}], missing_context: [{file, line, what_should_be_documented}]}`
+
 **Wait for all Phase 2 agents to complete before proceeding to Phase 3.**
 
 ---
@@ -759,18 +811,30 @@ Phase 2 agents are biased toward finding issues. Phase 3 agents must be biased t
 >
 > **DECISION CRITERIA:** REJECT if ANY mitigating factor exists. REJECT if the issue is handled elsewhere. REJECT if you cannot quote the actual problematic code. REJECT if repository settings address the issue. REJECT if a senior engineer would not flag this. CONFIRM only if ALL checks fail to disprove the finding.
 >
+> **7. CONFIDENCE SCORING (only if CONFIRM):** Score the finding 0–100 using this rubric verbatim:
+>
+> - **0** — Not confident at all. False positive that doesn't survive scrutiny, or pre-existing issue not introduced by recent changes.
+> - **25** — Somewhat confident. Might be a real issue, but you couldn't fully verify. If stylistic, not explicitly called out by project conventions.
+> - **50** — Moderately confident. Verified as real, but minor or rare in practice. Not very important relative to the rest of the review.
+> - **75** — Highly confident. Double-checked. Real issue likely to be hit in practice. The current approach is insufficient. Important and impacts functionality, OR explicitly violates a project convention/CLAUDE.md rule.
+> - **100** — Absolutely certain. Double-checked. Definitely real, will happen frequently. Evidence directly confirms it.
+>
+> A REJECTED finding always has confidence 0. A CONFIRMED finding must score at least 25.
+>
 > **Return JSON:**
 >
 > ```json
 > {
 >   "decision": "REJECT|CONFIRM",
+>   "confidence_score": 0,
 >   "code_quoted": "exact code snippet you examined",
 >   "mitigating_factors_checked": ["list of things you checked"],
 >   "mitigating_factors_found": ["any factors that address the issue"],
 >   "related_files_checked": ["files you searched"],
 >   "repo_settings_checked": ["gh commands run and their output"],
 >   "rejection_reason": "why this is a false positive (if REJECT)",
->   "confirmation_evidence": "specific proof the issue exists (if CONFIRM)"
+>   "confirmation_evidence": "specific proof the issue exists (if CONFIRM)",
+>   "confidence_rationale": "why this score and not the next one up/down"
 > }
 > ```
 
@@ -807,6 +871,30 @@ To ensure thorough validation:
 - Validate maximum 3 findings per agent
 - Complex findings (security, IaC, compliance) get dedicated 1:1 agents
 - If an agent validates more than 3 findings, split and re-run
+
+---
+
+## PHASE 3.5: CONFIDENCE FILTER
+
+**Apply a confidence threshold to drop low-signal findings before report generation.**
+
+After all Phase 3 validation agents return:
+
+1. Drop every finding with `decision: REJECT` (already filtered by adversarial validation).
+2. Drop every CONFIRMED finding with `confidence_score < 80` — these are real but low-priority or under-verified, and would dilute the report.
+3. Critical-severity findings are the one exception: keep any CONFIRMED **Critical** finding with score ≥ 50, because the cost of missing a real critical issue outweighs the noise cost.
+
+**Threshold rationale:** 80 is the default because below that, false-positive risk exceeds reviewer-attention cost. Adjust per-run only if the user explicitly asks (e.g., "be more aggressive, threshold 60" for an audit; "only show certainties, threshold 95" for a release-gate review).
+
+### Filter accounting
+
+Update the phase log with:
+
+- `findings_above_threshold` — kept for the report
+- `findings_filtered_by_confidence` — confirmed but below threshold
+- `critical_kept_below_threshold` — critical findings kept under the 50–80 exception
+
+Findings filtered at this step are **not lost** — list them in an appendix called "Filtered (low confidence)" so a human reviewer can spot-check the cuts.
 
 ---
 
@@ -1115,6 +1203,10 @@ This section highlights what the team is doing well. Good practices should be re
 ### Files Reviewed
 
 [Collapsible list of files]
+
+### Filtered (Low Confidence)
+
+[Findings that survived adversarial validation but scored below the confidence threshold in Phase 3.5. Listed here for spot-checking — not included in the main findings or action items. Format: `severity | confidence | file:line | one-line description`. Empty section is allowed if every CONFIRMED finding cleared the threshold.]
 
 ---
 

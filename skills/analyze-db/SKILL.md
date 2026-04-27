@@ -1,7 +1,7 @@
 ---
 name: analyze-db
 description: Analyze, document, map, or scan the database schema. Use when the user wants to analyze the database, document the database, generate schema docs, map the database, create DB documentation, or inspect the database structure. Generates a docs/DB.md file with complete database schema documentation. Auto-detects language/framework. Supports MySQL, PostgreSQL, SQLite, MongoDB, Elasticsearch, Redis, and BigQuery.
-allowed-tools: Bash(php:*), Bash(python:*), Bash(ruby:*), Bash(rails:*), Bash(go:*), Bash(npm:*), Bash(npx:*), Bash(yarn:*), Bash(dotnet:*), Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Glob, Grep, mcp__postgres__query, mcp__postgres__list_tables, mcp__postgres__describe_table, mcp__postgres__list_schemas, mcp__mysql__mysql_query, mcp__mongodb__find, mcp__mongodb__aggregate, mcp__mongodb__listDatabases, mcp__mongodb__listCollections, mcp__mongodb__collectionSchema, mcp__redis__health_check, mcp__redis__get, mcp__redis__hash, mcp__redis__json, mcp__bigquery__*
+allowed-tools: Bash(php:*), Bash(python:*), Bash(ruby:*), Bash(npm:*), Bash(npx:*), Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Glob, Grep, mcp__postgres__query, mcp__postgres__list_tables, mcp__postgres__describe_table, mcp__postgres__list_schemas, mcp__mysql__mysql_query, mcp__mongodb__find, mcp__mongodb__aggregate, mcp__mongodb__count, mcp__mongodb__list-databases, mcp__mongodb__list-collections, mcp__mongodb__collection-schema, mcp__redis__*, mcp__bigquery__*
 ---
 
 ## Purpose
@@ -16,8 +16,8 @@ This skill uses database MCP tools when available and falls back to CLI commands
 | --- | --- | --- |
 | PostgreSQL | `mcp__postgres__list_tables`, `describe_table`, `list_schemas`, `query` | `psql` |
 | MySQL | `mcp__mysql__mysql_query` | `mysql` |
-| MongoDB | `mcp__mongodb__listDatabases`, `listCollections`, `collectionSchema`, `find` | `mongosh` |
-| Redis | `mcp__redis__health_check`, `get`, `hash`, `json` | `redis-cli` |
+| MongoDB | `mcp__mongodb__list-databases`, `list-collections`, `collection-schema`, `find` | `mongosh` |
+| Redis | `mcp__redis__info`, `dbsize`, `scan_keys`, `type`, `get`, `hgetall`, `json_get` | `redis-cli` |
 | SQLite | No MCP — CLI only | `sqlite3` |
 | BigQuery | `mcp__bigquery__query`, `list_tables`, `get_table_schema` | `bq` |
 | Elasticsearch | No MCP — CLI only | `curl` |
@@ -71,7 +71,7 @@ Use these exact command formats:
 ### MySQL
 
 ```bash
-mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --password="$MYSQL_PASS" "$MYSQL_DB" -e "SQL_QUERY"
+MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "SQL_QUERY"
 ```
 
 ### PostgreSQL
@@ -445,7 +445,7 @@ Before connecting to the database, verify the required environment variables are
 #### MySQL CLI Test
 
 ```bash
-mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --password="$MYSQL_PASS" "$MYSQL_DB" -e "SELECT 1"
+MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "SELECT 1"
 ```
 
 **Required environment variables:**
@@ -553,7 +553,7 @@ Connect via CLI to gather live data and verify the schema analysis.
 **List ALL tables and row counts (uses estimates, instant). Every table returned here MUST appear in docs/DB.md:**
 
 ```bash
-mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --password="$MYSQL_PASS" "$MYSQL_DB" -e "
+MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "
 SELECT table_name, table_rows
 FROM information_schema.tables
 WHERE table_schema = DATABASE()
@@ -563,13 +563,13 @@ ORDER BY table_rows DESC;"
 **Check indexes:**
 
 ```bash
-mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --password="$MYSQL_PASS" "$MYSQL_DB" -e "SHOW INDEX FROM table_name;"
+MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "SHOW INDEX FROM table_name;"
 ```
 
 **Get date ranges for time-series tables:**
 
 ```bash
-mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --password="$MYSQL_PASS" "$MYSQL_DB" -e "
+MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "
 SELECT MIN(created_at) as earliest, MAX(created_at) as latest FROM orders;"
 ```
 
@@ -697,14 +697,14 @@ For each enum or status field identified, query the actual values and their dist
 **For small tables (<1M rows) - full count is OK:**
 
 ```bash
-mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --password="$MYSQL_PASS" "$MYSQL_DB" -e "
+MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "
 SELECT status, COUNT(*) as count FROM orders GROUP BY status ORDER BY count DESC;"
 ```
 
 **For large tables (>1M rows) - use sampling:**
 
 ```bash
-mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --password="$MYSQL_PASS" "$MYSQL_DB" -e "
+MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "
 SELECT status, COUNT(*) as count FROM orders
 WHERE created_at >= NOW() - INTERVAL 30 DAY
 GROUP BY status ORDER BY count DESC;"
@@ -713,7 +713,7 @@ GROUP BY status ORDER BY count DESC;"
 **For very large tables - just get distinct values:**
 
 ```bash
-mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --password="$MYSQL_PASS" "$MYSQL_DB" -e "
+MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "
 SELECT DISTINCT status FROM orders LIMIT 20;"
 ```
 
@@ -861,7 +861,7 @@ MySQL / PostgreSQL (select one)
 ## CLI Command
 
 <!-- Used by query-db skill -->
-- MySQL: `mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --password="$MYSQL_PASS" "$MYSQL_DB"`
+- MySQL: `MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB"`
 - PostgreSQL: `psql`
 
 ## Framework

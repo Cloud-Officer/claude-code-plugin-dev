@@ -94,8 +94,10 @@ curl -s -f -H "Authorization: Loco $LOCO_KEY" https://localise.biz/api/locales
 Detect which Loco project(s) are configured by scanning environment variables.
 
 ```bash
-env | grep '^LOCO_API_KEY'
+env | grep -o '^LOCO_API_KEY[^=]*'
 ```
+
+> Use `grep -o` to print **only the variable names**, never the values. The keys themselves must never appear in transcripts or logs.
 
 **If no variables found:**
 
@@ -139,15 +141,18 @@ Extract from the user's request:
 
 #### Step 3: Validate Key Does Not Exist
 
-Fetch existing assets and check if the key already exists:
+Fetch existing assets and check if the key already exists. Capture the HTTP status separately so we can distinguish "not found" (good — we can create) from a real error:
 
 ```bash
-curl -s -f -H "Authorization: Loco $LOCO_KEY" "https://localise.biz/api/assets/$(echo -n "$KEY" | jq -sRr @uri)"
+STATUS=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Loco $LOCO_KEY" \
+  "https://localise.biz/api/assets/$(echo -n "$KEY" | jq -sRr @uri)")
 ```
 
-If the asset exists (HTTP 200), tell the user: "Key `$KEY` already exists. Use a different key or delete the existing one first."
+- `STATUS == 200` → key already exists. Tell the user: "Key `$KEY` already exists. Use a different key or delete the existing one first." Stop.
+- `STATUS == 404` → key does not exist; proceed to Step 4.
+- Anything else (401/403/5xx/000) → real error. Show the status to the user and stop.
 
-Stop here if the key exists.
+Do **not** use `curl -f` here — `-f` collapses 404 into a generic non-zero exit and hides the case we actually want to detect.
 
 #### Step 4: Analyze Naming Conventions
 

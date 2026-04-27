@@ -1,3 +1,9 @@
+---
+description: Implement a GitHub issue or Jira ticket end-to-end (explore, design, implement, PR)
+argument-hint: <issue-number-or-jira-key>
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(jira:*), Bash(awk:*), Bash(cat:*), Bash(echo:*), Bash(grep:*), Bash(jq:*), Bash(sed:*), Bash(tr:*), Read, Edit, Write, Glob, Grep, TodoWrite, Agent, mcp__github__*, mcp__atlassian__*, mcp__figma__*
+---
+
 Work on issue: $ARGUMENTS
 
 ## MCP Tools with Fallbacks
@@ -78,11 +84,17 @@ For Jira issues, always use `$ARGUMENTS: <description>` (the Jira key is the pre
 
 ## Workflow
 
-1. **Get issue details** - Present to user before proceeding
+Steps 4–6 and 8 are gated by Issue Type (detected above). The gating column on each step shows when to run it.
+
+0. **Initialize todo list** (all types)
+
+   Use `TodoWrite` to create a todo list of the workflow steps for this issue. Mark each item completed as you finish it. This survives context compaction and gives the user a stable progress view across long sessions.
+
+1. **Get issue details** (all types) — Present to user before proceeding
    - GitHub: `mcp__github__get_issue` (preferred) or `gh issue view $ARGUMENTS --comments`
    - Jira: `mcp__atlassian__getJiraIssue` (preferred) or `jira issue view $ARGUMENTS --comments 16`
 
-2. **Extract Figma design context** (only if Figma links are present)
+2. **Extract Figma design context** (all types — only if Figma links are present)
 
    Scan the issue title, description, and comments for Figma URLs (matching `figma.com/design/` or `figma.com/file/`). If found:
 
@@ -94,7 +106,7 @@ For Jira issues, always use `$ARGUMENTS: <description>` (the Jira key is the pre
 
    **If no Figma links are found or Figma MCP is unavailable, skip this step.**
 
-3. **Prepare repository**
+3. **Prepare repository** (all types)
 
    ```bash
    DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
@@ -107,13 +119,70 @@ For Jira issues, always use `$ARGUMENTS: <description>` (the Jira key is the pre
    - GitHub: `git checkout -b issue-$ARGUMENTS`
    - Jira: `git checkout -b $ARGUMENTS` (uppercase)
 
-4. **Implement the changes**
-   - Analyze issue and affected code
-   - If Figma design context was extracted in step 2, use it to match the design (spacing, colors, typography, component structure)
-   - Ask clarifying questions if description is unclear, multiple approaches exist, or context is missing
-   - Implement incrementally, get user approval before proceeding
+4. **Codebase exploration** (Feature: required · Task: if non-trivial · Bug: skip)
 
-5. **Create PR** (only when user explicitly requests)
+   Launch 2–3 explorer agents in parallel via the `Agent` tool with `subagent_type: Explore`. Each should focus on a different aspect of the codebase and return a list of 5–10 key files to read. Example prompts:
+
+   - "Find features similar to `<feature>` and trace through their implementation. Return the 5–10 most important files."
+   - "Map the architecture and abstractions for `<feature area>`. Return the 5–10 most important files."
+   - "Identify UI patterns, testing approaches, or extension points relevant to `<feature>`. Return the 5–10 most important files."
+
+   **After the agents return, read all files they identified yourself.** Agent summaries miss details — always read the actual code before designing.
+
+   Skip for Bug fixes (you already know the failure point from the issue) and trivial Tasks.
+
+5. **Clarifying questions gate** (Feature: required · Task: if scope unclear · Bug: skip)
+
+   Before implementing, identify all underspecified aspects:
+   - Edge cases and error handling
+   - Integration points with existing code
+   - Scope boundaries (what is in/out of scope)
+   - Backward compatibility requirements
+   - Performance, security, or accessibility constraints
+   - Design preferences when multiple approaches exist
+
+   **Present all questions to the user as a numbered list. Wait for answers before proceeding.**
+
+   If the user says "you decide" or "whatever you think is best", state your recommendation and get explicit confirmation before continuing.
+
+   Skip for Bug fixes — the failure mode answers most of the questions.
+
+6. **Architecture design** (Feature: required · Task: skip · Bug: skip)
+
+   Launch 2–3 architect agents in parallel via the `Agent` tool. Each agent designs an implementation approach with a different bias:
+
+   - **Minimal changes:** smallest diff, maximum reuse of existing patterns
+   - **Clean architecture:** maintainability, elegant abstractions, low future cost
+   - **Pragmatic balance:** speed + quality, suitable for shipping this week
+
+   Present all three to the user with:
+   - One-paragraph summary of each
+   - Trade-offs comparison (effort, risk, future flexibility)
+   - **Your recommendation with reasoning**
+   - Concrete differences in files/components touched
+
+   **Wait for the user to pick an approach before implementing.**
+
+7. **Implement the changes** (all types)
+   - For Feature type, follow the architecture chosen in step 6
+   - For Bug/Task, implement the fix directly
+   - If Figma design context was extracted in step 2, use it to match the design (spacing, colors, typography, component structure)
+   - Implement incrementally, get user approval before proceeding to the next major change
+
+8. **Pre-PR review** (opt-in for all types)
+
+   Ask the user: **"Run a pre-PR review before creating the PR? (y/n)"**
+
+   If yes, launch 3 parallel agents over the staged + committed diff:
+   - **Simplicity/DRY:** duplication, dead abstractions, over-engineering, premature generalization
+   - **Bugs:** off-by-one, missing error handling, broken contracts, type confusion, edge cases
+   - **Conventions:** mismatch with codebase patterns, naming, file organization, test placement
+
+   Consolidate findings into a list ordered by severity. Present the highest-severity issues to the user and ask which to fix before the PR.
+
+   For a deeper, whole-codebase audit, point the user at `/code-review-deep` instead — it covers security, dependencies, infrastructure, and more.
+
+9. **Create PR** (all types — only when user explicitly requests)
 
    **Commit and push:**
 
@@ -135,17 +204,17 @@ For Jira issues, always use `$ARGUMENTS: <description>` (the Jira key is the pre
    **After PR created:**
    - Jira only: `mcp__atlassian__transitionJiraIssue` (preferred) or `jira issue move $ARGUMENTS "Code Review"`
 
-6. **Update issue if needed**
-   If the implementation differs from the original or additional context would be helpful, update the issue.
-   Write in a prospective tone (as if before implementation, not after):
-   - GitHub: `mcp__github__update_issue` (preferred) or `gh issue edit $ARGUMENTS --title "<updated title>" --body "<updated description>"`
-   - Jira: `mcp__atlassian__editJiraIssue` (preferred) or `jira issue edit $ARGUMENTS --summary "<updated title>" --description "<updated description>"`
+10. **Update issue if needed** (all types)
+    If the implementation differs from the original or additional context would be helpful, update the issue.
+    Write in a prospective tone (as if before implementation, not after):
+    - GitHub: `mcp__github__update_issue` (preferred) or `gh issue edit $ARGUMENTS --title "<updated title>" --body "<updated description>"`
+    - Jira: `mcp__atlassian__editJiraIssue` (preferred) or `jira issue edit $ARGUMENTS --summary "<updated title>" --description "<updated description>"`
 
-7. **Cleanup**
+11. **Cleanup** (all types)
 
-   ```bash
-   git checkout $DEFAULT_BRANCH
-   ```
+    ```bash
+    git checkout $DEFAULT_BRANCH
+    ```
 
 ## Rules
 

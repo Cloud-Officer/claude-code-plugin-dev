@@ -14,9 +14,13 @@ Manage AWS infrastructure and services.
 
 | Operation | MCP Tool | CLI Fallback |
 | --- | --- | --- |
-| Search documentation | `mcp__aws__search_documentation` | N/A (no CLI equivalent) |
-| Execute API call | `mcp__aws__execute_api` | `aws <service> <command>` |
-| List resources | `mcp__aws__execute_api` | `aws <service> list-*` / `aws <service> describe-*` |
+| Search documentation | `mcp__aws__aws___search_documentation` | N/A (no CLI equivalent) |
+| Read documentation page | `mcp__aws__aws___read_documentation` | N/A |
+| Suggest a command | `mcp__aws__aws___suggest_aws_commands` | N/A |
+| Execute API call | `mcp__aws__aws___call_aws` | `aws <service> <command>` |
+| List resources | `mcp__aws__aws___call_aws` | `aws <service> list-*` / `aws <service> describe-*` |
+| List regions | `mcp__aws__aws___list_regions` | `aws ec2 describe-regions` |
+| Regional availability | `mcp__aws__aws___get_regional_availability` | N/A |
 
 The AWS MCP server provides access to 15,000+ AWS APIs. The `aws` CLI provides equivalent access for all services.
 
@@ -30,8 +34,9 @@ aws s3 ls
 aws s3 ls s3://bucket-name/
 # Lambda
 aws lambda list-functions --query 'Functions[].FunctionName'
-# CloudWatch
-aws cloudwatch get-metric-statistics --namespace AWS/EC2 --metric-name CPUUtilization --period 3600 --statistics Average --start-time "$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S)" --end-time "$(date -u +%Y-%m-%dT%H:%M:%S)"
+# CloudWatch (BSD/GNU date — works on macOS and Linux)
+START_TS="$(date -u -v-1H +%Y-%m-%dT%H:%M:%S 2>/dev/null || date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S)"
+aws cloudwatch get-metric-statistics --namespace AWS/EC2 --metric-name CPUUtilization --period 3600 --statistics Average --start-time "$START_TS" --end-time "$(date -u +%Y-%m-%dT%H:%M:%S)"
 # RDS
 aws rds describe-db-instances --query 'DBInstances[].{ID:DBInstanceIdentifier,Status:DBInstanceStatus,Engine:Engine}'
 ```

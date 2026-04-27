@@ -1,7 +1,7 @@
 ---
 name: query-db
 description: Query the database, run a query, look up data, search the database, or check data. Use when the user wants to query the database, run a SQL query, look up data, find data, search for records, check the database, or ask questions about data. Executes queries via CLI commands using natural language. Reads schema context from docs/DB.md. Supports MySQL, PostgreSQL, SQLite, MongoDB, Elasticsearch, Redis, and BigQuery.
-allowed-tools: Read, Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), mcp__postgres__query, mcp__postgres__list_tables, mcp__postgres__describe_table, mcp__postgres__list_schemas, mcp__mysql__mysql_query, mcp__mongodb__find, mcp__mongodb__aggregate, mcp__mongodb__listDatabases, mcp__mongodb__listCollections, mcp__mongodb__collectionSchema, mcp__redis__set, mcp__redis__get, mcp__redis__list, mcp__redis__hash, mcp__redis__sorted_set, mcp__redis__stream, mcp__redis__json, mcp__redis__health_check, mcp__bigquery__*
+allowed-tools: Read, Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), mcp__postgres__query, mcp__postgres__list_tables, mcp__postgres__describe_table, mcp__postgres__list_schemas, mcp__mysql__mysql_query, mcp__mongodb__find, mcp__mongodb__aggregate, mcp__mongodb__count, mcp__mongodb__list-databases, mcp__mongodb__list-collections, mcp__mongodb__collection-schema, mcp__redis__*, mcp__bigquery__*
 ---
 
 ## Purpose
@@ -15,9 +15,9 @@ This skill uses database MCP tools when available and falls back to CLI commands
 | Database | MCP Tools | CLI Fallback | Env Vars (inherited from shell) |
 | --- | --- | --- | --- |
 | PostgreSQL | `mcp__postgres__query`, `list_tables`, `describe_table` | `psql` | `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` |
-| MySQL | `mcp__mysql__mysql_query` | `mysql` | `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE` |
-| MongoDB | `mcp__mongodb__find`, `aggregate`, `listCollections` | `mongosh` | `MDB_MCP_CONNECTION_STRING` or `MONGODB_URI` |
-| Redis | `mcp__redis__get`, `hash`, `sorted_set`, `json`, etc. | `redis-cli` | `REDIS_HOST`, `REDIS_PORT`, `REDIS_PWD` or `REDIS_URL` |
+| MySQL | `mcp__mysql__mysql_query` | `mysql` | `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASS`, `MYSQL_DB` |
+| MongoDB | `mcp__mongodb__find`, `aggregate`, `list-collections` | `mongosh` | `MONGODB_URI` |
+| Redis | `mcp__redis__get`, `hgetall`, `lrange`, `zrange`, `json_get`, etc. | `redis-cli` | `REDIS_URL` |
 | SQLite | No MCP — CLI only | `sqlite3` | `SQLITE_DB` |
 | BigQuery | `mcp__bigquery__query`, `list_tables`, `get_table_schema` | `bq` | `BQ_PROJECT`, `BQ_DATASETS` |
 | Elasticsearch | No MCP — CLI only | `curl` | `ES_URL`, `ES_API_KEY` |
@@ -73,8 +73,10 @@ Use these exact command formats:
 ### MySQL
 
 ```bash
-mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --password="$MYSQL_PASS" "$MYSQL_DB" -e "SQL_QUERY"
+MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "SQL_QUERY"
 ```
+
+> Pass the password via `MYSQL_PWD` (env var) instead of `--password=`. The latter exposes the password to other users via `ps`/process listings.
 
 **Useful flags:**
 
@@ -189,14 +191,13 @@ Read `docs/DB.md` to understand:
 
 Look for the "CLI Command" section in `docs/DB.md`. It specifies the command to use for queries.
 
-**How to check:
-** Run a simple connectivity test using the CLI tool. If it fails, ask the user to set the required environment variables.
+**How to check:** Run a simple connectivity test using the CLI tool. If it fails, ask the user to set the required environment variables.
 
 **Connectivity Tests:**
 
 | Database      | Test Command                                                                                                  |
 |---------------|---------------------------------------------------------------------------------------------------------------|
-| MySQL         | `mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --password="$MYSQL_PASS" "$MYSQL_DB" -e "SELECT 1"` |
+| MySQL         | `MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "SELECT 1"`  |
 | PostgreSQL    | `psql -c "SELECT 1"`                                                                                          |
 | SQLite        | `sqlite3 "$SQLITE_DB" "SELECT 1"`                                                                             |
 | MongoDB       | `mongosh "$MONGODB_URI" --eval "db.runCommand({ping: 1})"`                                                    |
@@ -232,7 +233,7 @@ For PostgreSQL, MySQL, MongoDB, and Redis, check whether MCP tools are available
 | PostgreSQL | `mcp__postgres__query` | `psql -c "SQL"` |
 | MySQL | `mcp__mysql__mysql_query` | `mysql -h ... -e "SQL"` |
 | MongoDB | `mcp__mongodb__find`, `mcp__mongodb__aggregate` | `mongosh --eval "JS"` |
-| Redis | `mcp__redis__get`, `mcp__redis__hash`, `mcp__redis__sorted_set`, `mcp__redis__json`, etc. | `redis-cli -u ... COMMAND` |
+| Redis | `mcp__redis__get`, `mcp__redis__hgetall`, `mcp__redis__lrange`, `mcp__redis__zrange`, `mcp__redis__json_get`, etc. | `redis-cli -u ... COMMAND` |
 | BigQuery | `mcp__bigquery__query` | `bq query --use_legacy_sql=false "SQL"` |
 
 **If MCP tools are not available (tool not found errors), fall back to the CLI** approach described in Step 6. The Safety Guardrails (Automatic LIMIT Injection, showing the query first) still apply regardless of method.
@@ -274,7 +275,7 @@ Parse what the user is asking for:
 #### For MySQL
 
 ```bash
-mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --password="$MYSQL_PASS" "$MYSQL_DB" -e "
+MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "
 SELECT DATE(created_at) as day, COUNT(*) as orders, SUM(total)/100 as revenue
 FROM orders
 WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
@@ -453,7 +454,7 @@ Only export when the user explicitly asks for CSV, file export, or chart data.
 Example (MySQL):
 
 ```bash
-mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" --password="$MYSQL_PASS" "$MYSQL_DB" -B -e "QUERY" | tr '\t' ','
+MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -B -e "QUERY" | tr '\t' ','
 ```
 
 Example (BigQuery):
