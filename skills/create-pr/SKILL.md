@@ -1,33 +1,35 @@
 ---
 name: create-pr
-description: Create, open, submit, or prepare a pull request (PR). Generates commit message, PR title, and PR body. Use when the user wants to create a PR, open a PR, submit a PR, make a PR, push a PR, send a PR, generate PR content, prepare a pull request, or fill a PR template from code changes.
-allowed-tools: Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Glob
+description: Create, open, submit, or prepare a pull request (PR). Generates the commit message, PR title, and PR body, opens the PR, then returns the repo to its default branch. Use when the user wants to create a PR, open a PR, submit a PR, make a PR, push a PR, send a PR, generate PR content, prepare a pull request, or fill a PR template from code changes.
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(open:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Glob
 ---
 
-# Create Pull Request Content
+# Create Pull Request
 
-Generate all content needed for a pull request: commit message, PR title, and PR body.
+Generate the PR content, open the pull request, then leave the repo on its default branch.
 
 ## Step 1: Gather Information
 
 **YOU MUST EXECUTE THESE COMMANDS IN ORDER. DO NOT SKIP ANY STEP.**
 
-**Step 1.1:** Get branch info:
+**Step 1.1:** Capture branch info (used in later steps):
 
 ```bash
-git rev-parse --abbrev-ref HEAD
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "master")
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+echo "Default: $DEFAULT_BRANCH | Current: $CURRENT_BRANCH"
 ```
 
 **Step 1.2:** Get file change summary (THIS IS CRITICAL - you must see ALL files):
 
 ```bash
-DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "master") && echo "=== COMMITTED AHEAD OF BASE ===" && git diff ${DEFAULT_BRANCH}...HEAD --stat -- ':!docs/soup.md' ':!.soup.json' && echo "=== STAGED ===" && git diff --cached --stat -- ':!docs/soup.md' ':!.soup.json' && echo "=== UNSTAGED ===" && git diff --stat -- ':!docs/soup.md' ':!.soup.json'
+echo "=== COMMITTED AHEAD OF BASE ===" && git diff ${DEFAULT_BRANCH}...HEAD --stat -- ':!docs/soup.md' ':!.soup.json' && echo "=== STAGED ===" && git diff --cached --stat -- ':!docs/soup.md' ':!.soup.json' && echo "=== UNSTAGED ===" && git diff --stat -- ':!docs/soup.md' ':!.soup.json'
 ```
 
 **Step 1.3:** Get the full diff (committed + staged + unstaged changes):
 
 ```bash
-DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "master") && echo "=== COMMITTED AHEAD OF BASE ===" && git diff ${DEFAULT_BRANCH}...HEAD -- ':!docs/soup.md' ':!.soup.json' && echo "=== STAGED ===" && git diff --cached -- ':!docs/soup.md' ':!.soup.json' && echo "=== UNSTAGED ===" && git diff -- ':!docs/soup.md' ':!.soup.json'
+echo "=== COMMITTED AHEAD OF BASE ===" && git diff ${DEFAULT_BRANCH}...HEAD -- ':!docs/soup.md' ':!.soup.json' && echo "=== STAGED ===" && git diff --cached -- ':!docs/soup.md' ':!.soup.json' && echo "=== UNSTAGED ===" && git diff -- ':!docs/soup.md' ':!.soup.json'
 ```
 
 **NOTE:** Include ALL three sections (committed, staged, unstaged) in your analysis. Changes may appear in any combination depending on the workflow.
@@ -46,9 +48,9 @@ echo $JIRA_TICKET
 
 **CRITICAL:** The PR summary MUST mention ALL files shown in the Step 1.2 `--stat` output. Count the files and verify your summary accounts for all of them.
 
-## Step 2: Generate Output
+## Step 2: Generate PR Content
 
-Output ONLY the following format. Start immediately with "COMMIT MESSAGE:" - no preamble or commentary:
+Generate the commit message, PR title, and PR body following the guidelines below, and show them to the user in this exact format so the inputs to the upcoming `gh pr create` are visible and reviewable:
 
 ```text
 COMMIT MESSAGE:
@@ -61,12 +63,57 @@ PR BODY:
 <filled PR template - can contain any valid markdown>
 ```
 
-IMPORTANT formatting rules:
+Formatting rules for this block:
 
 - Section labels must be plain text exactly as shown: "COMMIT MESSAGE:", "PR TITLE:", "PR BODY:"
 - Do NOT use markdown formatting on the labels (no **bold**, no `code blocks` around them)
 - Separate sections with exactly "---" on its own line
 - The PR BODY content can contain any valid markdown (code blocks, lists, etc.)
+
+After printing this block, continue immediately with Step 3 — do not stop here.
+
+## Step 3: Commit Any Uncommitted Changes
+
+If there are unstaged or staged-but-uncommitted changes, commit them now using the commit message from Step 2. If the working tree is already clean, skip this step.
+
+```bash
+git add -A
+git diff --cached --quiet || git commit -m "<commit message from Step 2>"
+```
+
+## Step 4: Push the Branch
+
+```bash
+git push -u origin "$CURRENT_BRANCH"
+```
+
+## Step 5: Open the Pull Request
+
+Prefer `mcp__github__create_pull_request` when the GitHub MCP server is available. Otherwise use the GitHub CLI:
+
+```bash
+PR_URL=$(gh pr create --base "$DEFAULT_BRANCH" --head "$CURRENT_BRANCH" --title "<PR title from Step 2>" --body "<PR body from Step 2>")
+open "$PR_URL"
+```
+
+If a PR already exists for `$CURRENT_BRANCH` (e.g., the caller already opened it), `gh pr create` will fail — treat that as success and continue to Step 6.
+
+## Step 6: Return to Default Branch
+
+Leave the repo on the default branch so the user is back at a clean starting point:
+
+```bash
+git checkout "$DEFAULT_BRANCH"
+git pull --ff-only
+```
+
+**Skip this step when running inside a `git worktree`.** A branch can only be checked out by one worktree at a time, so `git checkout` will fail (or pull the branch out from under the main checkout). Detect with:
+
+```bash
+git rev-parse --is-inside-work-tree >/dev/null && [ "$(git rev-parse --git-common-dir)" != "$(git rev-parse --git-dir)" ] && echo "in worktree"
+```
+
+In a worktree, leave the branch in place and let the caller `cd` back to the main checkout.
 
 ## Commit Message Guidelines
 
@@ -132,3 +179,4 @@ If the section is required, write a paragraph explaining the breaking changes, c
 - NEVER add "Generated with Claude Code" or similar signatures to commit messages or PR body
 - NO emojis unless explicitly requested
 - Before generating PR content, ensure the `run-linters` skill has been executed to verify code quality
+- The skill is not done until Step 6 has run (or has been deliberately skipped because of a worktree). Do not stop after printing the Step 2 block.
