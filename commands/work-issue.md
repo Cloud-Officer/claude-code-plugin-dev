@@ -208,24 +208,24 @@ Steps 4–6 and 8 are gated by Issue Type (detected above). The gating column on
 
 9. **Create PR** (all types — only when user explicitly requests)
 
-   **Commit and push:**
+   **Commit (with the issue-tagged message):**
 
    ```bash
    git add .
    ```
 
-   - GitHub: `git commit -m "<PREFIX> #$ARGUMENTS: <brief description>"` then `git push -u origin issue-$ARGUMENTS` (use the commit prefix from the issue type table above)
-   - Jira: `git commit -m "$ARGUMENTS: <brief description>"` then `git push -u origin $ARGUMENTS`
+   - GitHub: `git commit -m "<PREFIX> #$ARGUMENTS: <brief description>"` (use the commit prefix from the issue type table above)
+   - Jira: `git commit -m "$ARGUMENTS: <brief description>"`
    - NO footers, NO co-authors, NO "Generated with Claude Code" signatures
 
-   **Generate PR content:**
-   Use the `create-pr` skill to generate PR title and body from the staged changes.
+   **Open the PR via the `create-pr` skill:**
+   The `create-pr` skill takes care of pushing the branch, opening the PR, and switching the working tree back to the default branch when done. Do NOT run `git push` or `gh pr create` here — the skill does both.
 
-   **Create PR:**
-   - GitHub: `mcp__github__create_pull_request` (preferred) or `gh pr create --base $DEFAULT_BRANCH --head issue-$ARGUMENTS --title "<PREFIX> #$ARGUMENTS: <summary>" --body "<PR body from skill>"`
-   - Jira: `gh pr create --base $DEFAULT_BRANCH --head $ARGUMENTS --title "$ARGUMENTS <summary>" --body "<PR body from skill>"`
+   When invoking the skill, override its commit-message / PR-title defaults with the issue-tagged form:
+   - GitHub: title = `<PREFIX> #$ARGUMENTS: <summary>`
+   - Jira: title = `$ARGUMENTS <summary>`
 
-   **After PR created:**
+   **After the skill finishes:**
    - Jira only: `mcp__atlassian__transitionJiraIssue` (preferred) or `jira issue move $ARGUMENTS "Code Review"`
 
 10. **Update issue if needed** (all types)

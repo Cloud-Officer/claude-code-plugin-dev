@@ -8,6 +8,7 @@ Claude Code plugin for development workflow automation.
 * [Installation](#installation)
   * [Quick Start](#quick-start)
   * [Configure Remote MCPs (optional)](#configure-remote-mcps-optional)
+  * [Google Workspace MCP (optional)](#google-workspace-mcp-optional)
   * [Complementary Plugins (optional)](#complementary-plugins-optional)
   * [Configure Environment Variables](#configure-environment-variables)
   * [Multi-Account Setups (direnv)](#multi-account-setups-direnv)
@@ -43,6 +44,7 @@ This plugin provides development workflow automation for Claude Code.
 * Heroku application management and deployment
 * App Store Connect management (builds, TestFlight, reviews, IAPs)
 * Google Play Store review management and analytics
+* Google Workspace integration (Gmail, Calendar, Drive, Docs, Sheets, Slides, Forms, Tasks, Contacts, Chat) via optional [`workspace-mcp`](#google-workspace-mcp-optional) setup
 
 ## Installation
 
@@ -201,6 +203,144 @@ claude mcp add vercel --transport http https://mcp.vercel.com
 Each prompts for OAuth on first use. Skills that need a remote MCP fall back to a CLI when one exists — see the **Setup
 ** column in the [Skills](#skills) table for which skill needs which.
 
+**Naming caveat for multi-tenant setups.** Each server name owns exactly one OAuth grant — Claude Code stores the access token keyed by the name and reuses it for every call. If you work across multiple tenants of the same service (e.g. two Atlassian sites, two Stripe accounts) from different folders on one machine, **give each instance a distinct name** rather than reusing the bare name. Otherwise the OAuth token from whichever folder authorized first leaks into the other folder, even though local-scope registration looks isolated.
+
+```bash
+# in ~/work/companya
+claude mcp add atlassian-companya --transport http https://mcp.atlassian.com/v1/mcp
+
+# in ~/work/companyb
+claude mcp add atlassian-companyb --transport http https://mcp.atlassian.com/v1/mcp
+```
+
+This applies to every OAuth-at-connect remote MCP listed above (`atlassian`, `bigquery`, `figma`, `newrelic`, `paypal`, `stripe`, `vercel`) — not to stdio servers like `google-workspace`, which select identity per-call via a parameter. If you rename instances, update the [Recommended Permissions](#recommended-permissions) entries to allow each variant.
+
+### Google Workspace MCP (optional)
+
+The `co-dev` plugin focuses on engineering workflows (issues, PRs, code review, deployments). Pair it with the open-source [`workspace-mcp`](https://github.com/taylorwilsdon/google_workspace_mcp) server to add Gmail, Calendar, Drive, Docs, Sheets, Slides, Forms, Tasks, Contacts, and Google Chat — useful alongside several of this plugin's skills (e.g. `weekly-dev-report` can email the report directly once Gmail is wired up, and `sprint-summary` output can be pasted straight into a shared Doc or Calendar event).
+
+This MCP is **not bundled** with the plugin — the steps below are independent and only needed if you want Workspace access from Claude Code.
+
+#### Step 1 — Google Cloud admin setup (one-time, per Workspace org)
+
+Sign in at [console.cloud.google.com](https://console.cloud.google.com) **with your Workspace admin account** — the org must be associated with the project, otherwise the **Internal** audience option will not appear later.
+
+1. **Create the project** — top-bar dropdown → **New Project** → name `workspace-mcp`, **Organization** = your Workspace org (e.g. `yourcompany.com`). If your org doesn't appear, the Workspace and Cloud accounts aren't linked yet — fix at [admin.google.com](https://admin.google.com) → Account → Google Cloud.
+2. **Enable the APIs** — APIs & Services → Library → enable each, one by one: Gmail, Google Calendar, Google Drive, Google Docs, Google Sheets, Google Slides, Google Forms, Tasks, People (for Contacts), Google Chat.
+3. **Configure the OAuth consent screen** — APIs & Services → OAuth consent screen → **Get started**.
+   * **App name:** `Workspace MCP`
+   * **User support email:** your admin email
+   * **Audience:** **Internal** (restricts auth to users in your org, no Google verification, no 100-user testing cap). If only **External** is offered, you signed in with the wrong account or created the project under No Organization.
+   * **Developer contact:** your admin email
+4. **Create the OAuth client credentials** — APIs & Services → Credentials → **Create Credentials → OAuth Client ID**.
+   * **Application type:** **Desktop app** (Web application will not work — it causes redirect URI errors during auth)
+   * **Name:** `workspace-mcp-desktop`
+5. Copy the **Client ID** (`...apps.googleusercontent.com`) and **Client Secret** (`GOCSPX-...`). Treat the secret like a password; never commit it.
+
+The same Client ID and Secret work for every user in the org since the consent screen is Internal. **Multiple Workspace organizations** (e.g. a personal org and a separate company org) each need their own Cloud project and credentials — the same Client ID cannot be reused across orgs.
+
+#### Step 2 — Per-machine install
+
+**macOS:**
+
+```bash
+brew install uv direnv
+```
+
+Hook direnv into your shell — add to `~/.zshrc` (once, then `source ~/.zshrc`):
+
+```bash
+eval "$(direnv hook zsh)"
+```
+
+Then in the directory where you'll launch Claude Code, create an `.envrc` file with everything workspace-mcp needs:
+
+```bash
+export GOOGLE_OAUTH_CLIENT_ID="your-client-id"
+export GOOGLE_OAUTH_CLIENT_SECRET="your-client-secret"
+export USER_GOOGLE_EMAIL="you@yourdomain.com"
+export PORT="8765"  # any unused port — see "Multi-account & multi-session" below for why this matters
+```
+
+Approve it with `direnv allow` (run from that directory). direnv loads the vars whenever you `cd` in and unloads them when you `cd` out — keep one `.envrc` per workspace org / per concurrently-running session, each with its own `USER_GOOGLE_EMAIL` and `PORT`. See [Multi-Account Setups (direnv)](#multi-account-setups-direnv) below for the caveats around switching mid-session.
+
+**Windows (PowerShell, no admin needed):**
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+[System.Environment]::SetEnvironmentVariable("GOOGLE_OAUTH_CLIENT_ID", "your-client-id", "User")
+[System.Environment]::SetEnvironmentVariable("GOOGLE_OAUTH_CLIENT_SECRET", "your-client-secret", "User")
+[System.Environment]::SetEnvironmentVariable("USER_GOOGLE_EMAIL", "you@yourdomain.com", "User")
+[System.Environment]::SetEnvironmentVariable("PORT", "8765", "User")
+```
+
+Close and reopen PowerShell so the new env vars take effect. Git for Windows must also be installed (Claude Code uses Git Bash internally) — get it from [git-scm.com](https://git-scm.com/download/win) with default options.
+
+User-scope env vars are global on Windows, so if you need a second workspace account or run multiple Claude sessions concurrently, override `USER_GOOGLE_EMAIL` and `PORT` per session before launching Claude (`$env:USER_GOOGLE_EMAIL="..."; $env:PORT="8766"; claude`).
+
+#### Step 3 — Add the MCP server
+
+Run this **from the directory** where you want the server active (the default scope is local — the registration is tied to that working directory, not your whole user account). The server inherits `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `USER_GOOGLE_EMAIL`, and `PORT` from the shell environment Claude Code is launched in, so no `-e` flags are needed:
+
+```bash
+claude mcp add google-workspace -- uvx workspace-mcp --tool-tier complete
+```
+
+(Add `--scope user` if you want the server available globally in every directory; add `--scope project` to write it to a shared `.mcp.json` in the repo — but never with hard-coded credentials, since `.mcp.json` typically gets committed.)
+
+On first use, a browser window opens for OAuth — sign in with the matching Google account and approve the scopes. Tokens cache locally:
+
+* macOS: `~/.google_workspace_mcp/credentials/`
+* Windows: `%USERPROFILE%\.google_workspace_mcp\credentials\`
+
+No browser prompt on subsequent startups. To **update** workspace-mcp: `uv cache clean` — Claude Code fetches the latest version on next startup. To **revoke** access: delete the credentials directory above, or remove the `Workspace MCP` app at [myaccount.google.com/permissions](https://myaccount.google.com/permissions). To **rotate** the Client Secret if it leaks: APIs & Services → Credentials → `workspace-mcp-desktop` → **Reset Secret**, then update env vars and re-auth.
+
+#### Multi-account & multi-session port assignment (important)
+
+The workspace-mcp server binds a local port for its OAuth callback (default `8000`). **Every workspace-mcp instance running concurrently on the machine needs a unique port.** There are two scenarios where this matters — most people anticipate the first but not the second:
+
+1. **Multiple accounts on the same machine** (e.g. personal + company in different folders). Each folder's `.envrc` (macOS/direnv) — or each session's PowerShell overrides (Windows) — needs its own `PORT`, otherwise both instances try to bind `8000` and the second one fails.
+2. **Multiple Claude Code sessions running at the same time, even from different directories.** Per-directory env vars don't help if two sessions still resolve to the same `PORT` — every running Claude Code session spawns its own MCP processes, and if any two of them point at the same port, the later one's workspace-mcp won't start. Even with a single account per directory, every directory whose Claude session might run *concurrently* with another needs its own port.
+
+Pick ports above 8000 (e.g. `8765`, `8766`, `8767`, …) and assign one per account *and* per concurrently-running session. The setup is then **one `.envrc` per directory** plus a single `claude mcp add` from each. Example with two accounts on macOS:
+
+```bash
+# ~/work/personal-stuff/.envrc
+export GOOGLE_OAUTH_CLIENT_ID="personal-client-id"
+export GOOGLE_OAUTH_CLIENT_SECRET="personal-secret"
+export USER_GOOGLE_EMAIL="you@personal.com"
+export PORT="8765"
+```
+
+```bash
+# ~/work/cloudofficer/.envrc
+export GOOGLE_OAUTH_CLIENT_ID="company-client-id"
+export GOOGLE_OAUTH_CLIENT_SECRET="company-secret"
+export USER_GOOGLE_EMAIL="you@company.com"
+export PORT="8766"
+```
+
+Run `direnv allow` once in each directory, then register the server from each (no `-e` flags — credentials and port come from `.envrc`):
+
+```bash
+cd ~/work/personal-stuff && claude mcp add google-workspace -- uvx workspace-mcp --tool-tier complete
+cd ~/work/cloudofficer && claude mcp add google-workspace -- uvx workspace-mcp --tool-tier complete
+```
+
+The port only matters during the OAuth callback handshake; it does not need to be reachable from outside the machine. Verify everything is registered (run from inside each directory):
+
+```bash
+claude mcp list
+```
+
+Sample prompts once it's up:
+
+```text
+List my unread emails
+Search drive for the Q3 proposal
+Create a calendar event for tomorrow at 2pm
+```
+
 ### Complementary Plugins (optional)
 
 These official plugins from the `claude-plugins-official` marketplace pair well with
@@ -293,6 +433,8 @@ If you also use remote MCP servers (see [Configure Remote MCPs](#configure-remot
 **Note:** These entries merge with your existing
 `allow` list — you don't need to replace it. Only add entries for the MCP servers you actually use.
 
+**Renamed instances** (see [Naming caveat for multi-tenant setups](#configure-remote-mcps-optional)) need their own permission entry — e.g. `mcp__atlassian-companya__*` and `mcp__atlassian-companyb__*` instead of (or in addition to) the bare `mcp__atlassian__*`.
+
 ## Usage
 
 ### Commands
@@ -313,7 +455,7 @@ These skills are automatically available to Claude. The **Setup
 | `appstore`            | Manage App Store Connect (builds, TestFlight, reviews, IAPs) | macOS-only. `mint install zelentsov-dev/asc-mcp`. Env: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY_PATH` (path to `.p8`). [Create API key](https://appstoreconnect.apple.com/access/integrations/api)                                           |
 | `aws`                 | Manage AWS infrastructure and services                       | `aws configure`, or env: `AWS_PROFILE` *(or)* `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` + `AWS_REGION`                                                                                                                                          |
 | `create-issue`        | Create GitHub or Jira issues with proper templates           | GitHub: `GITHUB_PERSONAL_ACCESS_TOKEN` *(or)* `gh auth login`. Jira: atlassian remote MCP *(or)* `jira init`                                                                                                                                        |
-| `create-pr`           | Generate commit message, PR title, and PR body               | None — uses local `git`                                                                                                                                                                                                                             |
+| `create-pr`           | Generate PR content, open the PR, return repo to default branch | GitHub: `gh auth login` *(or)* `GITHUB_PERSONAL_ACCESS_TOKEN`                                                                                                                                                                                    |
 | `crashlytics`         | Query Firebase Crashlytics crash data from BigQuery          | bigquery remote MCP *(or)* `gcloud auth application-default login`. Env: `BQ_PROJECT`, `BQ_CRASHLYTICS_DATASET`                                                                                                                                     |
 | `gcloud`              | Manage Google Cloud infrastructure and services              | `gcloud auth login && gcloud config set project <id>`. Optional: `CLOUDSDK_ACTIVE_CONFIG_NAME` for named configs                                                                                                                                    |
 | `heroku`              | Manage Heroku apps, dynos, logs, and databases               | `heroku login`                                                                                                                                                                                                                                      |
