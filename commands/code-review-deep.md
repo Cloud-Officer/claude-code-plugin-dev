@@ -6,948 +6,504 @@ allowed-tools: Bash(git:*), Bash(gh:*), Bash(jq:*), Bash(awk:*), Bash(cat:*), Ba
 
 # Deep Code Review (Parallel Agent Strategy)
 
-## MCP Tools with Fallbacks
-
-This command uses MCP tools when available and falls back gracefully if they are unavailable or return errors. Agents inherit MCP tool access.
-
-### GitHub Access
-
-**Prefer MCP tools** (`mcp__github__*`) when available. If MCP tools are not available (tool not found errors), **fall back to the `gh` CLI**.
-
-| Operation | MCP Tool | CLI Fallback |
-| --- | --- | --- |
-| Check issues enabled | `mcp__github__list_issues` (if it succeeds, issues are enabled) | `gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'` |
-| Check repo visibility | `gh repo view --json isPrivate` (no MCP equivalent — `search_repositories` is for searching, not metadata) | `gh repo view --json isPrivate --jq '.isPrivate'` |
-| Get repo owner/name | Parse from `git remote get-url origin` | `gh repo view --json owner,name` |
-| Check repo settings | No MCP equivalent — use `gh api` | `gh api "repos/{owner}/{repo}" --jq '...'` |
-
-### Library Documentation (Context7)
-
-Agents can use `mcp__context7__resolve-library-id` then `mcp__context7__query-docs` to look up current documentation for libraries and frameworks when validating code patterns or best practices. If Context7 is unavailable or returns errors (quota exceeded, timeouts), agents should fall back to `WebSearch` or skip the library doc check. Do not let Context7 failures block the review.
-
 You are a senior staff engineer orchestrating an exhaustive code audit using parallel agents. Be thorough, specific, quantitative, and educational.
 
-**IMPORTANT: Balance criticism with recognition.** A good code review acknowledges what the team is doing well, not just what needs improvement. Actively look for and document positive patterns, good architectural decisions, and best practices being followed. The report should feel constructive and encouraging, not purely negative.
+**Balance criticism with recognition.** A good code review acknowledges what the team is doing well, not just what needs improvement. Document positive patterns alongside findings. The report should feel constructive, not purely negative.
 
-**IMPORTANT: All agents inherit the current model. Do NOT specify a model parameter - let agents use the same model as the parent.**
+**Inherit the parent model.** Do NOT specify a model parameter on agent calls — let agents use the same model as the parent.
+
+**Web search is opt-in.** Do NOT default to web searches in agent prompts. Use the model's existing knowledge. Only invoke `WebSearch` (or `mcp__context7__*`) for: (a) CVE lookup against a current dependency version, (b) latest stable version checks for outdated-dep flagging, (c) anything the user explicitly asks to verify against current docs. Skip silently on quota/timeout.
+
+## MCP Tools with Fallbacks
+
+Prefer MCP tools (`mcp__github__*`, `mcp__context7__*`) when available; fall back to `gh` CLI / `WebSearch` on errors. Don't let MCP failures block the review.
+
+| Operation | Preferred | Fallback |
+| --- | --- | --- |
+| Repo metadata (visibility, owner, settings) | `gh repo view` / `gh api` | n/a |
+| Issues enabled | `gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'` | n/a |
+| Library docs | `mcp__context7__*` | `WebSearch` |
 
 ---
 
-## CRITICAL: Mandatory Phase Tracking
+## Phase Tracking
 
-**You MUST maintain a phase completion log throughout execution.** This ensures consistent, reproducible results across runs.
+Use `TaskCreate` to track phases. Create one task per phase plus one per Phase 2 agent. Mark `in_progress` when launching, `completed` when results are in. Do NOT include the task list in the final report — it's internal tracking only.
 
-**Before starting, create this tracking structure and update it after each phase:**
+**Completion rules:**
 
-```text
-=== CODE REVIEW PHASE LOG ===
-[ ] Pre-Flight Check
-    - existing_report: (pending)
-    - user_decision: (pending) - use_existing/delete_and_rerun/N/A
-
-[ ] Phase 1: Initial Scans (3 agents)
-    [ ] Agent 1.1 Tech Stack - status: (pending), result_received: (pending)
-        - languages: (pending)
-        - platforms: (pending)
-        - infrastructure: (pending)
-        - frameworks: (pending)
-    [ ] Agent 1.2 Config Files - status: (pending), result_received: (pending)
-        - categories_found: (pending)
-    [ ] Agent 1.3 Codebase Structure - status: (pending), result_received: (pending)
-        - source_files: (pending)
-        - test_files: (pending)
-        - estimated_loc: (pending)
-
-[ ] Phase 2: Deep Analysis (conditional agents based on Phase 1)
-    Core Agents (always run):
-    [ ] Agent 2.1 Security - status: (pending), findings: (pending)
-    [ ] Agent 2.2 Dependencies - status: (pending), findings: (pending)
-    [ ] Agent 2.3 Code Quality - status: (pending), findings: (pending)
-    [ ] Agent 2.4 Testing - status: (pending), findings: (pending)
-    [ ] Agent 2.12 Git Hygiene - status: (pending), findings: (pending)
-    [ ] Agent 2.15 Config Management - status: (pending), findings: (pending)
-    [ ] Agent 2.16 Bug Patterns - status: (pending), findings: (pending)
-    [ ] Agent 2.18 Documentation - status: (pending), findings: (pending)
-    [ ] Agent 2.19 CI/CD - status: (pending), findings: (pending)
-    [ ] Agent 2.20 Comment Quality - status: (pending), findings: (pending)
-
-    Conditional Agents (mark N/A if not applicable):
-    [ ] Agent 2.5 IaC - applicable: (pending), status: (pending), findings: (pending)
-    [ ] Agent 2.6 Performance - applicable: (pending), status: (pending), findings: (pending)
-    [ ] Agent 2.7 Observability - applicable: (pending), status: (pending), findings: (pending)
-    [ ] Agent 2.8 API Design - applicable: (pending), status: (pending), findings: (pending)
-    [ ] Agent 2.9 Concurrency - applicable: (pending), status: (pending), findings: (pending)
-    [ ] Agent 2.10 AI/ML - applicable: (pending), status: (pending), findings: (pending)
-    [ ] Agent 2.11 Compliance - applicable: (pending), status: (pending), findings: (pending)
-    [ ] Agent 2.13 Migrations - applicable: (pending), status: (pending), findings: (pending)
-    [ ] Agent 2.14 i18n - applicable: (pending), status: (pending), findings: (pending)
-    [ ] Agent 2.17 Backwards Compat - applicable: (pending), status: (pending), findings: (pending)
-
-[ ] Phase 3: Adversarial Validation
-    - total_findings_to_validate: (pending)
-    - findings_confirmed: (pending)
-    - findings_rejected: (pending)
-    - rejection_reasons: (pending) - list top 3 reasons
-    - findings_without_code_quotes: (pending) - auto-rejected
-    - findings_without_repo_check: (pending) - auto-rejected for CI/CD findings
-
-[ ] Phase 3.5: Confidence Filter
-    - threshold_used: (pending) - default 80, or user-specified value
-    - findings_above_threshold: (pending)
-    - findings_filtered_by_confidence: (pending)
-    - critical_kept_below_threshold: (pending) - critical findings kept under the 50–80 exception
-    - confidence_distribution: (pending) - count at 25/50/75/100
-
-[ ] Phase 4: Report Generation
-    - all_phases_complete: (pending)
-    - health_score: (pending)
-    - total_findings: (pending)
-    - positives_documented: (pending)
-=== END PHASE LOG ===
-```
-
-**COMPLETION REQUIREMENTS:**
-
-1. **Phase 1 MUST complete before Phase 2** - All 3 agents must return results
-2. **Phase 2 agents determined by Phase 1** - Mark conditional agents as N/A if not applicable
-3. **ALL Phase 2 agents must complete before Phase 3** - Do not skip agents
-4. **Phase 3 must validate ALL findings** - Not just a sample. Every CONFIRMED finding must include a confidence score.
-5. **Phase 3.5 must apply the confidence filter** - Cannot generate the report from raw Phase 3 output
-6. **Phase 4 report must include the completed phase log** - Proves all phases executed
-
-**DO NOT SKIP PHASES OR AGENTS.** Even if early phases suggest no issues in an area, run ALL applicable agents. Issues are often only revealed through thorough analysis.
+- Phase 1 must complete before Phase 2.
+- All applicable Phase 2 agents must complete before Phase 3 (mark conditional agents N/A if not applicable — do not silently skip).
+- Phase 3 must validate every Phase 2 finding.
+- Phase 3.5 must apply the confidence filter before report generation.
 
 ---
 
 ## EXECUTION OVERVIEW
 
-This review uses **parallel agents** for speed and thoroughness. Execute phases in order, but launch agents within each phase **simultaneously in a single message**.
+| Phase | Agents | Subagent type | Purpose |
+| ----- | ------ | ------------- | ------- |
+| 1 | 3 parallel | `Explore` | Quick scans: tech stack, configs, structure |
+| 2 | 7–10 parallel | `general-purpose` | Core + conditional deep analysis |
+| 3 | N parallel (10 findings/agent) | `general-purpose` | Adversarial validation + 0–100 confidence on CONFIRMs |
+| 3.5 | 0 (you) | n/a | Tiered confidence filter (Critical ≥50, High/Medium ≥65, Low/Info ≥80) |
+| 4 | 1 (you) | n/a | Aggregate kept findings, list filtered ones in appendix, generate report |
 
-| Phase | Parallel Agents | Purpose |
-| ----- | --------------- | ------- |
-| 1 | 3 | Quick scans: tech stack, configs, structure |
-| 2 | 4-20 | Core (security, deps, quality, tests, comments) + conditional (IaC, perf, observability, API, concurrency, AI/ML, compliance, git, migrations, i18n, config, bugs, backwards compat, docs, CI/CD) |
-| 3 | N (max 3 per agent) | **Adversarial validation**: Try to DISPROVE each finding + score 0–100 confidence on CONFIRMs |
-| 3.5 | 0 (you) | **Confidence filter**: drop CONFIRMED findings below threshold (default 80, Critical exception ≥50) |
-| 4 | 1 (you) | Aggregate kept findings, list filtered ones in an appendix, and generate report |
-
----
-
-## PRE-FLIGHT CHECK: Existing Report Detection
-
-**Before starting any analysis, check if `docs/code-review.md` already exists in the repository.**
-
-If the report exists, use the AskUserQuestion tool to ask the user:
-
-**Question:** "A code review report already exists (`docs/code-review.md`). What would you like to do?"
-
-**Options:**
-
-1. **Use existing report** - Skip analysis and use the current report (useful for creating Jira issues or reviewing findings)
-2. **Delete and re-run full analysis** - Remove the existing report and perform a fresh code review
-
-If the user chooses option 1, read the existing `docs/code-review.md` file, summarize the findings (count by severity), and wait for further instructions (e.g., "create jira issues").
-
-If the user chooses option 2, delete the existing `docs/code-review.md` and proceed with Phase 1.
+Launch all agents within a phase **in a single message** for true parallelism.
 
 ---
 
-## PHASE 1: INITIAL SCANS (Launch 3 Agents in Parallel)
+## PRE-FLIGHT CHECK: Existing Report
 
-**Launch these 3 agents simultaneously in a single message using the Task tool:**
+Before any analysis, check if `docs/code-review.md` exists. If it does, ask via `AskUserQuestion`:
+
+> A code review report already exists (`docs/code-review.md`). What would you like to do?
+>
+> 1. **Use existing report** — Skip analysis, summarize findings, await further instructions (e.g., "create issues").
+> 2. **Delete and re-run full analysis** — Remove existing report and proceed with Phase 1.
+
+---
+
+## PHASE 1: INITIAL SCANS
+
+Launch these 3 agents in a single message with `subagent_type: "Explore"`. Each is a fast read-only scout.
 
 ### Agent 1.1: Tech Stack Detection
 
-**Prompt:**
-> Analyze this codebase to identify:
->
-> 1. Primary language(s) from file extensions and package managers
-> 2. Platform(s): iOS, Android, Web, Backend, CLI, Library
-> 3. Infrastructure: AWS, GCP, Azure, Docker, Kubernetes, or none
-> 4. Frameworks and major libraries in use
->
-> Return as JSON: `{languages, platforms, infrastructure, frameworks}`
+> Identify: (1) primary languages from file extensions and package managers, (2) platforms (iOS, Android, Web, Backend, CLI, Library), (3) infrastructure (AWS/GCP/Azure/Docker/Kubernetes/none), (4) frameworks and major libraries. Return JSON: `{languages, platforms, infrastructure, frameworks}`.
 
 ### Agent 1.2: Config File Inventory
 
-**Prompt:**
-> Find and list ALL configuration files in this codebase:
->
-> - CI/CD: .github/workflows/*, .gitlab-ci.yml, Jenkinsfile, Fastfile
-> - Dependencies: package.json, Gemfile, Podfile, Package.swift, build.gradle
-> - Lock files: package-lock.json, Gemfile.lock, Package.resolved
-> - Environment: .env*, config/*.yml
-> - Platform: Info.plist, AndroidManifest.xml, entitlements
-> - Docker: Dockerfile, docker-compose.yml
-> - Docs: soup.json, soup.md, architecture.md, README.md
->
-> Return as JSON grouped by category with file paths.
+> Find ALL config files grouped by category: CI/CD (.github/workflows, .gitlab-ci.yml, Jenkinsfile, Fastfile), dependencies (package.json, Gemfile, Podfile, Package.swift, build.gradle), lock files, environment (.env*, config/*.yml), platform (Info.plist, AndroidManifest.xml, entitlements), Docker, docs (soup.json, soup.md, architecture.md, README.md). Return JSON grouped by category with file paths.
 
 ### Agent 1.3: Codebase Structure
 
-**Prompt:**
-> Analyze the codebase structure:
->
-> 1. Count source files by directory and language
-> 2. Count test files and identify test framework
-> 3. Identify major modules/packages
-> 4. Calculate approximate lines of code
->
-> Return as JSON: `{source_files, test_files, modules, estimated_loc}`
+> Count source files by directory and language, count test files and identify framework, identify major modules, estimate LOC. Return JSON: `{source_files, test_files, modules, estimated_loc}`.
 
-**Wait for all Phase 1 agents to complete before proceeding to Phase 2.**
+**Wait for all 3 to return before Phase 2.**
 
 ---
 
-## PHASE 2: DEEP ANALYSIS (Launch 4 Agents in Parallel)
+## PHASE 2: DEEP ANALYSIS
 
-**Using results from Phase 1, launch these agents simultaneously.**
+Use Phase 1 results to determine which conditional agents apply. Launch all applicable agents in a single message with `subagent_type: "general-purpose"`.
 
-**CRITICAL FOR ALL AGENTS: In addition to finding issues, each agent MUST also identify and report positive patterns, good practices, and well-implemented features in their domain. Return both `issues` and `positives` in the JSON response.**
+**Every Phase 2 agent MUST return both `issues` and `positives`** in its response so the final report acknowledges what's working.
 
-### Agent 2.1: Security Audit
+**JSON schemas in the prompts below are guidance, not strict contracts.** Agents may return any structured form as long as findings include: `id`, `severity`, `category`, `file`, `line` (when applicable), `description`, `impact`, `fix`.
 
-**Prompt:**
-> Perform a security audit of this codebase. Search for:
+### Core Agents (always run)
+
+#### Agent 2.A: Security & Secrets
+
+> Audit for security vulnerabilities and secret exposure.
 >
-> **Secrets:** Hardcoded API keys, tokens, credentials in source files, config files, plist, xml resources. Check for AWS keys (AKIA), Stripe keys, GitHub tokens, Firebase keys.
+> **Secrets:** Hardcoded API keys, tokens, credentials in source/config/plist/xml. Patterns: AKIA (AWS), sk_live/sk_test (Stripe), ghp_/gho_/github_pat_ (GitHub), AIzaSy (Google/Firebase), xox (Slack).
 >
-> **Injection:** SQL injection, command injection, XSS, template injection, deserialization vulnerabilities.
+> **Injection:** SQL, command, XSS, template (SSTI), unsafe deserialization.
 >
 > **Auth:** Weak password hashing, missing rate limiting, JWT issues, IDOR, hardcoded credentials.
 >
-> **Storage:** Verify secrets use secure storage (Keychain/Keystore not UserDefaults/SharedPreferences).
+> **Storage:** iOS uses Keychain (not UserDefaults); Android uses EncryptedSharedPreferences/Keystore (not SharedPreferences); Web uses httpOnly cookies (not localStorage); Backend uses Vault/Secrets Manager.
 >
-> **TLS:** Check certificate pinning across all environments.
+> **TLS:** Certificate pinning across all environments.
 >
-> Return findings as JSON array: `[{id, severity, category, file, line, description, impact, fix}]`
+> Return findings + positives.
 
-### Agent 2.2: Dependency Analysis
+#### Agent 2.B: Code Quality & Comments
 
-**Prompt:**
-> Analyze all dependencies in this codebase:
+> Review structural code quality and in-code comment accuracy. Bug patterns and error-handling strategy are covered by Agent 2.C — do not duplicate.
 >
-> 1. **Versions:** For each dependency, use web search to find latest stable version. Compare against current.
-> 2. **Security:** Check for known CVEs or security advisories.
-> 3. **Duplicates:** Find overlapping libraries (multiple image loaders, HTTP clients, etc.)
+> **Quality metrics — flag explicitly:** methods >100 lines, classes >1000 lines, >8 parameters, >6 nesting depth, cyclomatic complexity >25.
+>
+> **Quality patterns:** God classes, deep inheritance, giant switch/if-else, primitive obsession, stringly-typed data, boolean parameters that should be enums, manual loops where map/filter/reduce fit, callback hell, mutable shared state, scattered object creation that should be a factory, complex state transitions that should be a state machine, deprecated API usage.
+>
+> **Pattern duplication:** Scan for byte-identical or near-identical 5+ line blocks across files (the "shotgun-surgery" smell). Report count and locations — adding a new property/service/option then requires editing every site.
+>
+> **Quantitative counts — REQUIRED, return exact numbers:**
+>
+> - **Linter disables:** count `swiftlint:disable`, `eslint-disable`, `rubocop:disable`/`rubocop:todo`, `# type: ignore`, `# noqa`, `@SuppressWarnings`. Group by rule. Report total + by-rule breakdown.
+> - **Memory observers:** count `addObserver` vs `removeObserver` (Swift/Obj-C/Java). Report delta.
+> - **Pattern duplication count:** total duplicated blocks found, with one example per group.
+>
+> **Comment quality (in-code only — README/architecture is Agent 2.G's job):**
+>
+> - Factually inaccurate (signature mismatch, contradicts actual code).
+> - Outdated references (renamed code, wrong examples, references to methods that no longer exist).
+> - Stale TODOs (cross-check against current code; flag those without owner/ticket).
+> - Restating obvious code (`// increment counter` above `counter++`).
+> - Misleading or ambiguous phrasing (over-promising what the code does).
+> - Misplaced doc blocks (YARD/JSDoc/TSDoc above the wrong method).
+> - Refactor scars ("Original logic preserved exactly", "Extracted from X#y") that no longer carry information.
+> - Missing critical context on complex code (non-obvious side effects, hidden invariants, business rationale).
+>
+> **DO NOT FLAG comments:** Standard license headers, generated code auto-comments, comments correctly explaining the WHY, factually accurate type-system docs (TSDoc, Rustdoc, KDoc).
+>
+> Return findings (with file:line) + positives + the exact quantitative counts above.
+
+#### Agent 2.C: Bug Patterns & Error Handling
+
+> Review the codebase for common bug patterns and the error-handling strategy as a whole. Structural code quality and comments are covered by Agent 2.B — focus here on defects and error flow.
+>
+> **Bug patterns:**
+>
+> 1. **Null/nil:** Missing null checks, `Optional.get()` without `isPresent()`, force unwrap (`!`), accessing nullable without guard. Watch for parser quirks where empty input returns `false` (not `nil`) and downstream `&.` chains short-circuit incorrectly.
+> 2. **Bounds:** Off-by-one, index out of bounds, empty collection accessed without check.
+> 3. **Arithmetic:** Division by zero, integer overflow, float equality comparison, precision loss.
+> 4. **Resources:** File/connection/lock not closed in error paths, missing `finally`/`defer` cleanup, try-with-resources not used.
+> 5. **State:** Invalid transitions, stale cache without invalidation, partial-failure leaving inconsistent state, time-of-check-time-of-use races.
+>
+> **Error-handling strategy — count exact occurrences for each (REQUIRED):**
+>
+> - **Silent failures:** `try?`, `try!`, empty `catch {}`, `except: pass`, `_ = try?`. Report exact total per type and per file.
+> - **Catch-all without rethrow / context loss.**
+> - **Returning null/undefined/default values on error WITHOUT logging** — hides the failure entirely; flag every occurrence.
+> - **Optional chaining (`?.`) used as error suppression** — different from null-safety; flag when it skips operations that should have surfaced an error.
+> - **Production fallback to mock/stub/fake implementations** — production code should never silently fall back to test doubles.
+> - **Retry exhaustion without informing the user.**
+> - **Generic non-actionable user-facing error messages** ("Something went wrong" with no context and no next step).
+> - **Errors written to STDOUT instead of STDERR** (CLIs especially).
+> - **Narrow rescue/catch clauses** (catching only one subclass when the parent class has many — e.g. `OptionParser::InvalidOption` instead of `OptionParser::ParseError`; `IOError` instead of `Exception` parent).
+> - **Error messages that drop response body / context** (HTTP error wrapping that throws away the API's `errors` field; `e.message` losing `e.cause`).
+> - **Validators that silently `return` instead of `raise` on malformed input** (defeats the safety net they're supposed to provide).
+>
+> **Error propagation:**
+>
+> - Errors not bubbling with context (lost stack/cause chain).
+> - Sensitive data in error messages (PII, tokens, full request bodies).
+> - Missing correlation/request IDs for distributed debugging.
+>
+> Return findings (with file:line) + positives + exact silent-failure counts grouped by type and by file.
+
+#### Agent 2.D: Testing
+
+> Assess test coverage AND quality. Focus on **behavioral coverage** (would tests catch real regressions?) over line coverage.
+>
+> 1. **Coverage:** For each service/repository/viewmodel/controller, check if a test file exists. Calculate percentage.
+> 2. **Quality anti-patterns:** Tests without assertions, tests with sleep/delays, tests with logic (if/loops).
+> 3. **Test types present:** unit, integration, E2E, contract, security.
+> 4. **Flaky indicators:** Use of current date/time, random without seed, order-dependent tests.
+> 5. **Behavioral gaps — rate each 1–10 criticality** (10 = data loss / security / system failure; 1 = minor): negative tests missing (validation logic with no test that bad input is rejected), error-path tests missing (catch blocks/error returns/timeouts uncovered), boundary edge cases (empty/max/zero/negative/off-by-one), async/concurrent behavior untested.
+> 6. **Implementation coupling smells:** Tests asserting on private methods, internal data structures, exact log strings; tests that mirror implementation 1:1 instead of asserting on contracts.
+>
+> Return findings + positives.
+
+#### Agent 2.E: Dependencies & Backwards Compatibility
+
+> Two concerns merged: dependency health AND breaking-change risk.
+>
+> **Dependencies:**
+>
+> 1. **Versions:** For each dep, look up latest stable version (use `WebSearch` if needed). Compare against current.
+> 2. **CVEs:** Check for known security advisories (use `WebSearch` only for high-impact deps).
+> 3. **Duplicates:** Overlapping libraries (multiple HTTP clients, image loaders, etc.).
 > 4. **Maintenance:** Flag abandoned packages (12+ months inactive).
 > 5. **Licenses:** Flag copyleft (GPL/AGPL) in proprietary projects.
-> 6. **SOUP:** If soup.json exists (source of truth; soup.md is auto-generated from it), cross-reference coverage.
+> 6. **SOUP:** If `soup.json` exists (source of truth — `soup.md` is auto-generated), cross-reference coverage.
 >
-> Return as JSON: `{dependencies: [{name, current, latest, severity, issues}], duplicates: [{libs, overlap}], soup_coverage: "X of Y (Z%)"}`
+> **Backwards compatibility (only if library/SDK/public API):**
+>
+> - Removed/renamed public APIs, changed signatures or return types, breaking response schema changes, removed fields or changed error codes.
+> - Deprecated APIs without replacement documented or without removal timeline.
+> - SemVer violations (breaking change without major bump).
+> - DB schema changes that break old app versions (removed columns still queried).
+> - Missing migration guide for breaking changes.
+>
+> Return findings + positives + dep table (`{name, current, latest, severity, issues}`) + duplicates + soup_coverage `"X of Y (Z%)"`.
 
-### Agent 2.3: Code Quality Review
+#### Agent 2.F: Repository & CI/CD Hygiene
 
-**Prompt:**
-> Review code quality in this codebase:
+> Two concerns merged: git/repo hygiene AND CI/CD pipeline.
 >
-> 1. **Metrics:** Flag methods >100 lines, classes >1000 lines, >8 parameters, >6 nesting depth, cyclomatic complexity >25.
-> 2. **Error Handling:** Count silent failures (try?, empty catch, except pass). Report exact count.
-> 3. **Memory:** Count addObserver vs removeObserver calls. Flag potential leaks.
-> 4. **Linter Disables:** Count all disable comments (swiftlint:disable, eslint-disable, etc.)
-> 5. **Deprecated APIs:** Find deprecated API usage.
-> 6. **Code Pattern Improvements:** Flag when code could benefit from refactoring:
->    - **Structural:** God classes → extract, deep inheritance → composition, giant switch/if-else → strategy/polymorphism, constructor with 5+ params → builder pattern, scattered object creation → factory, global singletons → dependency injection
->    - **Behavioral:** Callback hell / nested callbacks → async/await or Promises, hardcoded algorithms → strategy pattern, complex state transitions → state machine, repeated null checks → Null Object or Optional
->    - **Data:** Primitive obsession → Value Objects (Email, Money, UserId types), stringly-typed data → enums/typed constants, boolean parameters → enum or separate methods, returning null from collections → return empty, mutable shared state → immutable structures
->    - **Modern Language Features:** Manual loops with accumulators → map/filter/reduce, type checks + casts → pattern matching, completion handlers → async/await, manual thread management → structured concurrency
+> **Git & Repo:**
 >
-> Return as JSON: `{metrics: [{file, issue, value}], silent_failures: {count, files}, memory_leaks: {added, removed, delta}, linter_disables: {count, by_rule}, deprecated: [{api, file, replacement}], pattern_improvements: [{file, current_pattern, recommended_pattern, rationale, effort}]}`
+> 1. Branch protection on main/master (no direct pushes, required reviews, required status checks). Use `gh api` to inspect actual settings.
+> 2. CODEOWNERS present (case-insensitive — see exclusions). Critical paths covered.
+> 3. Commit hygiene: vague messages ("fix", "update"), missing issue refs, WIP commits on main.
+> 4. Stale branches >30 days, inconsistent naming.
+> 5. Secrets accidentally committed in git history.
+> 6. Large binaries that should use Git LFS.
+>
+> **CI/CD Pipeline:**
+>
+> 1. **Stages present:** lint/format, type check, unit tests, integration tests, security scan (CodeQL/Semgrep/Snyk/Trivy), dependency scan. Missing test execution = HIGH. Missing security scan = HIGH.
+> 2. **GitHub Actions security:** Missing `permissions` block (HIGH), `permissions: write-all` (HIGH), workflow injection via untrusted `${{ github.event.* }}` in `run:` (CRITICAL), `pull_request_target` with checkout of PR code (CRITICAL).
+> 3. **Runners (cost):** Run `gh repo view --json isPrivate --jq '.isPrivate'` first. **Public repo (false):** GitHub runners are FREE — do NOT flag macOS/Windows runner cost. Cross-platform testing in public repos is a POSITIVE. **Private repo (true):** macOS costs ~10x Linux — flag if not needed for Apple-specific code.
+> 4. **Caching, `timeout-minutes`, matrix strategy, artifact upload, code coverage reporting.**
+> 5. **Dependency monitoring — MANDATORY EVIDENCE CHECK before flagging:**
+>
+>    ```bash
+>    REPO_INFO=$(gh repo view --json owner,name --jq '"\(.owner.login)/\(.name)"')
+>    gh api "repos/${REPO_INFO}" --jq '.security_and_analysis.dependabot_security_updates.status // "disabled"'
+>    ```
+>
+>    If output is `"enabled"`, Dependabot Security Updates are configured at the repo level — **DO NOT flag "No Dependabot Configuration"**. The finding is invalid without this command's output included as evidence. Severity logic: neither `dependabot.yml`/`renovate.json` NOR security updates enabled = HIGH; security updates enabled but no `dependabot.yml` = DO NOT FLAG; `dependabot.yml` exists but missing ecosystems (npm, pip, gradle, swift, cocoapods, github-actions, docker) = MEDIUM.
+> 6. **Deployment safety:** environment protection rules, required reviewers for production, secrets in workflow files vs environment secrets.
+>
+> Return findings + positives. For dependency monitoring, include the actual `gh api` output in the response.
 
-### Agent 2.4: Testing Assessment
+#### Agent 2.G: Documentation & Configuration
 
-**Prompt:**
-> Assess test coverage AND test quality. Focus on **behavioral coverage** (would tests catch real regressions?) over line coverage.
+> Two concerns merged: project documentation AND configuration management.
 >
-> 1. **Coverage:** For each service/repository/viewmodel/controller, check if corresponding test file exists. Calculate percentage.
-> 2. **Quality:** Flag tests without assertions, tests with sleep/delays, tests with logic (if/loops).
-> 3. **Types:** Check presence of unit, integration, E2E, contract, security tests.
-> 4. **Flaky Indicators:** Flag use of current date/time, random without seed, order-dependent tests.
-> 5. **Behavioral coverage gaps** — rate each gap on a 1–10 criticality scale (10 = could cause data loss, security incident, or system failure; 1 = minor):
->    - **Negative tests missing:** validation logic with no test that *bad input is rejected*
->    - **Error-path tests missing:** catch blocks, error returns, timeout handlers without coverage
->    - **Boundary edge cases:** empty input, max size, zero, negative, off-by-one inputs
->    - **Async/concurrent behavior untested:** race conditions, ordering guarantees, retry/timeout logic
-> 6. **Implementation coupling smell:**
->    - Tests asserting on private methods, internal data structures, or exact log strings (break on legitimate refactors)
->    - Tests that mirror implementation 1:1 instead of asserting on behavior contracts
+> **Documentation — required files:**
 >
-> Return as JSON: `{coverage: {services: "X/Y (Z%)", viewmodels: "X/Y (Z%)", missing: [files]}, anti_patterns: [{type, file, count}], test_types: {unit: bool, integration: bool, e2e: bool}, behavioral_gaps: [{type, description, file, criticality_1_to_10}], coupling_smells: [{description, file, line}]}`
+> - **README.md** sections: project name with build badge, table of contents, overview, installation, usage examples, contributing.
+> - **docs/architecture.md** standard repos: TOC, architecture diagram, software units, SOUP, critical algorithms, risk controls.
+> - **docs/architecture.md** AI/ML repos: datasets, preprocessing, splits, model architecture, training, evaluation, SOUP, risk controls, deployment.
+> - **CODEOWNERS** (any case variant — see exclusions).
+> - **PR template** (`.github/PULL_REQUEST_TEMPLATE.md`).
+> - **Issue templates** ONLY if GitHub issues are enabled (`gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'`).
+> - **LICENSE** ONLY if repo is public (`gh repo view --json isPrivate --jq '.isPrivate'` returns `false`).
+> - **API docs** (OpenAPI/Swagger) if APIs.
+>
+> **DO NOT FLAG missing:** CHANGELOG.md, CONTRIBUTING.md as separate file, SBOM, CODE_OF_CONDUCT.md, SECURITY.md.
+>
+> **Content verification:** Files must have actual content (not stubs). soup.json must have actual dependency data. Architecture docs must have actual diagrams/descriptions. Empty/stub doc = MEDIUM.
+>
+> **Case-insensitive search is MANDATORY.** GitHub treats `CODEOWNERS`/`codeowners`/`Codeowners`, `README.md`/`readme.md`, `LICENSE`/`license`, `pull_request_template.md`/`PULL_REQUEST_TEMPLATE.md` as equivalent. Search case-insensitively before flagging anything missing. Locations: root, `.github/`, `docs/` are all valid for CODEOWNERS.
+>
+> **Configuration management:**
+>
+> 1. **Environment separation:** Hardcoded values that vary by environment, `if env == "prod"` logic, prod config in non-prod builds.
+> 2. **Secrets in config files:** Should use vault/secrets manager. Missing `.env.example`.
+> 3. **Startup validation:** Required config validated at startup, fail-fast on missing/invalid config.
+> 4. **Feature flags:** Inconsistent naming, no cleanup of old flags, undocumented dependencies.
+> 5. **Platform-specific:** iOS xcconfig per environment; Android `buildConfigField` per flavor; Web client-side env exposure (NEXT_PUBLIC_, VITE_), build-time vs runtime.
+>
+> Return findings + positives.
 
-### Agent 2.5: Infrastructure as Code Review (If IaC detected in Phase 1)
+### Conditional Agents (run only if applicable from Phase 1)
 
-**Prompt:**
-> Review all Infrastructure as Code files (CloudFormation, SAM, Terraform, CDK, Kubernetes).
->
-> **Use web search to find current best practices and guidelines for:**
->
-> - AWS Well-Architected Framework (latest recommendations)
-> - CloudFormation/Terraform best practices (current year)
-> - VPC design patterns and subnet strategies
-> - Load balancer configuration guidelines
-> - Cost optimization recommendations
->
-> **Evaluate the IaC against current standards for:**
->
-> 1. **Architecture:** VPC/subnet design, LB configuration, security groups, high availability
-> 2. **Code Quality:** Modularity, DRY, parameterization, outputs/exports
-> 3. **Cost Optimization:** Right-sizing, reserved capacity opportunities, waste elimination (estimate monthly savings)
-> 4. **Modern Practices:** Are legacy patterns used where modern alternatives exist?
->
-> **CRITICAL - Check UserData/LaunchTemplate/LaunchConfiguration thoroughly:**
-> Before flagging missing observability/logging, you MUST:
->
-> - Decode and read ALL UserData scripts (Base64 encoded or Fn::Base64)
-> - Check for CloudWatch agent installation (amazon-cloudwatch-agent, awslogs, cloudwatch-agent.json)
-> - Check for logging agent installation (fluentd, fluent-bit, filebeat, logstash)
-> - Check LaunchTemplates referenced by AutoScaling groups
-> - Check nested stacks and referenced templates
-> - Look for `amazon-cloudwatch-agent-ctl` or `awslogs` service configuration
->
-> **DO NOT flag "No Application Log Streaming" if ANY of these are present:**
->
-> - CloudWatch agent installation in UserData
-> - awslogs daemon configuration
-> - Fluent-bit/Fluentd sidecar or installation
-> - Log group creation with retention policy
-> - CloudWatch agent configuration files (cloudwatch-agent.json, amazon-cloudwatch-agent.json)
->
-> Return as JSON: `{architecture: [{issue, severity, recommendation, source_guideline}], cost_optimization: [{finding, estimated_monthly_savings}], modernization: [{legacy_pattern, modern_alternative}], observability: {cloudwatch_agent_found: bool, log_groups: [], userdata_logging: [{instance, agent, config_file}]}}`
+#### Agent 2.H: Backend Concerns (only if backend/API detected)
 
-### Agent 2.6: Performance Review (If backend/API detected in Phase 1)
+> Merged: performance, observability, API design, concurrency, database migrations.
+>
+> **Performance:**
+>
+> - **DB:** N+1 queries (queries inside loops), missing indexes on FKs/filtered columns, unbounded queries without LIMIT, large OFFSET pagination (should use cursor).
+> - **Caching:** Cache without TTL, cache key without version, caching user-specific data globally, cache stampede risks.
+> - **API perf:** No pagination on list endpoints, long-running tasks in request cycle, missing timeouts on external calls, no connection pooling.
+> - **Memory:** Large objects held in memory, no streaming for large files, unbounded collections.
+>
+> **Observability:**
+>
+> - **Logging:** `print`/`console.log` in production, sensitive data in logs (PII, secrets), missing correlation IDs, unstructured messages, missing log levels.
+> - **Metrics:** No instrumentation, missing RED metrics (Rate, Errors, Duration), high-cardinality labels.
+> - **Health checks:** No endpoint, liveness probe checking dependencies (should only check process), missing readiness probes.
+> - **Resilience:** No circuit breaker for external calls, retry without exponential backoff, no timeouts on HTTP/DB calls, missing graceful shutdown.
+>
+> **API design (REST/GraphQL/gRPC):**
+>
+> - URL design: verbs in URLs (`/getUser`), inconsistent pluralization, deep nesting (>3), inconsistent casing.
+> - HTTP methods: GET for mutations, POST for everything, wrong status codes.
+> - Versioning: no strategy, breaking changes without version bump.
+> - Responses: inconsistent error format, stack traces in prod, no pagination metadata, inconsistent date formats.
+> - Validation: no request validation, accepting unknown fields silently, no Content-Type validation.
+> - gRPC (if applicable): proto organization, missing field-number documentation, reserved fields not used for removed fields, missing deadlines, no health-check service, missing reflection.
+>
+> **Concurrency:**
+>
+> - Race conditions: shared mutable state without sync, TOCTOU.
+> - Deadlocks: circular lock dependencies, sync calls on main thread.
+> - Resource leaks: threads/executors not shutdown, channels/streams not closed, missing cancellation.
+> - Language-specific: Swift (`@MainActor` missing for UI, non-Sendable crossing actors); Kotlin (`GlobalScope`, `runBlocking` on main); Go (goroutine leaks, map without mutex, channel without select timeout); JS/TS (unhandled promise rejections, event-loop blocking); Python (asyncio blocking calls, threading without Lock).
+> - DB: missing optimistic locking, long transactions holding locks.
+>
+> **Migrations (if DB detected):**
+>
+> - **Safety:** Non-reversible without justification, missing down migration, data + schema migrations mixed.
+> - **Zero-downtime:** Adding NOT NULL without default, renaming columns directly (use expand-contract), dropping columns still in use.
+> - **Large tables:** No batching, missing online schema-change tools, `SELECT *` in migrations.
+> - **Integrity:** FKs added without validating existing data, UNIQUE without checking duplicates, enum changes without handling existing values.
+> - **Testing:** Migrations not tested on production-like data, rollback untested.
+>
+> Return findings + positives, organized by sub-area.
 
-**Prompt:**
-> Review the codebase for performance issues.
->
-> **Use web search to find current best practices for:**
->
-> - Database query optimization (N+1, indexing, pagination)
-> - Caching strategies and patterns
-> - API performance guidelines
->
-> **Check for:**
->
-> 1. **Database:** N+1 queries (queries inside loops), missing indexes on foreign keys/filtered columns, unbounded queries without LIMIT, large OFFSET pagination (should use cursor)
-> 2. **Caching:** Cache without TTL, cache key without version, caching user-specific data globally, cache stampede risks
-> 3. **API:** No pagination on list endpoints, long-running tasks in request cycle, missing timeouts on external calls, no connection pooling
-> 4. **Memory:** Large objects held in memory, no streaming for large files, unbounded collections
->
-> Return as JSON: `{database: [{issue, severity, file, line, fix}], caching: [{issue, severity, fix}], api: [{issue, severity, endpoint, fix}]}`
+#### Agent 2.I: Infrastructure & Compliance (only if IaC or regulated data detected)
 
-### Agent 2.7: Observability Review (If backend/API detected in Phase 1)
+> Merged: Infrastructure as Code review AND compliance/privacy.
+>
+> **IaC (CloudFormation, SAM, Terraform, CDK, Kubernetes):**
+>
+> 1. **Architecture:** VPC/subnet design, LB configuration, security groups, high availability.
+> 2. **Code quality:** Modularity, DRY, parameterization, outputs/exports.
+> 3. **Cost:** Right-sizing, reserved capacity opportunities, waste (estimate monthly savings).
+> 4. **Modern practices:** Legacy patterns where modern alternatives exist.
+> 5. **CRITICAL — UserData/LaunchTemplate/LaunchConfiguration check before flagging missing observability:**
+>    - Decode and read ALL UserData scripts (Base64 / `Fn::Base64`).
+>    - Check for CloudWatch agent installation (`amazon-cloudwatch-agent`, `awslogs`, `cloudwatch-agent.json`).
+>    - Check for logging agents (fluentd, fluent-bit, filebeat, logstash).
+>    - Check LaunchTemplates referenced by AutoScaling groups.
+>    - Check nested stacks and referenced templates.
+>    - **DO NOT flag "No Application Log Streaming" if ANY of these are present:** CloudWatch agent in UserData, awslogs daemon config, fluent-bit/fluentd sidecar/installation, log group with retention, CloudWatch agent config files.
+>
+> **Compliance (only if user data or payments detected):**
+>
+> 1. **Data subject rights (GDPR/CCPA):** Right to access (export), right to deletion, right to rectification, consent withdrawal mechanism.
+> 2. **Consent:** Collection mechanism, no pre-checked boxes, consent records with timestamps, cookie consent.
+> 3. **Data handling:** PII encryption at rest/transit, PII in logs, retention policy, cross-border transfer safeguards.
+> 4. **Payments (PCI):** Card data tokenized (no PAN/CVV stored), PAN masking in logs, TLS for card data.
+> 5. **Healthcare (HIPAA):** PHI encryption, access controls, PHI access audit logging, BAA with vendors.
+> 6. **Audit trail:** Logging of data access, consent changes, security events.
+>
+> Return findings + positives.
 
-**Prompt:**
-> Review the codebase for observability and resilience.
->
-> **Use web search to find current best practices for:**
->
-> - Structured logging standards
-> - Application metrics (RED method, USE method)
-> - Distributed tracing
-> - Health check patterns
->
-> **Check for:**
->
-> 1. **Logging:** print/console.log in production code, sensitive data in logs (PII, secrets), missing correlation/request IDs, unstructured log messages, missing log levels
-> 2. **Metrics:** No metrics instrumentation, missing RED metrics (Rate, Errors, Duration), high-cardinality labels
-> 3. **Health Checks:** No health endpoint, liveness probe checking dependencies (should only check process), missing readiness probes
-> 4. **Resilience:** No circuit breaker for external calls, retry without exponential backoff, no timeout on HTTP/DB calls, missing graceful shutdown
->
-> Return as JSON: `{logging: [{issue, severity, file, fix}], metrics: {present: bool, issues: []}, health_checks: {present: bool, issues: []}, resilience: [{issue, severity, fix}]}`
+#### Agent 2.J: Localization & AI/ML (only if user-facing UI or ML detected)
 
-### Agent 2.8: API Design Review (If REST/GraphQL/gRPC API detected in Phase 1)
+> Merged: i18n/localization AND AI/ML practices. Run only the relevant sub-section.
+>
+> **i18n (if user-facing UI):**
+>
+> - **String externalization:** Hardcoded user-facing strings in code, concatenation that breaks translation, missing translation keys.
+> - **Pluralization:** Missing plural forms, incorrect rules for non-English.
+> - **Formatting:** Date/time/currency not locale-aware, hardcoded number/date formats.
+> - **RTL:** Hardcoded left/right vs leading/trailing (iOS), missing `supportsRtl` (Android), `margin-left` vs `margin-inline-start` (CSS).
+> - **Platform:** iOS strings in `Localizable.strings`/`.xcstrings`, `NSLocalizedString` usage; Android `@string/` not hardcoded, translations in `values-XX/`; Web i18n library usage, no template literals with embedded text.
+> - **Workflow:** String extraction in CI, missing translations flagged.
+>
+> **AI/ML (if ML frameworks detected):**
+>
+> - **Reproducibility:** Random seeds set, model versioning, experiment tracking, no hardcoded hyperparameters.
+> - **Data:** Schema/validation, train/test split verification, data leakage risks, feature versioning.
+> - **Model management:** Model registry, model metadata, A/B testing capability, rollback mechanism.
+> - **Security:** Models loaded from untrusted sources can execute arbitrary code on load — flag any such loading paths. Input validation for inference, model endpoint auth.
+> - **Performance:** Batching for inference, GPU utilization monitoring, model optimization (quantization, pruning).
+> - **Monitoring:** Drift detection, prediction logging, performance degradation alerts.
+>
+> Return findings + positives.
 
-**Prompt:**
-> Review the API design for best practices.
->
-> **Use web search to find current best practices for:**
->
-> - REST API design conventions (current year)
-> - GraphQL schema design best practices
-> - gRPC API design and protobuf conventions
-> - HTTP status code usage
-> - API versioning strategies
-> - Error response formats
->
-> **Check for:**
->
-> 1. **URL Design (REST):** Verbs in URLs (/getUser), inconsistent pluralization, deep nesting (>3 levels), inconsistent casing
-> 2. **HTTP Methods:** GET used for mutations, POST for everything, wrong status codes (200 for errors, 500 for client errors)
-> 3. **Versioning:** No versioning strategy, breaking changes without version bump
-> 4. **Responses:** Inconsistent error format, stack traces in production errors, no pagination metadata, inconsistent date formats
-> 5. **Validation:** No request validation, accepting unknown fields silently, no Content-Type validation
-> 6. **gRPC Specific (if applicable):**
->    - Proto file organization and package naming
->    - Missing field numbers documentation
->    - Reserved fields not used for removed fields
->    - Missing deadline/timeout on calls
->    - No health check service (grpc.health.v1)
->    - Streaming used inappropriately
->    - Missing reflection service for debugging
->
-> Return as JSON: `{url_design: [{issue, severity, endpoint, fix}], methods: [{issue, severity, endpoint}], versioning: {strategy: string, issues: []}, responses: [{issue, severity, fix}], grpc: [{issue, severity, proto_file, fix}]}`
-
-### Agent 2.9: Concurrency Review (If applicable based on language/framework)
-
-**Prompt:**
-> Review the codebase for concurrency and thread safety issues.
->
-> **Use web search to find current best practices for:**
->
-> - Concurrency patterns for the detected language(s)
-> - Thread safety guidelines
-> - Async/await best practices
->
-> **Check for:**
->
-> 1. **Race Conditions:** Shared mutable state without synchronization, TOCTOU (time-of-check-time-of-use) bugs
-> 2. **Deadlocks:** Circular lock dependencies, sync calls on main thread
-> 3. **Resource Leaks:** Threads/executors not shutdown, channels/streams not closed, missing cancellation handling
-> 4. **Language-Specific:**
->    - Swift: Missing @MainActor for UI, non-Sendable crossing actor boundaries, DispatchQueue.main.sync from main
->    - Kotlin: GlobalScope usage, runBlocking on main, missing Dispatchers.Main for UI
->    - Go: Goroutine leaks, map access without mutex, channel without select timeout
->    - JS/TS: Unhandled promise rejections, event loop blocking, race conditions in shared state
->    - Python: asyncio blocking calls in async functions, threading without Lock
-> 5. **Database:** Missing optimistic locking, long transactions holding locks
->
-> Return as JSON: `{race_conditions: [{issue, severity, file, line}], deadlocks: [{issue, severity, file}], resource_leaks: [{issue, severity, file}], language_specific: [{issue, severity, file, fix}]}`
-
-### Agent 2.10: AI/ML Review (If ML frameworks detected in Phase 1)
-
-**Prompt:**
-> Review the AI/ML codebase for best practices.
->
-> **Use web search to find current best practices for:**
->
-> - ML model versioning and reproducibility
-> - Training pipeline best practices
-> - Model deployment and serving guidelines
-> - ML security considerations
->
-> **Check for:**
->
-> 1. **Reproducibility:** No random seed setting, missing model versioning, no experiment tracking, hardcoded hyperparameters
-> 2. **Data Handling:** No data validation/schema, missing train/test split verification, data leakage risks, no feature versioning
-> 3. **Model Management:** No model registry, missing model metadata, no A/B testing capability, no rollback mechanism
-> 4. **Security:** Model files from untrusted sources (pickle vulnerabilities), no input validation for inference, exposed model endpoints without auth
-> 5. **Performance:** No batching for inference, missing GPU utilization monitoring, no model optimization (quantization, pruning)
-> 6. **Monitoring:** No model drift detection, missing prediction logging, no performance degradation alerts
->
-> Return as JSON: `{reproducibility: [{issue, severity, fix}], data: [{issue, severity, file}], model_management: [{issue, severity}], security: [{issue, severity, file}], monitoring: [{issue, severity}]}`
-
-### Agent 2.11: Compliance Review (If user data/payments detected in Phase 1)
-
-**Prompt:**
-> Review the codebase for compliance with privacy and security regulations.
->
-> **Use web search to find current requirements for:**
->
-> - GDPR data subject rights and consent requirements
-> - CCPA/CPRA privacy requirements
-> - HIPAA requirements (if healthcare data detected)
-> - PCI DSS requirements (if payment processing detected)
-> - SOC 2 trust service criteria
-> - ISO 27001 information security controls
->
-> **Check for:**
->
-> 1. **Data Subject Rights:** Right to access (data export), right to deletion, right to rectification, consent withdrawal mechanism
-> 2. **Consent Management:** Consent collection mechanism, pre-checked boxes (violation), consent records with timestamps, cookie consent
-> 3. **Data Handling:** PII encryption at rest/transit, PII in logs, data retention policy, cross-border transfer safeguards
-> 4. **Payment Security (if applicable):** Card data storage (should tokenize), CVV storage (never allowed), PAN masking in logs, TLS for card data
-> 5. **Healthcare (if applicable):** PHI encryption, access controls, audit logging of PHI access, BAA with vendors
-> 6. **Audit Trail:** Logging of data access, consent changes, security events
->
-> Return as JSON: `{data_rights: [{requirement, implemented: bool, severity}], consent: [{issue, severity}], data_handling: [{issue, severity, file}], payment: [{issue, severity}], healthcare: [{issue, severity}], audit: [{issue, severity}]}`
-
-### Agent 2.12: Git & Repository Hygiene Review (Always run)
-
-**Prompt:**
-> Review the repository configuration and git practices.
->
-> **Use web search to find current best practices for:**
->
-> - GitHub/GitLab branch protection rules
-> - Conventional commits and commit message standards
-> - CODEOWNERS best practices
->
-> **Check for:**
->
-> 1. **Branch Protection:** No protection on main/master, direct pushes allowed, no required reviews, no status checks required, force push allowed
-> 2. **CODEOWNERS:** Missing CODEOWNERS file, stale/invalid owners, critical paths not covered
-> 3. **Commit Standards:** Inconsistent commit message format, vague messages ("fix", "update"), missing issue references, WIP commits on main
-> 4. **Branch Hygiene:** Stale branches (>30 days inactive), inconsistent naming, long-lived feature branches
-> 5. **Secrets in History:** Check for accidentally committed secrets in git history
-> 6. **Large Files:** Binary files or large assets that should use Git LFS
->
-> Return as JSON: `{branch_protection: [{issue, severity, recommendation}], codeowners: [{issue, severity}], commits: [{issue, severity}], branches: [{issue, severity}], secrets_in_history: [{finding, severity, commit}], large_files: [{file, size_mb}]}`
-
-### Agent 2.13: Database & Migrations Review (If database detected in Phase 1)
-
-**Prompt:**
-> Review database migrations and schema management.
->
-> **Use web search to find current best practices for:**
->
-> - Zero-downtime database migrations
-> - Database migration patterns for the detected ORM/framework
-> - Large table migration strategies
->
-> **Check for:**
->
-> 1. **Migration Safety:** Non-reversible migrations without justification, missing rollback/down migration, data migration mixed with schema migration
-> 2. **Zero-Downtime:** Adding NOT NULL without default, renaming columns directly (should use expand-contract), dropping columns still in use
-> 3. **Large Tables:** Migrations on large tables without batching, missing online schema change tools for big tables, SELECT * in migrations
-> 4. **Data Integrity:** Foreign keys added without validating existing data, UNIQUE constraints without checking duplicates, enum changes without handling existing values
-> 5. **Naming:** Inconsistent migration naming, non-descriptive names
-> 6. **Testing:** Migrations not tested on production-like data, rollback not tested
->
-> Return as JSON: `{safety: [{issue, severity, file}], zero_downtime: [{issue, severity, migration, fix}], large_tables: [{issue, severity, table}], integrity: [{issue, severity}], naming: [{issue, severity}]}`
-
-### Agent 2.14: i18n & Localization Review (If user-facing UI detected in Phase 1)
-
-**Prompt:**
-> Review internationalization and localization practices.
->
-> **Use web search to find current best practices for:**
->
-> - i18n patterns for the detected platform (iOS/Android/Web)
-> - ICU message format and pluralization
-> - RTL support guidelines
->
-> **Check for:**
->
-> 1. **String Externalization:** Hardcoded user-facing strings in code, concatenated strings with variables (breaks translation), missing translation keys
-> 2. **Pluralization:** Missing plural forms handling, incorrect plural rules for non-English
-> 3. **Formatting:** Date/time/currency not locale-aware, hardcoded number formats, hardcoded date formats
-> 4. **RTL Support:** Hardcoded left/right instead of leading/trailing (iOS), missing supportsRtl (Android), margin-left instead of margin-inline-start (CSS)
-> 5. **Platform-Specific:**
->    - iOS: Strings not in Localizable.strings/.xcstrings, missing NSLocalizedString
->    - Android: Hardcoded strings instead of @string/, missing translations in values-XX/
->    - Web: Missing i18n library usage, template literals with embedded text
-> 6. **Translation Workflow:** No string extraction in CI, missing translations not flagged
->
-> Return as JSON: `{strings: [{issue, severity, file, line}], pluralization: [{issue, severity}], formatting: [{issue, severity, file}], rtl: [{issue, severity, file}], platform: [{issue, severity, file}]}`
-
-### Agent 2.15: Configuration Management Review (Always run)
-
-**Prompt:**
-> Review configuration management practices.
->
-> **Use web search to find current best practices for:**
->
-> - Environment configuration patterns
-> - Configuration validation at startup
-> - Feature flag management
->
-> **Check for:**
->
-> 1. **Environment Separation:** Hardcoded values that vary by environment, environment-specific logic in code (if env == "prod"), production config in non-prod builds
-> 2. **Secrets Management:** Secrets in configuration files (not using vault/secrets manager), missing .env.example documentation
-> 3. **Startup Validation:** Missing validation of required config at startup, no fail-fast on missing config, invalid config formats not caught
-> 4. **Feature Flags:** Inconsistent flag naming, no cleanup of old flags, flag dependencies not documented
-> 5. **Platform-Specific:**
->    - iOS: Missing xcconfig per environment, Info.plist values not per-config
->    - Android: Missing buildConfigField per flavor, values missing in some flavors
->    - Web: Client-side env exposure issues (NEXT_PUBLIC_, VITE_), build-time vs runtime confusion
-> 6. **Documentation:** Config options not documented, missing default values documentation
->
-> Return as JSON: `{environment: [{issue, severity, file}], secrets: [{issue, severity, file}], validation: [{issue, severity}], feature_flags: [{issue, severity}], documentation: [{issue, severity}]}`
-
-### Agent 2.16: Bug Patterns & Error Handling Review (Always run)
-
-**Prompt:**
-> Review the codebase for common bug patterns and error handling strategy.
->
-> **Check for:**
->
-> 1. **Null/Nil Bugs:** Missing null checks, Optional.get() without isPresent(), force unwrap (!), accessing nullable without guard
-> 2. **Bounds Bugs:** Off-by-one errors, index out of bounds risks, empty collection not handled before access
-> 3. **Arithmetic Bugs:** Division by zero risks, integer overflow, float equality comparison, precision loss
-> 4. **Resource Bugs:** File/connection not closed in error paths, missing finally/defer cleanup, try-with-resources not used
-> 5. **State Bugs:** Invalid state transitions, stale cache without invalidation, partial failure leaving inconsistent state
-> 6. **Error Handling Strategy:**
->    - Silent failures: Count try?/try!/empty catch/except pass
->    - Catch-all without rethrow
->    - Error swallowing (log and continue without recovery)
->    - Missing error context when rethrowing
->    - Panic/crash for recoverable errors
->    - **Returning null/undefined/default values on error WITHOUT logging** — hides the failure entirely; flag every occurrence
->    - **Optional chaining (`?.`) used as error suppression** — different from null-safety; flag when it skips operations that should have surfaced an error
->    - **Production fallback to mock/stub/fake implementations** — architectural smell; production code should never silently fall back to test doubles
->    - **Retry exhaustion without informing the user** — final failure after all retries must surface to the caller
->    - **Generic non-actionable user-facing error messages** — "Something went wrong" with no context and no next step
-> 7. **Error Propagation:** Errors not bubbling with context, sensitive data in error messages, missing correlation IDs
->
-> Return as JSON: `{null_bugs: [{issue, severity, file, line}], bounds_bugs: [{issue, severity, file}], arithmetic_bugs: [{issue, severity, file}], resource_bugs: [{issue, severity, file}], state_bugs: [{issue, severity, file}], error_handling: {silent_failures: {count, files}, strategy_issues: [{issue, severity}]}, error_propagation: [{issue, severity}]}`
-
-### Agent 2.17: Backwards Compatibility Review (If library/API/SDK project)
-
-**Prompt:**
-> Review for backwards compatibility and breaking changes.
->
-> **Use web search to find current best practices for:**
->
-> - Semantic versioning (SemVer)
-> - API deprecation patterns
-> - Breaking change documentation
->
-> **Check for:**
->
-> 1. **Breaking Changes:** Removed public API/method, changed method signature, changed return types, renamed public classes/functions
-> 2. **Deprecation:** Deprecated APIs without replacement documented, deprecated without removal timeline, using deprecated APIs from dependencies
-> 3. **Versioning:** Version not following SemVer, breaking changes without major version bump
-> 4. **API Contracts:** Changed response schema without versioning, removed fields from responses, changed error codes/formats
-> 5. **Database:** Schema changes breaking old app versions, removed columns still queried by old versions
-> 6. **Migration Path:** No migration guide for breaking changes, no compatibility layer/shim
->
-> Return as JSON: `{breaking_changes: [{change, severity, file, migration_needed}], deprecation: [{api, severity, replacement, removal_version}], versioning: [{issue, severity}], api_contracts: [{issue, severity}], migration: [{issue, severity}]}`
-
-### Agent 2.18: Documentation Review (Always run)
-
-**Prompt:**
-> Review documentation completeness and quality.
->
-> **README.md - Required sections (flag if missing):**
->
-> - Project name with build badge
-> - Table of Contents
-> - Introduction / Overview
-> - Installation instructions
-> - Usage examples
-> - Contributing guidelines
->
-> **docs/architecture.md - Required sections for standard repos:**
->
-> - Table of Contents
-> - Architecture diagram
-> - Software units
-> - Software of Unknown Provenance (SOUP)
-> - Critical algorithms
-> - Risk controls
->
-> **docs/architecture.md - Required sections for AI/ML repos:**
->
-> - Datasets
-> - Data Preprocessing
-> - Data Splits
-> - Model Architecture
-> - Model Training
-> - Model Evaluation
-> - Software of Unknown Provenance (SOUP)
-> - Risk controls
-> - Model Deployment
->
-> **Other required files:**
->
-> - CODEOWNERS (case-insensitive search - see below)
-> - PR template (.github/PULL_REQUEST_TEMPLATE.md)
-> - Issue templates (.github/ISSUE_TEMPLATE/) - **ONLY check if GitHub issues are enabled** (run: `gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'`). If issues are disabled (returns `false`), skip this check as the repo uses an external tracker like Jira.
-> - LICENSE - **ONLY check if repo is public** (run: `gh repo view --json isPrivate --jq '.isPrivate'`). If private (returns `true`), do NOT flag missing LICENSE - private repos are proprietary by default.
-> - API docs (OpenAPI/Swagger for APIs)
->
-> **DO NOT FLAG these files as missing (they are optional):**
->
-> - CHANGELOG.md - Not required (hard to maintain, git history serves this purpose)
-> - CONTRIBUTING.md as separate file - Contributing section in README is sufficient
-> - SBOM (Software Bill of Materials) - Not required
-> - CODE_OF_CONDUCT.md - Not required
-> - SECURITY.md - Not required (GitHub security policy via UI is sufficient)
->
-> **Content verification (CRITICAL):**
->
-> - Check that files have ACTUAL content, not just headers/stubs
-> - Empty or stub documentation = MEDIUM finding
-> - soup.json must exist (source of truth; soup.md is auto-generated from it) and have actual dependency data
-> - Architecture docs must have actual diagrams/descriptions
->
-> **CRITICAL - Case-insensitive file search (MANDATORY):**
-> GitHub treats these files case-insensitively. When checking for required files, ALL of these are equivalent and valid:
->
-> - CODEOWNERS / codeowners / Codeowners / .github/CODEOWNERS / .github/codeowners
-> - README.md / readme.md / Readme.md
-> - LICENSE / license / License
-> - CONTRIBUTING.md / contributing.md
-> - pull_request_template.md / PULL_REQUEST_TEMPLATE.md
->
-> **DO NOT flag missing file if ANY case variant exists.** Use case-insensitive glob patterns.
->
-> Return as JSON: `{readme: {present: bool, sections: [{name, present: bool}], quality: "complete/partial/stub"}, architecture: {present: bool, sections: [{name, present: bool}], quality: "complete/partial/stub"}, other_docs: [{file, present: bool, severity}], content_issues: [{file, issue, severity}]}`
-
-### Agent 2.19: CI/CD & Workflow Review (Always run)
-
-**Prompt:**
-> Review all CI/CD configuration files for best practices and security.
->
-> **Use web search to find current best practices for:**
->
-> - GitHub Actions security hardening (current year)
-> - GitLab CI/CD best practices
-> - CI/CD pipeline optimization
->
-> **Check for:**
->
-> 1. **Pipeline Completeness:**
->    - Missing stages: lint/format, type check, unit tests, integration tests, security scan, dependency scan
->    - No test execution in CI = HIGH
->    - No security scanning (CodeQL/Semgrep/Snyk/Trivy) = HIGH
->
-> 2. **GitHub Actions Security:**
->    - Missing `permissions` block (HIGH) - should use least privilege
->    - Using `permissions: write-all` (HIGH)
->    - Workflow injection via `${{ github.event.issue.title }}` or similar untrusted input in run: (CRITICAL)
->    - Secrets potentially exposed in logs (CRITICAL)
->    - Using `pull_request_target` with checkout of PR code (CRITICAL)
->    - Third-party actions not pinned to SHA (INFO - not required but note if using @latest)
->
-> 3. **Runner & Cost Optimization:**
->    - **IMPORTANT: Check repo visibility first:** `gh repo view --json isPrivate --jq '.isPrivate'`
->    - If **public repo (returns `false`)**: GitHub runners are FREE - do NOT flag macOS/Windows runners as cost issues
->      - Cross-platform testing in public repos is a POSITIVE (add to positives section)
->      - Only flag if runners are failing/hanging, not for "unnecessary" platform coverage
->    - If **private repo (returns `true`)**: macOS runners cost ~10x Linux, flag if not needed for Apple-specific code
->    - No caching configured for dependencies (MEDIUM)
->    - No `timeout-minutes` set (MEDIUM - risk of hung jobs)
->    - Self-hosted runners without security hardening
->
-> 4. **Dependency Monitoring:**
->    - **⚠️ MANDATORY CHECK - DO NOT SKIP:** Before flagging ANY Dependabot/Renovate issue, you MUST:
->      1. Check if `dependabot.yml` or `renovate.json` exists in `.github/`
->      2. **ALWAYS run this API check regardless of step 1 result:**
->
->         ```bash
->         # Get repo owner and name
->         REPO_INFO=$(gh repo view --json owner,name --jq '"\(.owner.login)/\(.name)"')
->         # Check if Dependabot Security Updates are enabled via repo settings
->         gh api "repos/${REPO_INFO}" --jq '.security_and_analysis.dependabot_security_updates.status // "disabled"'
->         ```
->
->      3. If the API returns `"enabled"`, Dependabot Security Updates ARE configured at the repository level (monitors CVEs and creates security PRs automatically)
->      4. **DO NOT flag "No Dependabot/Renovate Configuration" if security updates are enabled** - this is a valid configuration
->
->    - **Severity logic (ONLY after completing the mandatory check above):**
->      - Neither dependabot.yml/renovate.json NOR security updates enabled via API = HIGH (no dependency monitoring at all)
->      - Security updates enabled via API but no dependabot.yml = **DO NOT FLAG** (CVE monitoring is active - this is the recommended approach for many repos)
->      - dependabot.yml exists but missing ecosystems = MEDIUM (should cover all: npm, pip, gradle, swift, cocoapods, github-actions, docker)
->    - No auto-merge for patch updates = LOW
->
->    - **Evidence required in findings:** If you flag a Dependabot issue, you MUST include the output of the `gh api` command showing `"disabled"` or `null`. If you cannot show this evidence, the finding is invalid.
->
-> 5. **Build & Test Configuration:**
->    - Tests not running in parallel where possible
->    - No matrix strategy for cross-platform/version testing
->    - Missing artifact upload for test results
->    - No code coverage reporting
->    - Flaky test handling not configured
->
-> 6. **Deployment Safety:**
->    - No environment protection rules
->    - Missing required reviewers for production
->    - No deployment gates/checks
->    - Secrets in workflow files instead of environment secrets
->
-> Return as JSON: `{pipeline: [{stage, present: bool, severity}], security: [{issue, severity, file, line, fix}], optimization: [{issue, severity, estimated_impact}], dependency_monitoring: {api_check_output: "enabled|disabled|null", security_updates_enabled: bool, config_file: "dependabot.yml|renovate.json|none", ecosystems: [{ecosystem, monitored: bool, severity}], issues: [{issue, severity}]}, deployment: [{issue, severity}]}`
->
-> **IMPORTANT:** The `api_check_output` field MUST contain the actual output from `gh api repos/{owner}/{repo} --jq '.security_and_analysis.dependabot_security_updates.status'`. If this field is missing or empty, the dependency_monitoring section is incomplete.
-
-### Agent 2.20: Code Comment Quality Review (Always run)
-
-**Prompt:**
-> Review **in-code comments** (inline `//`, `#`, `/* */`, docstrings) for accuracy and long-term value. Project-level docs (README, architecture.md) are covered by Agent 2.18 — do not duplicate.
->
-> **Check for:**
->
-> 1. **Factual inaccuracy:** Function signatures don't match documented parameters/return types. Described behavior contradicts actual code. Referenced types/functions/variables that no longer exist or are misused.
-> 2. **Outdated references:** Comments referring to renamed/refactored code. Examples in comments that don't match current implementation. Performance/complexity claims no longer accurate.
-> 3. **Stale TODOs and FIXMEs:** Items that may already have been silently addressed (cross-check against current code). TODOs without owner, ticket reference, or date.
-> 4. **Restating obvious code:** `// increment counter` above `counter++`. Comments describing WHAT instead of WHY. Flag for removal.
-> 5. **Misleading or ambiguous language:** Phrases that could be interpreted multiple ways. Assumptions stated as fact that may no longer hold.
-> 6. **Missing critical context (selective, not exhaustive):** Non-obvious side effects, hidden invariants, business-logic rationale, workarounds for specific bugs — flag where absent on complex code, not on every function.
->
-> **DO NOT FLAG:**
->
-> - Standard license headers
-> - Generated code with auto-comments
-> - Comments correctly explaining the WHY of non-obvious code
-> - Type-system doc comments required by tooling (TSDoc, Rustdoc, KDoc) when factually accurate
->
-> Return as JSON: `{inaccurate: [{file, line, comment, actual_code, severity}], outdated: [{file, line, issue}], stale_todos: [{file, line, todo, likely_addressed: bool}], restating_obvious: [{file, line, suggestion}], misleading: [{file, line, ambiguity}], missing_context: [{file, line, what_should_be_documented}]}`
-
-**Wait for all Phase 2 agents to complete before proceeding to Phase 3.**
+**Wait for all Phase 2 agents to complete before Phase 3.**
 
 ---
 
-## PHASE 3: ADVERSARIAL VALIDATION (Launch N Agents in Parallel)
+## PHASE 3: ADVERSARIAL VALIDATION
 
-**For EVERY finding from Phase 2, launch a validation agent whose job is to DISPROVE the finding.**
+For every Phase 2 finding, launch validation agents (`general-purpose`) tasked with **disproving** the finding. Phase 2 agents are biased toward finding issues; Phase 3 must be biased toward rejection.
 
-### Why Adversarial?
+**Batch size: up to 10 findings per agent.** This is a deliberate cost optimization. Group findings by file or area when possible to maximize cache reuse within an agent.
 
-Phase 2 agents are biased toward finding issues. Phase 3 agents must be biased toward REJECTING findings. A finding only survives if it cannot be reasonably disproven. This eliminates false positives that waste developer time.
+### Validation Prompt (per finding)
 
-### Validation Agent Template
-
-**Prompt:**
-> **Your mission: Try to DISPROVE this finding. Assume it's a false positive until proven otherwise.**
+> **Mission: Try to DISPROVE this finding. Assume it's a false positive until proven otherwise.**
 >
-> **Claimed Finding:** [description from Phase 2]
-> **File:** [file path]
-> **Claimed Issue:** [what was flagged]
+> **Finding:** [description]
+> **File:** [path]
+> **Severity:** [severity]
 >
-> **You MUST complete ALL of these checks before confirming any finding:**
+> Complete ALL of these checks. If you cannot, REJECT.
 >
-> **1. READ THE ACTUAL CODE (quote it):** Read the file at the specified location. Quote the exact code snippet (5-10 lines of context). If you cannot quote the code, REJECT the finding.
+> 1. **Quote the actual code** — read the file at the specified location and quote 5–10 lines of context. No quote = REJECT.
+> 2. **Check for mitigating factors** — wrappers, middleware, base classes, configuration files (.env, config/, settings), related files providing the missing functionality, handling at a different layer (infra, framework, platform).
+> 3. **Check for existing handling elsewhere** — grep the codebase for related patterns. Check imports for libraries that handle this automatically.
+> 4. **Check repository settings** (CI/CD, security, branch protection findings) — `gh api`/`gh repo view`. Many settings live in GitHub UI, not config files.
+> 5. **Verify context** — is the code reachable? Test/example/template file? Is severity proportionate to actual risk?
+> 6. **"Would a senior engineer flag this?"** — real issue or pedantic? Would the fix provide meaningful value?
 >
-> **2. CHECK FOR MITIGATING FACTORS:** Is there a wrapper, middleware, or base class that handles this? Is there a configuration file that addresses this? (Check .env, config/, settings). Is there a related file that provides the missing functionality? Is this handled at a different layer (infrastructure, framework, platform)?
+> **REJECT if:** any mitigating factor exists, the issue is handled elsewhere, you cannot quote the problematic code, repo settings address it, a senior engineer would not flag it.
 >
-> **3. CHECK FOR EXISTING HANDLING:** Search the codebase for related handling (grep for relevant patterns). Check if the issue is addressed elsewhere in the same file. Check imports - does a library/framework handle this automatically?
+> **CONFIRM only if:** all checks fail to disprove the finding.
 >
-> **4. CHECK REPOSITORY SETTINGS (for CI/CD, security, branch protection findings):** Use `gh api` to check repository-level settings. Use `gh repo view` to check features enabled via UI. Many settings are configured via GitHub UI, not config files.
+> **Confidence score (CONFIRMs only, 0–100):**
 >
-> **5. VERIFY THE CONTEXT:** Is this code actually used/reachable? Is this a test file, example, or template that shouldn't be flagged? Is the severity appropriate for the actual risk?
+> - **0** — false positive or pre-existing/not introduced by recent changes.
+> - **25** — might be real but couldn't fully verify; stylistic and not called out by project conventions.
+> - **50** — verified real but minor or rare in practice.
+> - **75** — double-checked; real, likely to be hit; current approach insufficient; OR explicitly violates a project convention/CLAUDE.md rule.
+> - **100** — certain, evidence directly confirms it, will happen frequently.
 >
-> **6. APPLY THE "WOULD A SENIOR ENGINEER FLAG THIS?" TEST:** Is this a real issue or pedantic nitpicking? Would fixing this provide meaningful value? Is the recommended fix actually better than the current code?
+> REJECTED = confidence 0. CONFIRMED must score ≥25.
 >
-> **DECISION CRITERIA:** REJECT if ANY mitigating factor exists. REJECT if the issue is handled elsewhere. REJECT if you cannot quote the actual problematic code. REJECT if repository settings address the issue. REJECT if a senior engineer would not flag this. CONFIRM only if ALL checks fail to disprove the finding.
->
-> **7. CONFIDENCE SCORING (only if CONFIRM):** Score the finding 0–100 using this rubric verbatim:
->
-> - **0** — Not confident at all. False positive that doesn't survive scrutiny, or pre-existing issue not introduced by recent changes.
-> - **25** — Somewhat confident. Might be a real issue, but you couldn't fully verify. If stylistic, not explicitly called out by project conventions.
-> - **50** — Moderately confident. Verified as real, but minor or rare in practice. Not very important relative to the rest of the review.
-> - **75** — Highly confident. Double-checked. Real issue likely to be hit in practice. The current approach is insufficient. Important and impacts functionality, OR explicitly violates a project convention/CLAUDE.md rule.
-> - **100** — Absolutely certain. Double-checked. Definitely real, will happen frequently. Evidence directly confirms it.
->
-> A REJECTED finding always has confidence 0. A CONFIRMED finding must score at least 25.
->
-> **Return JSON:**
+> **Return JSON for each finding:**
 >
 > ```json
 > {
+>   "finding_id": "...",
 >   "decision": "REJECT|CONFIRM",
 >   "confidence_score": 0,
->   "code_quoted": "exact code snippet you examined",
->   "mitigating_factors_checked": ["list of things you checked"],
->   "mitigating_factors_found": ["any factors that address the issue"],
->   "related_files_checked": ["files you searched"],
->   "repo_settings_checked": ["gh commands run and their output"],
->   "rejection_reason": "why this is a false positive (if REJECT)",
->   "confirmation_evidence": "specific proof the issue exists (if CONFIRM)",
->   "confidence_rationale": "why this score and not the next one up/down"
+>   "code_quoted": "...",
+>   "mitigating_factors_found": ["..."],
+>   "repo_settings_checked": ["..."],
+>   "rejection_reason": "...",
+>   "confirmation_evidence": "...",
+>   "confidence_rationale": "..."
 > }
 > ```
 
-### Rejection Criteria (Remove findings that match ANY of these)
+### Auto-rejection rules
 
-| Criterion | Example |
-| --------- | ------- |
-| Handled by framework/library | Express middleware handles auth, React sanitizes by default |
-| Handled by infrastructure | WAF blocks injection, load balancer handles TLS |
-| Handled by repository settings | Dependabot enabled via UI, branch protection via settings |
-| Handled elsewhere in codebase | Base class validates, wrapper sanitizes, config enables |
-| Test/example/template code | Files in `test/`, `examples/`, `templates/`, `__mocks__/` |
-| Intentionally disabled with comment | `// nosec: false positive because...`, documented exception |
-| Pedantic/low-value | Would take 2 hours to fix, saves 2 seconds |
-| Wrong severity | Flagged as HIGH but is actually INFO-level observation |
-| Deprecated/unused code | Code path is never executed, scheduled for removal |
-
-### Validation Success Criteria
-
-A finding is CONFIRMED only when:
-
-- [ ] Actual code is quoted in the response
-- [ ] All 6 check categories were performed
-- [ ] No mitigating factors were found
-- [ ] Repository settings were checked (for applicable findings)
-- [ ] The agent explicitly states why rejection criteria don't apply
-
-**If the validation response is missing code quotes or check results, the finding is AUTO-REJECTED.**
-
-### Batch Size Limit
-
-To ensure thorough validation:
-
-- Validate maximum 3 findings per agent
-- Complex findings (security, IaC, compliance) get dedicated 1:1 agents
-- If an agent validates more than 3 findings, split and re-run
+| Rule | Why |
+| ---- | --- |
+| No code quoted | Cannot verify the finding exists |
+| Handled by framework/library | Express middleware, React sanitization, ORM parameterization |
+| Handled by infrastructure | WAF, load balancer TLS, rate limiting at edge |
+| Handled by repository settings | Dependabot enabled via UI, branch protection in settings |
+| Handled elsewhere | Base class validates, wrapper sanitizes |
+| Test/example/template code | `test/`, `examples/`, `templates/`, `__mocks__/` |
+| Intentionally disabled with comment | `// nosec: false positive because…` |
+| Pedantic / low-value | 2 hours to fix, saves 2 seconds |
+| Wrong severity | Flagged HIGH but actually INFO |
+| Deprecated/unreachable code | Never executed, scheduled for removal |
+| CI/CD finding without `gh api` evidence | Repository settings not actually checked |
 
 ---
 
 ## PHASE 3.5: CONFIDENCE FILTER
 
-**Apply a confidence threshold to drop low-signal findings before report generation.**
+Apply **tiered thresholds by severity**. More important findings survive at lower confidence because the cost of missing a Critical or High issue exceeds the cost of carrying a few mid-confidence ones; conversely, low-severity findings need higher confidence to be worth a reviewer's attention.
 
-After all Phase 3 validation agents return:
+After validation:
 
-1. Drop every finding with `decision: REJECT` (already filtered by adversarial validation).
-2. Drop every CONFIRMED finding with `confidence_score < 80` — these are real but low-priority or under-verified, and would dilute the report.
-3. Critical-severity findings are the one exception: keep any CONFIRMED **Critical** finding with score ≥ 50, because the cost of missing a real critical issue outweighs the noise cost.
+1. Drop all `decision: REJECT` findings.
+2. Apply per-severity thresholds to CONFIRMED findings:
+   - **🔴 Critical:** keep if `confidence_score ≥ 50`
+   - **🟠 High / 🟡 Medium:** keep if `confidence_score ≥ 65`
+   - **🔵 Low / ⚪ Info:** keep if `confidence_score ≥ 80`
 
-**Threshold rationale:** 80 is the default because below that, false-positive risk exceeds reviewer-attention cost. Adjust per-run only if the user explicitly asks (e.g., "be more aggressive, threshold 60" for an audit; "only show certainties, threshold 95" for a release-gate review).
+Adjust per-run only if the user explicitly asks (e.g., "be aggressive — keep everything ≥50" for a deep audit; "release gate — only show ≥90" for a tight pre-release review). Document the override at the top of the report.
 
-### Filter accounting
-
-Update the phase log with:
-
-- `findings_above_threshold` — kept for the report
-- `findings_filtered_by_confidence` — confirmed but below threshold
-- `critical_kept_below_threshold` — critical findings kept under the 50–80 exception
-
-Findings filtered at this step are **not lost** — list them in an appendix called "Filtered (low confidence)" so a human reviewer can spot-check the cuts.
+Findings filtered here go into the **"Filtered (Low Confidence)"** appendix — not lost, just spot-checkable by a human.
 
 ---
 
 ## PHASE 4: REPORT GENERATION
 
-**MANDATORY PRE-REPORT VERIFICATION:**
+**Pre-report verification:** all phases complete, all applicable agents returned, every CONFIRMED finding has a code quote and confidence score. If anything is incomplete, stop and finish it.
 
-Before generating the report, you MUST:
+Then:
 
-1. Review your phase log from the start of the review
-2. Verify ALL phases show "complete" status (not "pending")
-3. Verify ALL applicable agents returned results
-4. If ANY phase or agent is incomplete, STOP and complete it first
+1. Aggregate kept findings.
+2. Deduplicate overlapping issues.
+3. Sort by severity (Critical → High → Medium → Low → Info).
+4. Write `docs/code-review.md` (create the directory if needed).
+5. Include positive observations from every applicable Phase 2 agent.
 
-**If you skipped any phase or agent, the review is incomplete and results will be inconsistent.**
-
-After all validation agents complete:
-
-1. **Aggregate** validated findings from all Phase 2 agents
-2. **Deduplicate** any overlapping issues
-3. **Sort** by severity (Critical → High → Medium → Low → Info)
-4. **Generate** `docs/code-review.md` using the output format below (create the `docs/` directory if it does not exist)
-5. **Include** positive observations from Phase 2 agents
-
-**Note:** The Phase Completion Log is for internal tracking during execution. Do NOT include it in the final report.
+Do NOT include the internal phase tracking in the final report.
 
 ---
 
-## EXCLUSIONS - DO NOT FLAG
+## EXCLUSIONS — DO NOT FLAG
 
 | Item | Reason |
 | ---- | ------ |
-| GitHub Actions using tags (`@v4`) or branches (`@master`, `@main`) | SHA pinning not required - floating refs are acceptable |
-| GitHub Actions pinned to floating branch | Same as above - this is a valid and common practice |
+| GitHub Actions using tags (`@v4`) or branches (`@master`) | SHA pinning not required |
 | Missing SBOM | Not required |
 | Missing CHANGELOG.md | Not required |
 | Security controls required by compliance frameworks | Intentional (AWS Security, CIS, PCI DSS) |
-| File casing for GitHub files (CODEOWNERS, README, LICENSE, etc.) | GitHub is case-insensitive - `codeowners` = `CODEOWNERS` |
-| CODEOWNERS reported as missing when lowercase `codeowners` exists | GitHub treats all case variants identically - DO NOT FLAG |
-| CODEOWNERS in `.github/` vs root | Both locations valid: `CODEOWNERS`, `.github/CODEOWNERS`, `.github/codeowners`, `docs/CODEOWNERS` |
-| README/LICENSE with different extensions (.md, .txt, none) | All valid |
-| Any "missing file" when a case variant exists | Search case-insensitively before flagging any missing file |
-| Version numbers in config files | Do NOT fact-check versions against world knowledge alone. If uncertain (e.g., "does Ruby 4.0 exist?"), use web search to verify before flagging as invalid. |
-| Missing/inconsistent AWS resource tags | Organization-specific, enforced by SCPs/Config Rules, not code review |
-| Administrators can bypass branch protection | Intentional GitHub feature for emergency fixes, org-level policy decision |
-| Branch protection not enforced for admins | Same as above - this is a trust/governance decision, not a code issue |
-| Users/teams in "bypass list" for branch protection | Intentional - bypass actors are explicitly configured for emergency access |
-| X users can bypass PR reviews | Same as above - these are trusted maintainers with emergency access |
-| Missing LICENSE file in private repos | Private repos are proprietary by default - LICENSE only required for public/open source repos |
-| Missing dependabot.yml when Dependabot Security Updates enabled | Security updates via repo settings is a VALID configuration. MUST run `gh api repos/{owner}/{repo} --jq '.security_and_analysis.dependabot_security_updates.status'` - if returns "enabled", DO NOT flag any Dependabot issues |
-| "No Dependabot/Renovate Configuration" without API check evidence | Invalid finding - agent MUST show the `gh api` output proving security updates are disabled before flagging |
-| macOS/Windows runners in public repos | GitHub provides FREE runners for public repos - cross-platform testing is a POSITIVE, not a cost issue. Only flag runner costs for private repos. |
-| "Unnecessary" cross-platform testing in open source | More test coverage is better for open source. This should be noted as a strength, not flagged as waste. |
+| File casing for GitHub files (CODEOWNERS, README, LICENSE) | GitHub is case-insensitive |
+| CODEOWNERS reported missing when lowercase variant exists | Same as above |
+| CODEOWNERS in `.github/` vs root vs `docs/` | All locations valid |
+| README/LICENSE with different extensions | All valid |
+| Any "missing file" when a case variant exists | Search case-insensitively first |
+| Version numbers in config files | Use web search to verify before flagging as invalid |
+| Missing/inconsistent AWS resource tags | Org-specific, enforced by SCPs/Config Rules |
+| Administrators can bypass branch protection | Intentional for emergency fixes |
+| Users/teams in branch-protection bypass list | Trust/governance decision |
+| Missing LICENSE file in private repos | Private repos are proprietary by default |
+| Missing dependabot.yml when Security Updates enabled via API | Valid configuration — must show `gh api` output |
+| Dependabot finding without `gh api` evidence | Invalid — must include API output |
+| macOS/Windows runners in public repos | Free; cross-platform testing is a POSITIVE |
+| "Unnecessary" cross-platform testing in open source | Strength, not waste |
 
 ---
 
@@ -955,13 +511,13 @@ After all validation agents complete:
 
 | Level | Criteria | Action |
 | ----- | -------- | ------ |
-| **🔴 CRITICAL** | Exploitable vulnerabilities, data exposure, auth bypass, hardcoded secrets, breaking changes | Must fix before merge |
-| **🟠 HIGH** | Conditional security issues, performance regression, missing error handling, data integrity risks | Should fix before merge |
-| **🟡 MEDIUM** | Maintainability issues, minor performance, missing validation, test gaps | Fix next iteration |
-| **🔵 LOW** | Style issues, minor refactoring, nice-to-have improvements | Address when convenient |
-| **⚪ INFO** | Observations, alternatives, best practices FYI | Awareness only |
+| 🔴 CRITICAL | Exploitable vuln, data exposure, auth bypass, hardcoded secrets, breaking changes | Must fix before merge |
+| 🟠 HIGH | Conditional security, perf regression, missing error handling, data integrity risk | Should fix before merge |
+| 🟡 MEDIUM | Maintainability, minor perf, missing validation, test gaps | Fix next iteration |
+| 🔵 LOW | Style, minor refactor, nice-to-have | When convenient |
+| ⚪ INFO | Observations, alternatives, FYI | Awareness only |
 
-### Version Lag Severity (Dependencies & Runtimes)
+### Version-Lag Severity (Dependencies & Runtimes)
 
 | Condition | Severity |
 | --------- | -------- |
@@ -970,84 +526,23 @@ After all validation agents complete:
 | 2+ major versions behind | HIGH |
 | 1 major version behind | MEDIUM |
 | 3+ minor versions behind | MEDIUM |
-| 1-2 minor versions behind | LOW |
+| 1–2 minor versions behind | LOW |
 
----
-
-## REFERENCE: CHECK DETAILS
-
-The following sections provide detailed guidance for each agent. Share relevant sections with agents as needed.
-
-### Security Checks (Agent 2.1)
-
-**Secrets patterns:** AKIA (AWS), sk_live/sk_test (Stripe), ghp_/gho_/github_pat_ (GitHub), AIzaSy (Google/Firebase), xox (Slack)
-
-**Secure storage by platform:**
-
-| Platform | Insecure | Secure |
-| -------- | -------- | ------ |
-| iOS | UserDefaults | Keychain |
-| Android | SharedPreferences | EncryptedSharedPreferences / Keystore |
-| Web | localStorage | httpOnly cookies |
-| Backend | Plaintext config | Vault / Secrets Manager |
-
-**Injection types:** SQL, Command, XSS, Template (SSTI), Deserialization
-
-### Code Quality Thresholds (Agent 2.3)
+### Code Quality Thresholds
 
 | Metric | Warning | Flag |
 | ------ | ------- | ---- |
 | Method length | >60 lines | >100 lines |
 | Class length | >600 lines | >1000 lines |
 | Parameters | >6 | >8 |
-| Nesting depth | >4 levels | >6 levels |
+| Nesting depth | >4 | >6 |
 | Cyclomatic complexity | >15 | >25 |
-
-### CI/CD Checklist (Agent 2.1 or separate)
-
-| Check | Severity if Missing |
-| ----- | ------------------- |
-| Lint/Format | MEDIUM |
-| Type check | MEDIUM |
-| Unit tests | HIGH |
-| Security scan (CodeQL/Semgrep/Snyk) | HIGH |
-| Dependency vulnerability scan | HIGH |
-| Permissions block in Actions | HIGH |
-
-### Documentation Requirements
-
-| File | Severity if Missing |
-| ---- | ------------------- |
-| README.md | HIGH |
-| CODEOWNERS | MEDIUM |
-| LICENSE | HIGH (open source) |
-| docs/architecture.md | MEDIUM |
-
----
-
-## COMPLETION CRITERIA
-
-The review is complete when:
-
-- [ ] Phase log shows ALL phases complete (no "pending" values)
-- [ ] All core Phase 2 agents returned results
-- [ ] All applicable conditional Phase 2 agents returned results (or marked N/A)
-- [ ] All Phase 3 validation agents completed with:
-  - [ ] Code quoted for every CONFIRMED finding
-  - [ ] Mitigating factors checklist completed
-  - [ ] Repository settings checked for CI/CD/security findings
-  - [ ] Rejection rate documented (expect 30-50% rejection for healthy codebase)
-- [ ] Only CONFIRMED findings (not REJECTED) appear in final report
-- [ ] Findings documented with specific counts
-- [ ] Positive observations documented for each applicable category
-- [ ] Health score justified
-- [ ] Report generated in correct format
 
 ---
 
 ## QUANTITATIVE REQUIREMENTS
 
-**Reports MUST include specific counts:**
+Reports MUST include specific counts:
 
 - Dependencies: "X total, Y outdated, Z vulnerable, W duplicate"
 - Test coverage: "X of Y services tested (Z%)"
@@ -1056,35 +551,22 @@ The review is complete when:
 - Resource leaks: "X added, Y removed, Z potential leaks"
 - Secrets: "Searched X files, found Y hardcoded secrets"
 
-**If full enumeration not feasible:**
-
-1. State scope measured (e.g., "sampled 50 of 200 files")
-2. Do NOT fabricate counts
-3. Mark partial counts with "~" prefix
-
-Never use vague language like "some tests exist" or "a few issues found".
+If full enumeration isn't feasible: state scope (e.g., "sampled 50 of 200 files"), don't fabricate counts, mark partial counts with `~` prefix. Never use vague language like "some tests exist" or "a few issues found".
 
 ---
 
 ## OUTPUT FORMAT
 
-**Output the report to `docs/code-review.md` (create the `docs/` directory if it does not exist).**
+Output to `docs/code-review.md`. Use Unicode emojis: 🔴 🟠 🟡 🔵 ⚪ ✅ ⚠️ ❌. Never use GitHub shortcodes (`:red_circle:`).
 
-### Formatting Rules
+**Markdown lint compliance** (must pass `markdownlint-cli2` defaults):
 
-- Use Unicode emojis: 🔴 🟠 🟡 🔵 ⚪ ✅ ⚠️ ❌
-- NEVER use GitHub shortcodes (`:red_circle:`)
-
-**Markdown lint compliance.** The output MUST pass `markdownlint-cli2` with the project's default ruleset. Specifically:
-
-- **MD031 (blanks-around-fences):** every fenced code block must have a blank line BEFORE the opening ``` and AFTER the closing ```. No exceptions, even inside list items or table cells.
-- **MD032 (blanks-around-lists):** every list (bulleted or numbered) must have a blank line before the first item and after the last item. Lists must not abut surrounding paragraphs, headings, or tables without a blank line between them.
-- **MD033 (no-inline-html):** do NOT emit any inline HTML. The only allowed element is `<br>`. In particular, do NOT use `<details>`/`<summary>` collapsibles — render long lists as plain bulleted lists under a heading instead.
-- **MD040 (fenced-code-language):** every fenced code block must specify a language (e.g. ` ```bash`, ` ```yaml`, ` ```text`). Use ` ```text` for plain output that has no language.
-- **MD012 (no-multiple-blanks):** do not emit two or more consecutive blank lines.
-- **MD047 (single-trailing-newline):** end the file with exactly one trailing newline.
-
-Before writing the file, mentally verify: does every fenced block have blank lines around it? Does every list? Are there any HTML tags other than `<br>`? If yes, fix before writing.
+- **MD031:** Blank line before opening ``` and after closing ```.
+- **MD032:** Blank line before first list item and after last.
+- **MD033:** No inline HTML except `<br>`. No `<details>`/`<summary>` — render long lists as flat bulleted lists under a heading.
+- **MD040:** Every fenced block specifies a language (use `text` for plain output).
+- **MD012:** No two consecutive blank lines.
+- **MD047:** End file with exactly one trailing newline.
 
 ### Report Structure
 
@@ -1100,7 +582,7 @@ Before writing the file, mentally verify: does every fenced block have blank lin
 
 ## Review Coverage
 
-[Checklist of what was reviewed with ✅/⚠️/❌ status]
+[Checklist with ✅/⚠️/❌]
 
 ---
 
@@ -1125,7 +607,7 @@ Before writing the file, mentally verify: does every fenced block have blank lin
 **Effort:** XS (<30min) | S (<2hr) | M (1 day) | L (2-3 days) | XL (>3 days)
 
 **Issue:**
-Description of what was found.
+Description.
 
 **Impact:**
 Why this matters.
@@ -1137,63 +619,7 @@ How to address it.
 
 ## ✅ Positive Observations & Strengths
 
-This section highlights what the team is doing well. Good practices should be recognized and continued.
-
-### Architecture & Design
-
-[Describe positive architectural decisions, clean separation of concerns, good use of design patterns, thoughtful module organization, etc. Be specific about what files/patterns demonstrate this.]
-
-### Code Quality
-
-[Highlight clean, readable code, consistent style, good naming conventions, appropriate abstraction levels, well-documented complex logic, etc.]
-
-### Security Practices
-
-[Acknowledge good security practices: proper secret management, input validation, secure authentication patterns, appropriate encryption usage, etc.]
-
-### Testing
-
-[Recognize good test coverage, well-structured tests, meaningful test names, good use of mocks/fixtures, integration tests for critical paths, etc.]
-
-### DevOps & CI/CD
-
-[Note well-configured pipelines, proper caching, security scanning in place, good deployment practices, infrastructure as code, cross-platform testing matrix (especially valuable for open source), comprehensive test coverage across OS/versions, etc.]
-
-### Documentation
-
-[Praise comprehensive README, good inline comments where needed, architecture documentation, API documentation, etc.]
-
-### Dependencies & Maintenance
-
-[Acknowledge up-to-date dependencies, well-curated library choices, no abandoned packages, proper version pinning, etc.]
-
-### Infrastructure as Code (If applicable)
-
-[Recognize well-architected IaC: proper VPC/subnet design, security group best practices, cost optimization, modern AWS services, encryption at rest, etc.]
-
-### Performance
-
-[Highlight good performance patterns: efficient queries, proper caching, pagination, connection pooling, lazy loading, etc.]
-
-### Observability & Monitoring
-
-[Acknowledge logging best practices, metrics collection, alerting, distributed tracing, health checks, CloudWatch/Datadog integration, etc.]
-
-### API Design (If applicable)
-
-[Recognize clean API design: consistent naming, proper versioning, good error responses, pagination, rate limiting, documentation, etc.]
-
-### Compliance & Data Handling (If applicable)
-
-[Acknowledge good compliance practices: encryption, data retention policies, audit logging, consent management, PII handling, etc.]
-
-### Configuration Management
-
-[Highlight good config practices: environment separation, secrets management, feature flags, validation at startup, etc.]
-
-### Error Handling & Resilience
-
-[Recognize robust error handling: proper error propagation, circuit breakers, retry with backoff, graceful degradation, etc.]
+Highlight what the team is doing well, organized by area (Architecture, Code Quality, Security, Testing, DevOps/CI/CD, Documentation, Dependencies, IaC, Performance, Observability, API Design, Compliance, Configuration, Error Handling). Be specific about which files/patterns demonstrate this. Skip sections that don't apply.
 
 ---
 
@@ -1201,23 +627,19 @@ This section highlights what the team is doing well. Good practices should be re
 
 ### Dependency Status
 
-[Table of packages with current/latest versions]
+[Table of packages with current/latest]
 
 ### Duplicate Libraries
 
 [Table of overlapping libraries]
 
-### Security Assessment
-
-[Summary of security findings]
-
 ### Files Reviewed
 
-[Plain bulleted list of files reviewed. Do NOT wrap in `<details>`/`<summary>` — those are HTML and violate MD033. If the list is long, that is fine; render it as a flat bulleted list under this heading.]
+[Plain bulleted list — do NOT wrap in `<details>`/`<summary>`]
 
 ### Filtered (Low Confidence)
 
-[Findings that survived adversarial validation but scored below the confidence threshold in Phase 3.5. Listed here for spot-checking — not included in the main findings or action items. Format: `severity | confidence | file:line | one-line description`. Empty section is allowed if every CONFIRMED finding cleared the threshold.]
+[Findings that survived adversarial validation but scored below threshold in Phase 3.5. Format: `severity | confidence | file:line | one-line description`. Empty section is fine if all CONFIRMED findings cleared the threshold.]
 
 ---
 
@@ -1263,7 +685,7 @@ This section highlights what the team is doing well. Good practices should be re
 | OBS | Observability |
 | CONC | Concurrency |
 | ML | AI/ML |
-| COMP | Compliance (GDPR, HIPAA, PCI) |
+| COMP | Compliance |
 | GIT | Git & Repository Hygiene |
 | MIG | Database Migrations |
 | I18N | Internationalization |
@@ -1272,44 +694,36 @@ This section highlights what the team is doing well. Good practices should be re
 
 ---
 
-## JIRA ISSUE CREATION (Optional - On Request)
+## ISSUE CREATION (On Request Only)
 
-**This section is NOT executed automatically.** After the report is generated, if the user requests issue creation (e.g., "create issues", "create tickets", "log issues"), use the `create-issue` skill to create issues for each finding. The skill will automatically detect whether to use GitHub Issues or Jira.
+NOT executed automatically. After the report is generated, if the user asks ("create issues", "create tickets", "log issues"), use the `create-issue` skill — it auto-detects GitHub Issues vs Jira.
 
-**Use the Task template** from the skill for all code review findings.
+**Create issues for ALL severity levels including INFO (⚪).**
 
-### Code Review Specific Rules
+**Summary format:** `[REPO-NAME][FINDING-ID] Brief description` (e.g., `[pnp-ios][SEC-001] Rotate hardcoded AWS credentials`).
 
-**IMPORTANT: Create Jira issues for ALL severity levels including INFO (⚪).** Do not skip any findings.
+**Before creating:**
 
-**Summary format:** `[REPO-NAME][FINDING-ID] Brief description` (e.g., `[pnp-ios][SEC-001] Rotate hardcoded AWS credentials`)
+```bash
+jira issue list --label "code-review" --plain --columns key,summary
+```
 
-**BEFORE creating issues:**
+Skip any matching by BOTH repo name AND finding ID.
 
-1. List existing issues with the `code-review` label to avoid duplicates:
+**After creating:**
 
-   ```bash
-   jira issue list --label "code-review" --plain --columns key,summary
-   ```
+```bash
+jira issue list --label "code-review" --plain --columns key,summary,status
+```
 
-2. Skip any that already exist (match by BOTH repo name AND finding ID in summary)
-
-**AFTER creating all issues:**
-
-1. List all issues to confirm:
-
-   ```bash
-   jira issue list --label "code-review" --plain --columns key,summary,status
-   ```
-
-2. Report: "Created X new issues, Y already existed, Z total issues"
+Report: "Created X new issues, Y already existed, Z total issues".
 
 ### Labels
 
-Always include `code-review` label plus a category label:
+Always include `code-review` plus one category label:
 
-| Finding Prefix | Label |
-| -------------- | ----- |
+| Prefix | Label |
+| ------ | ----- |
 | SEC-* | security |
 | DEP-* | dependencies |
 | CI-* | ci-cd |
@@ -1333,4 +747,4 @@ Always include `code-review` label plus a category label:
 
 ---
 
-*Begin the code review by executing Phase 1: Launch 3 parallel agents for initial scans.*
+*Begin the review by executing Phase 1: launch 3 parallel `Explore` agents for initial scans.*
