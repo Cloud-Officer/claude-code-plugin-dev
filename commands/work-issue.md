@@ -106,9 +106,7 @@ Steps 4–6 and 8 are gated by Issue Type (detected above). The gating column on
 
    **If no Figma links are found or Figma MCP is unavailable, skip this step.**
 
-3. **Prepare an isolated worktree** (all types)
-
-   This step uses `git worktree` instead of `git checkout -b`. Worktrees give each issue its own working directory, so any uncommitted work in the user's main checkout is left untouched and multiple issues can be in flight in parallel.
+3. **Prepare an isolated branch** (all types)
 
    ```bash
    DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
@@ -122,7 +120,39 @@ Steps 4–6 and 8 are gated by Issue Type (detected above). The gating column on
    - GitHub: `BRANCH=issue-$ARGUMENTS`
    - Jira: `BRANCH=$ARGUMENTS` (uppercase — matches the Jira key)
 
-   Ensure `.worktrees/` is gitignored in the target repo. If it isn't, add and commit the change before creating the worktree (otherwise the worktree contents would pollute `git status`):
+   **Worktree usage is opt-in based on what the repo already does.** Worktrees are great for keeping the user's main checkout untouched and running multiple issues in parallel, but introducing them into a repo that doesn't use them adds a `.worktrees/` directory, a `.gitignore` change, and a workflow expectation the rest of the team may not share. So default to plain branching, and only use a worktree if the repo is already set up for it.
+
+   Detect whether the repo already uses worktrees:
+
+   ```bash
+   USE_WORKTREE=no
+   if [ -d "$REPO_ROOT/.worktrees" ]; then
+     USE_WORKTREE=yes
+   elif [ "$(git worktree list --porcelain | grep -c '^worktree ')" -gt 1 ]; then
+     # More than one worktree registered (the main checkout itself counts as 1).
+     USE_WORKTREE=yes
+   fi
+   ```
+
+   ### Path A — `USE_WORKTREE=no` (default for repos not already using worktrees)
+
+   Use plain `git checkout -b` against the latest default branch:
+
+   ```bash
+   # Refuse to clobber uncommitted changes in the user's main checkout.
+   if ! git diff --quiet || ! git diff --cached --quiet; then
+     echo "Uncommitted changes in the working tree — stash, commit, or discard before continuing." >&2
+     exit 1
+   fi
+   git checkout -b "$BRANCH" "origin/$DEFAULT_BRANCH"
+   git submodule update --init --recursive
+   ```
+
+   All subsequent steps run from `$REPO_ROOT` on the new branch.
+
+   ### Path B — `USE_WORKTREE=yes` (only when the repo already uses worktrees)
+
+   Ensure `.worktrees/` is gitignored. If it isn't, add and commit the change before creating the worktree (otherwise the worktree contents would pollute `git status`):
 
    ```bash
    if ! git check-ignore -q .worktrees 2>/dev/null; then
@@ -235,6 +265,14 @@ Steps 4–6 and 8 are gated by Issue Type (detected above). The gating column on
     - Jira: `mcp__atlassian__editJiraIssue` (preferred) or `jira issue edit $ARGUMENTS --summary "<updated title>" --description "<updated description>"`
 
 11. **Cleanup** (all types)
+
+    The cleanup depends on which path was taken in step 3.
+
+    ### If `USE_WORKTREE=no` (plain branch)
+
+    The `create-pr` skill already returns the working tree to the default branch when it finishes. Nothing else to do — the local branch `$BRANCH` is preserved for follow-up work. Delete it explicitly with `git branch -D "$BRANCH"` once the PR is merged.
+
+    ### If `USE_WORKTREE=yes` (worktree)
 
     Two options — ask the user which they want, defaulting to **keep** so they can inspect or continue iterating:
 

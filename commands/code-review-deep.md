@@ -135,20 +135,20 @@ This review uses **parallel agents** for speed and thoroughness. Execute phases 
 
 ## PRE-FLIGHT CHECK: Existing Report Detection
 
-**Before starting any analysis, check if `CODE_REVIEW_REPORT.md` already exists in the repository root.**
+**Before starting any analysis, check if `docs/code-review.md` already exists in the repository.**
 
 If the report exists, use the AskUserQuestion tool to ask the user:
 
-**Question:** "A code review report already exists (`CODE_REVIEW_REPORT.md`). What would you like to do?"
+**Question:** "A code review report already exists (`docs/code-review.md`). What would you like to do?"
 
 **Options:**
 
 1. **Use existing report** - Skip analysis and use the current report (useful for creating Jira issues or reviewing findings)
 2. **Delete and re-run full analysis** - Remove the existing report and perform a fresh code review
 
-If the user chooses option 1, read the existing `CODE_REVIEW_REPORT.md` file, summarize the findings (count by severity), and wait for further instructions (e.g., "create jira issues").
+If the user chooses option 1, read the existing `docs/code-review.md` file, summarize the findings (count by severity), and wait for further instructions (e.g., "create jira issues").
 
-If the user chooses option 2, delete the existing `CODE_REVIEW_REPORT.md` and proceed with Phase 1.
+If the user chooses option 2, delete the existing `docs/code-review.md` and proceed with Phase 1.
 
 ---
 
@@ -916,7 +916,7 @@ After all validation agents complete:
 1. **Aggregate** validated findings from all Phase 2 agents
 2. **Deduplicate** any overlapping issues
 3. **Sort** by severity (Critical → High → Medium → Low → Info)
-4. **Generate** `CODE_REVIEW_REPORT.md` using the output format below
+4. **Generate** `docs/code-review.md` using the output format below (create the `docs/` directory if it does not exist)
 5. **Include** positive observations from Phase 2 agents
 
 **Note:** The Phase Completion Log is for internal tracking during execution. Do NOT include it in the final report.
@@ -1068,12 +1068,23 @@ Never use vague language like "some tests exist" or "a few issues found".
 
 ## OUTPUT FORMAT
 
-**Output the report to `CODE_REVIEW_REPORT.md` in the repository root.**
+**Output the report to `docs/code-review.md` (create the `docs/` directory if it does not exist).**
 
 ### Formatting Rules
 
 - Use Unicode emojis: 🔴 🟠 🟡 🔵 ⚪ ✅ ⚠️ ❌
 - NEVER use GitHub shortcodes (`:red_circle:`)
+
+**Markdown lint compliance.** The output MUST pass `markdownlint-cli2` with the project's default ruleset. Specifically:
+
+- **MD031 (blanks-around-fences):** every fenced code block must have a blank line BEFORE the opening ``` and AFTER the closing ```. No exceptions, even inside list items or table cells.
+- **MD032 (blanks-around-lists):** every list (bulleted or numbered) must have a blank line before the first item and after the last item. Lists must not abut surrounding paragraphs, headings, or tables without a blank line between them.
+- **MD033 (no-inline-html):** do NOT emit any inline HTML. The only allowed element is `<br>`. In particular, do NOT use `<details>`/`<summary>` collapsibles — render long lists as plain bulleted lists under a heading instead.
+- **MD040 (fenced-code-language):** every fenced code block must specify a language (e.g. ` ```bash`, ` ```yaml`, ` ```text`). Use ` ```text` for plain output that has no language.
+- **MD012 (no-multiple-blanks):** do not emit two or more consecutive blank lines.
+- **MD047 (single-trailing-newline):** end the file with exactly one trailing newline.
+
+Before writing the file, mentally verify: does every fenced block have blank lines around it? Does every list? Are there any HTML tags other than `<br>`? If yes, fix before writing.
 
 ### Report Structure
 
@@ -1202,7 +1213,7 @@ This section highlights what the team is doing well. Good practices should be re
 
 ### Files Reviewed
 
-[Collapsible list of files]
+[Plain bulleted list of files reviewed. Do NOT wrap in `<details>`/`<summary>` — those are HTML and violate MD033. If the list is long, that is fine; render it as a flat bulleted list under this heading.]
 
 ### Filtered (Low Confidence)
 

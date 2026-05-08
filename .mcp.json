@@ -52,8 +52,8 @@
       "args": ["--workers", "apps,builds,versions,reviews,beta_groups,iap"]
     },
     "playstore": {
-      "command": "npx",
-      "args": ["-y", "github:Kirill812/GPlay_reviews_MCP_server"]
+      "command": "uvx",
+      "args": ["play-store-mcp"]
     },
     "gcloud": {
       "command": "npx",
