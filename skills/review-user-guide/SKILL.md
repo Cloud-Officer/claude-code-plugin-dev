@@ -6,87 +6,26 @@ allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:
 
 # Review User Guide Documentation
 
-Review the `docs/user-guide.md` file in a repository and create or update it with comprehensive user documentation. This skill analyzes the codebase to document the product from an end-user perspective, covering UI, features, workflows, and usage instructions. Works for all project types and languages.
+Review or create `docs/user-guide.md` from an end-user perspective. Works for all project types and languages.
 
-## CRITICAL: Mandatory Analysis Tracking
+## Phase Tracking
 
-**You MUST maintain an analysis checklist throughout execution.** At each step, record what was found. This ensures consistent, reproducible results.
+Use `TaskCreate` to track progress: one task per phase below. Mark `in_progress` when starting, `completed` when results are recorded. Do NOT include the task list in the final output — it's internal tracking.
 
-**Before starting, create this tracking structure and update it as you progress:**
+**Required phases:**
 
-```text
-=== ANALYSIS CHECKPOINT LOG ===
-[ ] Step 1: Repository Information
-    - organization: (pending)
-    - repository: (pending)
-    - description: (pending)
-    - has_user_guide: (pending)
+1. Repository info gathered
+2. Product type detected
+3. Deep analysis (relevant sub-phases per product type)
+4. Existing user-guide validated (if present)
+5. Report generated
+6. User guide written/updated (if approved)
 
-[ ] Step 2: Product Type Detection
-    - product_type: (pending) - web_app/cli_tool/api/library/mobile_app/desktop_app/hybrid
-    - framework: (pending)
-    - detection_evidence: (pending)
-
-[ ] Step 3-7: Deep Analysis (complete applicable sections)
-    For Web Applications:
-    [ ] 3.1 Routes/Pages - routes_found: (pending), count: (pending)
-    [ ] 3.2 Models/Data - models_found: (pending), count: (pending)
-    [ ] 3.3 Forms - forms_found: (pending), count: (pending)
-    [ ] 3.4 Help Text/UI Guidance - help_texts_found: (pending), count: (pending)
-    [ ] 3.5 Conditional Field Visibility - conditionals_found: (pending), triggers_mapped: (pending)
-    [ ] 3.6 Form Section Structure - sections_found: (pending), count: (pending)
-    [ ] 3.7 UI Components - components_found: (pending), count: (pending)
-    [ ] 3.8 Navigation - nav_elements: (pending)
-
-    For CLI Tools:
-    [ ] 4.1 Commands - commands_found: (pending), count: (pending)
-    [ ] 4.2 Help Output - help_extracted: (pending)
-    [ ] 4.3 Options/Flags - options_found: (pending), count: (pending)
-
-    For APIs:
-    [ ] 5.1 Endpoints - endpoints_found: (pending), count: (pending)
-    [ ] 5.2 Schemas - schemas_found: (pending)
-    [ ] 5.3 Authentication - auth_method: (pending)
-    [ ] 5.4 OpenAPI - openapi_exists: (pending)
-
-    For Libraries:
-    [ ] 6.1 Public API - exports_found: (pending), count: (pending)
-    [ ] 6.2 Docstrings - documented: (pending)
-    [ ] 6.3 Examples - examples_found: (pending)
-
-    For Mobile Apps:
-    [ ] 7.1 Screens - screens_found: (pending), count: (pending)
-    [ ] 7.2 Navigation - nav_structure: (pending)
-
-[ ] Step 8: Document Structure Validation (if user-guide.md exists)
-    - h1_title_correct: (pending)
-    - required_sections_present: (pending)
-    - toc_links_valid: (pending)
-
-[ ] Step 9: Report Generated
-    - all_checks_completed: (pending)
-    - features_in_code: (pending)
-    - features_documented: (pending)
-    - undocumented_features: (pending)
-    - issues_found: (pending)
-=== END CHECKPOINT LOG ===
-```
-
-**COMPLETION REQUIREMENT:** Before generating the final report, you MUST verify that ALL applicable checkpoints show actual values (not "pending"). If any checkpoint is still "pending", go back and complete that analysis step.
-
-**EVIDENCE REQUIREMENT:** For every check, you MUST record:
-
-1. **What the user guide claims** - the exact feature, command, or workflow described
-2. **What the code shows** - the actual evidence (routes, controllers, CLI definitions, API endpoints)
-3. **Comparison result** - MATCH, MISMATCH, or MISSING with specific details
-
-A bare "PASS" without evidence is not acceptable. If you cannot provide evidence, the check is incomplete.
-
-**DO NOT SKIP STEPS.** Even if an earlier check seems to suggest no issues, you MUST complete ALL steps. Issues are often only revealed when cross-referencing multiple sources.
+**Evidence rule:** Every check must record (a) what the guide claims, (b) what the code shows, (c) MATCH / MISMATCH / MISSING. A bare "PASS" without code evidence is invalid.
 
 ## User Guide Document Structure
 
-The user guide must have the following H1 title and H2 sections:
+Required H1 + H2 sections:
 
 ```text
 # User Guide
@@ -102,697 +41,176 @@ The user guide must have the following H1 title and H2 sections:
 
 ### Project-Type-Specific Sections
 
-**Web Applications (Rails, Django, Express, Laravel, etc.):**
-
-```text
-## Navigation
-## Pages
-## Step-by-Step Guides
-## Workflows
-```
-
-**CLI Tools:**
-
-```text
-## Commands
-## Options & Flags
-## Examples
-```
-
-**REST APIs:**
-
-```text
-## Authentication
-## Endpoints
-## Request/Response Examples
-## Error Handling
-```
-
-**Libraries/SDKs:**
-
-```text
-## Installation
-## Quick Start
-## API Reference
-## Examples
-```
-
-**Mobile Applications:**
-
-```text
-## Screens
-## Navigation
-## Features
-## Offline Mode
-```
-
-**Desktop Applications:**
-
-```text
-## Windows & Views
-## Menus & Toolbars
-## Keyboard Shortcuts
-## Features
-```
+| Type | Required H2 sections |
+| ---- | -------------------- |
+| Web App | Navigation, Pages, Step-by-Step Guides, Workflows |
+| CLI Tool | Commands, Options & Flags, Examples |
+| REST API | Authentication, Endpoints, Request/Response Examples, Error Handling |
+| Library / SDK | Installation, Quick Start, API Reference, Examples |
+| Mobile App | Screens, Navigation, Features, Offline Mode |
+| Desktop App | Windows & Views, Menus & Toolbars, Keyboard Shortcuts, Features |
 
 ## MCP Tools with Fallbacks
 
-This skill uses MCP tools when available and falls back gracefully if they are unavailable or return errors.
+Prefer MCP tools when available; fall back to CLI on errors. Don't let MCP failures block the review.
 
-### GitHub Access
-
-**Prefer MCP tools** (`mcp__github__*`) when available. If MCP tools are not available (tool not found errors), **fall back to the `gh` CLI**.
-
-| Operation | MCP Tool | CLI Fallback |
+| Operation | Preferred | Fallback |
 | --- | --- | --- |
-| Get repo metadata | `mcp__github__get_file_contents` (path: `/`) for top-level structure; for richer metadata use the CLI fallback | `gh repo view --json owner,name,description` |
 | Get file contents | `mcp__github__get_file_contents` | `cat <file>` |
-| Get repo owner/name | Parse from `git remote get-url origin` | `gh repo view --json owner,name` |
+| Repo metadata | `gh repo view --json owner,name,description` | n/a |
+| Library docs | `mcp__context7__*` | `WebSearch` → `mcp__fetch__fetch` |
 
-### Library Documentation (Context7)
-
-Use `mcp__context7__resolve-library-id` then `mcp__context7__query-docs` to look up current documentation for libraries and frameworks found in the project. If Context7 is unavailable or returns errors (quota exceeded, timeouts), **fall back to `WebSearch`** and then `mcp__fetch__fetch` to retrieve documentation from official sources. Do not let Context7 failures block the review.
-
-## Step 1: Gather Repository Information
+## Phase 1: Repository Info
 
 ```bash
-# Get organization and repository name (fallback if MCP tools unavailable)
 gh repo view --json owner,name,description
+ls -la docs/user-guide.md docs/manual.md 2>/dev/null
 ```
 
-```bash
-# Check if docs/user-guide.md exists
-ls -la docs/user-guide.md 2>/dev/null || echo "No docs/user-guide.md found"
-```
+Record: organization, repository, description, has_user_guide. If `docs/manual.md` exists but `docs/user-guide.md` does not, plan to rename.
 
-```bash
-# Check if docs directory exists
-ls -la docs/ 2>/dev/null || echo "No docs directory found"
-```
-
-Store these values:
+## Phase 2: Detect Product Type
 
-- `organization`: The owner/organization name
-- `repository`: The repository name
-- `description`: Repository description
-- `has_user_guide`: true/false
+Classify as one of: `web_app`, `cli_tool`, `api`, `library`, `mobile_app`, `desktop_app`, `hybrid`.
 
-## Step 2: Detect Product Type
+**Detection signals (use the appropriate one — don't run all):**
 
-Analyze the repository to determine what type of product this is.
+- **Rails** — `Gemfile` containing `rails`; `config/routes.rb`; `app/controllers/`, `app/views/`
+- **Django** — `manage.py`; `*/urls.py`; `requirements.txt`/`pyproject.toml` containing `django`
+- **Express / Next.js / React** — `package.json` with `express`/`koa`/`fastify`/`nest`/`next`/`react`/`vue`/`angular`/`svelte`; `pages/`, `app/`, `src/pages/`, `src/app/`
+- **Laravel** — `artisan`, `routes/web.php`, `app/Http/Controllers/`
+- **CLI tool** — `package.json` with `bin`; usage of `argparse`/`click`/`typer`/`commander`/`yargs`/`clap`/`cobra`; `cmd/` or `cli/` directory
+- **REST API** — route decorators (`@app.route`, `@router`, `@RestController`, `router.get`); `api/` or `routes/`; FastAPI/Flask/Express/Gin/Echo/Fiber
+- **Library / SDK** — `package.json` `main`/`exports`; `setup.py` / `pyproject.toml` with `name`/`packages`; no app entry point
+- **Mobile** — `android/`, `ios/`, `pubspec.yaml`, `lib/main.dart`; `package.json` with `react-native`/`expo`/`ionic`/`capacitor`
+- **Hybrid** — multiple types match (e.g. CLI exposing both a binary and a library)
 
-### Web Application Detection
+## Phase 3: Deep Analysis
 
-**Ruby on Rails:**
+Run only the sub-phases that match the detected product type. For each, record exact counts and file:line locations as evidence.
 
-```bash
-# Check for Rails
-ls -la Gemfile config/routes.rb app/controllers/ app/views/ 2>/dev/null
-cat Gemfile 2>/dev/null | grep -E "rails|gem 'rails'"
-```
+### 3.1 Web Applications
 
-**Django:**
+**Routes / pages** — Rails: `cat config/routes.rb`, list `app/controllers/`. Django: `cat */urls.py`, find `views.py`. Express: `grep -rn "router\.\(get\|post\|put\|delete\|patch\)" --include="*.js" --include="*.ts"`. Next.js / React: list `pages/`, `app/`, `src/pages/`, `src/app/` for `*.tsx`/`*.jsx`.
 
-```bash
-# Check for Django
-ls -la manage.py */urls.py */views.py */templates/ 2>/dev/null
-cat requirements.txt pyproject.toml 2>/dev/null | grep -iE "django"
-```
-
-**Express/Node.js Web:**
+**Models / data** — Rails: `app/models/`, `db/schema.rb`. Django: `find . -name "models.py"`. Generic: any `Schema`/`type Entity` declarations.
 
-```bash
-# Check for Express/web frameworks
-cat package.json 2>/dev/null | jq -r '.dependencies | keys[]' | grep -iE "express|koa|fastify|hapi|nest"
-ls -la views/ templates/ public/ src/pages/ src/routes/ 2>/dev/null
-```
-
-**Laravel:**
+**Forms** — Rails: `grep -rl "form_for\|form_with\|form_tag" app/views/`. Django: `find . -name "forms.py"`. React/Vue: `grep -rl "<form\|<Form\|useForm\|formik\|react-hook-form" --include="*.tsx" --include="*.jsx"`.
 
-```bash
-# Check for Laravel
-ls -la artisan routes/web.php app/Http/Controllers/ resources/views/ 2>/dev/null
-```
-
-**Next.js/React:**
+**Help text & UI guidance (CRITICAL — reuse in the guide):** look for `help_text:`, `placeholder:`, `helperText`, `tooltip`, `hint`, `description:`, `aria-describedby`, `list_items:` across views/components. This text is what users see on screen and must be reproduced verbatim in the Step-by-Step Guides.
 
-```bash
-# Check for Next.js/React apps
-ls -la pages/ app/ src/pages/ src/app/ components/ 2>/dev/null
-cat package.json 2>/dev/null | jq -r '.dependencies | keys[]' | grep -iE "next|react|vue|angular|svelte"
-```
-
-### CLI Tool Detection
-
-```bash
-# Check for CLI patterns
-cat package.json 2>/dev/null | jq -r '.bin // empty'
-grep -rl "argparse\|click\|typer\|commander\|yargs\|clap\|cobra" --include="*.py" --include="*.js" --include="*.ts" --include="*.rs" --include="*.go" . 2>/dev/null |
-  head -5
-ls -la cmd/ cli/ bin/ 2>/dev/null
-```
+**Conditional field visibility (CRITICAL):** find fields that show/hide based on other fields.
 
-### API Detection
+- Rails (Stimulus / inline JS): `wrapper_class.*hide-`, `wrapper_class.*show-`, `data-action.*toggle`, `style.display`, `.classList.toggle`.
+- React/Vue: `v-if=`, `v-show=`, `x-show=`, `{cond && <`, `hidden={`.
+- For each conditional field, record: trigger field, trigger condition (value/state), affected fields, and visibility logic (show-when-true vs hide-when-true).
 
-```bash
-# Check for API patterns
-grep -rl "@app.route\|@router\|@Controller\|@RestController\|@GetMapping\|@PostMapping\|router.get\|router.post" --include="*.py" --include="*.js" --include="*.ts" --include="*.java" --include="*.rb" . 2>/dev/null |
-  head -10
-ls -la api/ routes/ endpoints/ 2>/dev/null
-cat package.json 2>/dev/null | jq -r '.dependencies | keys[]' | grep -iE "fastapi|flask|express|gin|echo|fiber"
-```
+**Form section structure** — `form_section`, `<fieldset>`, `<legend>`, `<FormSection>`, `<FormGroup>`, `fieldsets` (Django admin). Record section title and description text.
 
-### Library Detection
+**UI components, navigation** — component files; `nav`, `menu`, `sidebar`, `header`, `footer`, `navbar`, `drawer` patterns.
 
-```bash
-# Check if it's a library (no app entry point, exports functions/classes)
-cat package.json 2>/dev/null | jq -r '.main, .exports, .types' | grep -v null
-cat setup.py pyproject.toml 2>/dev/null | grep -E "name|packages"
-ls -la src/lib/ lib/ 2>/dev/null
-```
+### 3.2 CLI Tools
 
-### Mobile App Detection
+**Commands** — Python (Click/Typer/argparse): `@click.command`, `@app.command`, `add_parser`, `add_subparser`. Node (Commander/Yargs): `.command(`, `.option(`, `yargs.`. Go (Cobra): `cobra.Command`, `cmd.AddCommand`. Rust (Clap): `#[command`, `Command::new`.
 
-```bash
-# Check for mobile frameworks
-ls -la android/ ios/ lib/main.dart pubspec.yaml 2>/dev/null
-cat package.json 2>/dev/null | jq -r '.dependencies | keys[]' | grep -iE "react-native|expo|ionic|capacitor"
-```
+**Help output** — Try `./bin/* --help` if executable. Otherwise extract from source.
 
-### Classification
+**Options / flags** — `add_argument`, `.option(`, `.flag(`, `--<name>` patterns.
 
-Based on detection, classify as one of:
+### 3.3 REST APIs
 
-- `web_app` - Web application with UI
-- `cli_tool` - Command-line interface tool
-- `api` - REST/GraphQL API service
-- `library` - Reusable library/SDK
-- `mobile_app` - Mobile application
-- `desktop_app` - Desktop application
-- `hybrid` - Multiple types (e.g., CLI + library)
+**Endpoints** — FastAPI/Flask: `@app.<method>`, `@router.<method>`. Express: `router.<method>`, `app.<method>`. Rails API: `app/controllers/api/`, namespace blocks in `config/routes.rb`.
 
-## Step 3: Deep Analysis - Web Applications
+**Schemas** — `Schema`, `Serializer`, `DTO`, `interface .*Request`, `type .*Response`.
 
-### 3.1 Discover Routes/Pages
+**Authentication** — search for `auth`, `jwt`, `bearer`, `api.key`, `oauth`, `token`. Identify the actual mechanism used.
 
-**Rails:**
+**OpenAPI / Swagger** — `openapi.yaml`, `openapi.json`, `swagger.*`, `api-spec.*`.
 
-```bash
-# Get all routes
-cat config/routes.rb
-# Find controllers
-ls -la app/controllers/*.rb
-# Find views
-find app/views -name "*.erb" -o -name "*.haml" -o -name "*.slim" 2>/dev/null | head -30
-```
+### 3.4 Libraries / SDKs
 
-**Django:**
+**Public API** — Python: `__all__`, `__init__.py` exports, top-level `class`/`def`. Node/TS: `export` statements. Rust: `pub fn`/`pub struct`/`pub enum`/`pub trait`. Go: capitalized `func`/`type`.
 
-```bash
-# Get URL patterns
-cat */urls.py
-# Find views
-find . -name "views.py" -not -path "*/venv/*" 2>/dev/null | xargs cat 2>/dev/null | head -100
-# Find templates
-find . -name "*.html" -path "*/templates/*" 2>/dev/null | head -30
-```
+**Docstrings** — comments preceding public items (`"""…"""`, `///`, `//`).
 
-**Express/Node:**
+**Examples** — `examples/`, `example/`, `demo/`, files matching `*example*` / `*demo*`.
 
-```bash
-# Find route definitions
-grep -rn "router\.\(get\|post\|put\|delete\|patch\)\|app\.\(get\|post\|put\|delete\|patch\)" --include="*.js" --include="*.ts" . 2>/dev/null |
-  grep -v node_modules | head -30
-```
+### 3.5 Mobile Apps
 
-**Next.js/React:**
+**Screens** — Flutter: `lib/**/*screen*.dart`, `*page*.dart`, files using `Scaffold`, `MaterialApp`. React Native: `*Screen*` files, files using `createStackNavigator`, `createBottomTabNavigator`.
 
-```bash
-# Find pages
-find pages app src/pages src/app -name "*.tsx" -o -name "*.jsx" -o -name "*.js" 2>/dev/null | grep -v _app |
-  grep -v _document | head -30
-```
+**Navigation** — `Navigator`, `createNavigator`, route definitions.
 
-### 3.2 Discover Models/Data Structures
+## Phase 4: Validate Existing User Guide
 
-**Rails:**
+If `docs/user-guide.md` exists:
 
-```bash
-# Get models
-ls -la app/models/*.rb
-# Get schema
-cat db/schema.rb 2>/dev/null | head -100
-```
+1. **H1 title** must be exactly `# User Guide` (not `# Manual`).
+2. **Required H2 sections** (per product type) present in correct order.
+3. **TOC links** resolve to actual sections.
+4. **Cross-reference table (MANDATORY):**
 
-**Django:**
+   | Documented Feature | Code Evidence |
+   | ------------------ | ------------- |
+   | {claim from guide} | {file:function, or MISSING} |
 
-```bash
-# Get models
-find . -name "models.py" -not -path "*/venv/*" 2>/dev/null | xargs cat 2>/dev/null | grep -E "class.*Model" | head -30
-```
+   For each documented feature: confirm it exists, confirm description matches implementation, flag outdated examples.
+   For each feature found in Phase 3: confirm it's documented, otherwise flag undocumented.
 
-### 3.3 Discover Forms
+5. **Web-app specific** (if applicable):
+   - Forms documented as **guided walkthroughs**, not field tables.
+   - **Help text** in the guide matches the actual `help_text:` / `helperText` in form views.
+   - **Conditional visibility** is explicitly documented (which fields appear/disappear and when).
+   - **Form section structure** in the guide matches the UI layout.
 
-**Rails:**
+If `docs/manual.md` exists, plan to rename to `docs/user-guide.md` and replace the H1 title.
 
-```bash
-# Find form templates
-grep -rl "form_for\|form_with\|form_tag" app/views/ 2>/dev/null | head -20
-```
+## Phase 5: Generate Report
 
-**Django:**
-
-```bash
-# Find forms
-find . -name "forms.py" -not -path "*/venv/*" 2>/dev/null | xargs cat 2>/dev/null | head -50
-```
-
-**React/Vue:**
-
-```bash
-# Find form components
-grep -rl "<form\|<Form\|useForm\|formik\|react-hook-form" --include="*.tsx" --include="*.jsx" --include="*.vue" . 2>/dev/null |
-  grep -v node_modules | head -20
-```
-
-### 3.4 Discover Help Text and UI Guidance
-
-Extract help text, tooltips, placeholders, and section descriptions that guide users when filling forms. This content should be reused in the user guide.
-
-**Rails:**
-
-```bash
-# Find help_text parameters in form views
-grep -rn "help_text:" app/views/ app/helpers/ 2>/dev/null | head -30
-# Find form section descriptions and list_items
-grep -rn "form_section\|description:\|list_items:" app/views/ app/helpers/ 2>/dev/null | head -30
-# Find placeholder text
-grep -rn "placeholder:" app/views/ 2>/dev/null | head -20
-```
-
-**Django:**
-
-```bash
-# Find help_text in forms and models
-grep -rn "help_text=" --include="*.py" . 2>/dev/null | grep -v venv | grep -v migrations | head -30
-# Find widget placeholders
-grep -rn "placeholder" --include="*.py" --include="*.html" . 2>/dev/null | grep -v venv | head -20
-```
-
-**React/Vue/Angular:**
-
-```bash
-# Find help/guidance props in components
-grep -rn "helperText\|tooltip\|placeholder\|description\|hint\|aria-describedby" --include="*.tsx" --include="*.jsx" --include="*.vue" . 2>/dev/null |
-  grep -v node_modules | head -30
-```
-
-**Generic (any framework):**
-
-```bash
-# Find common help text patterns in templates
-grep -rn "help-text\|hint\|tooltip\|aria-describedby\|\.help\b\|\.hint\b" --include="*.html" --include="*.erb" --include="*.hbs" --include="*.pug" . 2>/dev/null | head -20
-```
-
-### 3.5 Discover Conditional Field Visibility
-
-Find fields that show or hide based on user selections. This is critical for guiding users through forms.
-
-**Rails (inline JS / Stimulus):**
-
-```bash
-# Find CSS wrapper classes used for toggling visibility (e.g., hide-*, show-*)
-grep -rn "wrapper_class.*hide-\|wrapper_class.*show-" app/views/ 2>/dev/null | head -20
-# Find JavaScript toggle functions in form views
-grep -rn "style.display\|\.hidden\|\.visible\|toggle\|addEventListener.*change" app/views/ app/javascript/ 2>/dev/null | head -30
-# Find Stimulus show/hide actions
-grep -rn "data-action.*show\|data-action.*hide\|data-action.*toggle\|data-.*target" app/views/ 2>/dev/null | head -20
-```
-
-**React/Vue/Angular:**
-
-```bash
-# Find conditional rendering patterns
-grep -rn "v-if=\|v-show=\|x-show=\|x-if=\|{.*&&.*<\|? <\|condition\|isVisible\|showField\|hidden={" --include="*.tsx" --include="*.jsx" --include="*.vue" . 2>/dev/null |
-  grep -v node_modules | head -30
-```
-
-**Django / Generic JS:**
-
-```bash
-# Find JavaScript show/hide in templates
-grep -rn "\.show()\|\.hide()\|\.toggle()\|display.*none\|display.*block\|classList.*hidden" --include="*.html" --include="*.js" . 2>/dev/null |
-  grep -v node_modules | grep -v venv | head -30
-```
-
-**Map the dependency chain:** For each conditional field found, record:
-
-1. **Trigger field** — which field the user interacts with (e.g., a checkbox or dropdown)
-2. **Trigger condition** — what value or state triggers the change (e.g., "checked", "value is High")
-3. **Affected fields** — which fields appear or disappear
-4. **Visibility logic** — show when condition is true, or hide when condition is true (inverse logic)
-
-### 3.6 Discover Form Section Structure
-
-Find how forms group fields into logical sections with headers and descriptions.
-
-**Rails:**
-
-```bash
-# Find form_section helpers or fieldset groupings
-grep -rn "form_section\|<fieldset\|<legend" app/views/ 2>/dev/null | head -20
-# Extract section titles and descriptions
-grep -A3 "form_section" app/views/ 2>/dev/null | head -40
-```
-
-**React/Vue:**
-
-```bash
-# Find section/fieldset components
-grep -rn "<fieldset\|<FormSection\|<FormGroup\|<Section\|<AccordionItem" --include="*.tsx" --include="*.jsx" --include="*.vue" . 2>/dev/null |
-  grep -v node_modules | head -20
-```
-
-**Django:**
-
-```bash
-# Find fieldset definitions in admin or forms
-grep -rn "fieldsets\|<fieldset\|<legend" --include="*.py" --include="*.html" . 2>/dev/null | grep -v venv | head -20
-```
-
-### 3.7 Extract UI Components
-
-```bash
-# Find component files
-find . -name "*.tsx" -o -name "*.jsx" -o -name "*.vue" -o -name "*.svelte" 2>/dev/null | grep -v node_modules |
-  grep -iE "component|page|view|screen" | head -30
-```
-
-### 3.8 Discover Navigation
-
-```bash
-# Find navigation components
-grep -rl "nav\|menu\|sidebar\|header\|footer\|navbar\|drawer" --include="*.tsx" --include="*.jsx" --include="*.vue" --include="*.erb" --include="*.html" . 2>/dev/null |
-  grep -v node_modules | head -15
-```
-
-## Step 4: Deep Analysis - CLI Tools
-
-### 4.1 Discover Commands
-
-**Python (Click/Typer/Argparse):**
-
-```bash
-# Find CLI entry points
-grep -rn "@click.command\|@click.group\|@app.command\|add_parser\|add_subparser" --include="*.py" . 2>/dev/null |
-  grep -v venv | head -30
-```
-
-**Node.js (Commander/Yargs):**
-
-```bash
-# Find command definitions
-grep -rn "\.command(\|\.option(\|yargs\." --include="*.js" --include="*.ts" . 2>/dev/null | grep -v node_modules |
-  head -30
-```
-
-**Go (Cobra):**
-
-```bash
-# Find cobra commands
-grep -rn "cobra.Command\|cmd.AddCommand" --include="*.go" . 2>/dev/null | head -30
-```
-
-**Rust (Clap):**
-
-```bash
-# Find clap definitions
-grep -rn "#\[command\|#\[arg\|Command::new" --include="*.rs" . 2>/dev/null | head -30
-```
-
-### 4.2 Extract Command Help
-
-```bash
-# Try to get help output
-./bin/* --help 2>/dev/null || npm run --help 2>/dev/null || python -m * --help 2>/dev/null || echo "Cannot extract help"
-```
-
-### 4.3 Discover Options/Flags
-
-```bash
-# Find option definitions
-grep -rn "\.option\|\.flag\|add_argument\|--\w" --include="*.py" --include="*.js" --include="*.ts" --include="*.go" --include="*.rs" . 2>/dev/null |
-  grep -v node_modules | grep -v venv | head -40
-```
-
-## Step 5: Deep Analysis - APIs
-
-### 5.1 Discover Endpoints
-
-**FastAPI/Flask:**
-
-```bash
-# Find API routes
-grep -rn "@app\.\(get\|post\|put\|delete\|patch\)\|@router\.\(get\|post\|put\|delete\|patch\)" --include="*.py" . 2>/dev/null |
-  grep -v venv | head -40
-```
-
-**Express:**
-
-```bash
-# Find Express routes
-grep -rn "router\.\(get\|post\|put\|delete\|patch\)\|app\.\(get\|post\|put\|delete\|patch\)" --include="*.js" --include="*.ts" . 2>/dev/null |
-  grep -v node_modules | head -40
-```
-
-**Rails API:**
-
-```bash
-# Find API controllers
-ls -la app/controllers/api/ 2>/dev/null
-cat config/routes.rb 2>/dev/null | grep -E "namespace :api|resources"
-```
-
-### 5.2 Extract Request/Response Schemas
-
-```bash
-# Find schema definitions
-grep -rl "Schema\|Serializer\|DTO\|interface.*Request\|interface.*Response\|type.*Request\|type.*Response" --include="*.py" --include="*.ts" --include="*.rb" . 2>/dev/null |
-  grep -v node_modules | grep -v venv | head -20
-```
-
-### 5.3 Discover Authentication
-
-```bash
-# Find auth patterns
-grep -rn "auth\|jwt\|bearer\|api.key\|oauth\|token" --include="*.py" --include="*.js" --include="*.ts" --include="*.rb" . 2>/dev/null |
-  grep -v node_modules | grep -v venv | grep -v test | head -20
-```
-
-### 5.4 Check for OpenAPI/Swagger
-
-```bash
-# Find OpenAPI specs
-ls -la openapi.yaml openapi.json swagger.yaml swagger.json api-spec.* 2>/dev/null
-find . -name "openapi*" -o -name "swagger*" 2>/dev/null | head -5
-```
-
-## Step 6: Deep Analysis - Libraries
-
-### 6.1 Discover Public API
-
-**Python:**
-
-```bash
-# Find exports in __init__.py
-cat */__init__.py src/*/__init__.py 2>/dev/null | grep -E "^from|^import|__all__"
-# Find public classes/functions
-grep -rn "^class \|^def \|^async def " --include="*.py" . 2>/dev/null | grep -v venv | grep -v test | grep -v "_" |
-  head -40
-```
-
-**Node.js/TypeScript:**
-
-```bash
-# Find exports
-grep -rn "^export \|module\.exports" --include="*.ts" --include="*.js" . 2>/dev/null | grep -v node_modules |
-  grep -v test | head -40
-```
-
-**Rust:**
-
-```bash
-# Find public items
-grep -rn "^pub fn\|^pub struct\|^pub enum\|^pub trait" --include="*.rs" . 2>/dev/null | head -40
-```
-
-**Go:**
-
-```bash
-# Find exported functions (capitalized)
-grep -rn "^func [A-Z]\|^type [A-Z]" --include="*.go" . 2>/dev/null | grep -v vendor | head -40
-```
-
-### 6.2 Extract Docstrings/Comments
-
-```bash
-# Find documented functions
-grep -B5 "^def \|^class \|^func \|^pub fn" --include="*.py" --include="*.go" --include="*.rs" . 2>/dev/null |
-  grep -E '"""|///|//|#' | head -30
-```
-
-### 6.3 Find Examples
-
-```bash
-# Find example files
-find . -name "example*" -o -name "*example*" -o -name "demo*" 2>/dev/null | grep -v node_modules | head -20
-ls -la examples/ example/ demo/ 2>/dev/null
-```
-
-## Step 7: Deep Analysis - Mobile Apps
-
-### 7.1 Discover Screens (Flutter)
-
-```bash
-# Find Flutter screens/pages
-find lib -name "*screen*.dart" -o -name "*page*.dart" -o -name "*view*.dart" 2>/dev/null | head -30
-grep -rl "Scaffold\|MaterialApp\|CupertinoPageScaffold" --include="*.dart" lib/ 2>/dev/null | head -20
-```
-
-### 7.2 Discover Screens (React Native)
-
-```bash
-# Find React Native screens
-find . -name "*Screen*" -o -name "*screen*" 2>/dev/null | grep -v node_modules | head -30
-grep -rl "createStackNavigator\|createBottomTabNavigator\|Screen" --include="*.tsx" --include="*.jsx" . 2>/dev/null |
-  grep -v node_modules | head -20
-```
-
-### 7.3 Extract Navigation Structure
-
-```bash
-# Find navigation definitions
-grep -rn "Navigator\|createNavigator\|navigation\|router" --include="*.dart" --include="*.tsx" --include="*.jsx" . 2>/dev/null |
-  grep -v node_modules | head -30
-```
-
-## Step 8: Validate Existing User Guide Document
-
-If `docs/user-guide.md` exists, validate its structure.
-
-### Check H1 Title
-
-```bash
-head -5 docs/user-guide.md
-grep "^# " docs/user-guide.md | head -1
-```
-
-**Expected:** `# User Guide`
-
-Note: If the file was previously named `docs/manual.md`, rename it to `docs/user-guide.md`.
-
-### Check Required H2 Sections
-
-```bash
-grep "^## " docs/user-guide.md
-```
-
-**Must include (in order):**
-
-```text
-## Table of Contents
-## Getting Started
-## Features
-{Project-type-specific sections}
-## Configuration
-## Troubleshooting
-## FAQ
-```
-
-### Cross-Reference with Code (MANDATORY - do not skip)
-
-**You MUST create a two-column comparison table:**
-
-| Documented Feature        | Code Evidence                               |
-|---------------------------|---------------------------------------------|
-| {feature from user guide} | {file:function where it exists, or MISSING} |
-
-For EACH documented feature/page/command:
-
-1. Verify it exists in the codebase - record the specific file and function
-2. Check if the description matches the implementation - record mismatches
-3. Flag outdated screenshots or examples
-
-For EACH feature found in code (from Steps 3-7):
-
-1. Check if it is documented in the user guide
-2. Record undocumented features with their code location
-
-For web applications, ALSO verify:
-
-1. **Step-by-step guide format** - Forms are documented as guided walkthroughs, not field tables
-2. **Help text accuracy** - UI help text in the user guide matches the actual help_text in form views
-3. **Conditional visibility** - All fields with conditional show/hide behavior are documented with their trigger conditions
-
-## Step 9: Generate Comprehensive Report
-
-**MANDATORY PRE-REPORT VERIFICATION:**
-
-Before generating the report, you MUST:
-
-1. Review your checkpoint log from the start of analysis
-2. Verify ALL applicable checkpoints have actual values (not "pending")
-3. If ANY checkpoint is still pending, STOP and complete that step first
-4. Cross-reference findings: features found in code analysis MUST appear in the report
-
-**If you skipped any step, the review is incomplete and results will be inconsistent.**
-
-### Report Format
+Pre-report verification: every applicable phase task is marked complete; cross-reference evidence is recorded; counts are exact (not "some" / "a few").
 
 ```text
 ## User Guide Review Report
 
-### Analysis Checkpoint Log
-
-{Include your completed checkpoint log here - ALL values must be filled in, none should say "pending"}
-
 ### Repository Info
-- **Organization:** {org}
-- **Repository:** {repo}
-- **Product Type:** {web_app/cli/api/library/mobile/desktop}
-- **Document Status:** {exists/missing}
+- Organization: {org}
+- Repository: {repo}
+- Product Type: {type}
+- Document Status: {exists / missing}
 
 ### Structure Checks
-- [ ] H1 title "# User Guide": {PASS/FAIL}
-- [ ] Required H2 sections present: {PASS/FAIL}
-- [ ] Table of Contents links valid: {PASS/FAIL}
+- H1 title `# User Guide`: {PASS / FAIL}
+- Required H2 sections: {PASS / FAIL — list missing}
+- TOC links valid: {PASS / FAIL}
 
-### Content Accuracy Checks
-- [ ] Getting Started matches actual setup: {PASS/FAIL}
-- [ ] All features documented: {PASS/FAIL}
-- [ ] {Project-specific checks}
+### Content Accuracy
+- Getting Started matches actual setup: {PASS / FAIL}
+- All features documented: {PASS / FAIL}
+- {Product-type-specific checks}
 
-### Guide Style Checks (Web Applications)
-- [ ] Forms documented as guided walkthroughs (not field tables): {PASS/FAIL}
-- [ ] UI help text incorporated from form views: {PASS/FAIL}
-- [ ] Conditional field visibility documented: {PASS/FAIL}
-- [ ] Form section structure matches UI layout: {PASS/FAIL}
+### Web App Style Checks (if applicable)
+- Forms as guided walkthroughs: {PASS / FAIL}
+- Help text reused from UI code: {PASS / FAIL}
+- Conditional visibility documented: {PASS / FAIL}
+- Section structure matches UI: {PASS / FAIL}
 
-### Coverage Analysis
-- **Documented features:** {n}
-- **Features in code:** {n}
-- **Undocumented features:** {list}
-- **Documented but removed:** {list}
-- **Conditional fields documented:** {n} of {total}
-- **Help texts incorporated:** {n} of {total}
+### Coverage
+- Documented features: {n}
+- Features in code: {n}
+- Undocumented features: {list with file:line}
+- Documented but removed: {list}
+- Conditional fields documented: {n} of {total}
+- Help texts incorporated: {n} of {total}
 
 ### Proposed Changes
-{Show exact changes needed}
+{Specific edits with file:line targets}
 ```
 
-## Step 10: Create or Update User Guide Document
+## Phase 6: Write or Update the Guide
 
-### Web Application Template
+After the report is approved, write `docs/user-guide.md` using the structure below. **Do not paste templates verbatim — fill them with content discovered in Phase 3.**
+
+### Required structure (all product types)
 
 ```markdown
 # User Guide
@@ -801,660 +219,110 @@ Before generating the report, you MUST:
 
 - [Getting Started](#getting-started)
 - [Features](#features)
-- [Navigation](#navigation)
-- [Pages](#pages)
-- [Step-by-Step Guides](#step-by-step-guides)
-- [Workflows](#workflows)
+- {Product-type-specific sections}
 - [Configuration](#configuration)
 - [Troubleshooting](#troubleshooting)
 - [FAQ](#faq)
 
 ## Getting Started
 
-### Prerequisites
+### Prerequisites / Requirements
+{Detected from package files, README, deployment configs}
 
-{Based on detected requirements}
+### Installation / Access
+{Install command, URL, or onboarding step}
 
-### Accessing the Application
-
-{URL or deployment info}
-
-### First-Time Setup
-
-1. {Step based on onboarding flow}
-2. {Step}
-3. {Step}
-
-### Logging In
-
-{Based on discovered auth mechanism}
+### First-Time Setup / Quick Start
+{Minimal example or numbered steps}
 
 ## Features
 
 ### Feature Overview
 
 | Feature | Description | Location |
-|---------|-------------|----------|
-
-{For each discovered feature:} | {name} | {description} | {page/section} |
-
-### Key Capabilities
-
-{Based on code analysis}
-
-## Navigation
-
-### Main Menu
-
-{Based on discovered navigation components}
-
-| Menu Item | Description | Shortcut |
-|-----------|-------------|----------|
-| {item} | {description} | {if any} |
-
-### Sidebar/Secondary Navigation
-
-{If applicable}
-
-## Pages
-
-{For each discovered page/view:}
-
-### {Page Name}
-
-**URL:** `{route}`
-
-**Purpose:** {Inferred from controller/view}
-
-{Describe what the user sees when they first land on this page — the main content area, key data displayed, and the overall layout.}
-
-#### What You Can Do Here
-
-{For each action, describe it from the user's perspective:}
-
-- **{Action}** — {Description of what happens when the user performs this action, where it leads, and any prerequisites}
-
-{If the page has a status workflow or lifecycle, describe it narratively:}
-
-#### {Entity} Status Workflow
-
-{Entity names} progress through the following statuses:
-
-1. **{Status}** — {What this status means and who can set it}
-2. **{Status}** — {Description}
-
-## Step-by-Step Guides
-
-{IMPORTANT: Write this section as a guided walkthrough, NOT as field tables. Use the help text discovered from the UI code (Step 3.4) and the conditional visibility logic (Step 3.5) to write instructions that feel like a knowledgeable colleague walking the user through each form.}
-
-{For each discovered form:}
-
-### {Action Verb + Entity} (e.g., "Creating a New Service", "Filing an Incident Report")
-
-Navigate to **{page name}** in the sidebar and click **{action button label}**.
-
-{For each form section discovered via form_section, fieldset, or logical grouping:}
-
-#### {Section Title}
-
-{Include the section description/guidance text from the UI code. If the UI has list_items explaining enum options, reproduce them here as a bulleted guide.}
-
-{For each field in the section, use numbered steps:}
-
-1. **{Field Label}** — {Use the actual help_text from the UI code if available. Otherwise write a clear plain-language explanation of what to enter and why. For checkboxes, explain what checking it means.}
-   {If the field is a select/dropdown with enum values, explain the options:}
-   - **{Option 1}:** {Description — use list_items text from UI if available}
-   - **{Option 2}:** {Description}
-
-{When a field triggers conditional visibility, document it inline:}
-
-2. **{Trigger Field Label}** — {Help text / explanation of the field.}
-
-   > When you {check this box / select "Value"}, the following fields appear:
-
-   - **{Conditional Field 1}** — {Help text / explanation}
-   - **{Conditional Field 2}** — {Help text / explanation}
-
-{When a field triggers inverse visibility (hides other fields):}
-
-3. **{Trigger Field Label}** — {Help text / explanation.}
-
-   > When you {check this box / select "Value"}, the {section name} fields below are no longer needed and will be hidden.
-
-{End of form sections}
-
-#### Saving and Next Steps
-
-{What happens when the user clicks Save — where they are redirected, what status the record starts in, and what they should do next.}
-
-## Workflows
-
-{For each major user workflow:}
-
-### {Workflow Name}
-
-**Goal:** {what user accomplishes}
-
-**Steps:**
-
-1. **{Step 1}**
-  - Navigate to {page}
-  - {Action}
-
-2. **{Step 2}**
-  - {Action}
-  - Expected result: {result}
-
-3. **{Step 3}**
-  - {Action}
-  - Completion: {final state}
-
-## Configuration
-
-### User Settings
-
-{Based on discovered settings pages/models}
-
-| Setting | Description | Default |
-|---------|-------------|---------|
-| {setting} | {description} | {default} |
-
-### Environment Variables
-
-{If user-configurable}
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| {var} | {description} | {yes/no} |
-
-## Troubleshooting
-
-### Common Issues
-
-{Based on error handling in code}
-
-#### {Issue 1}
-
-**Symptom:** {what user sees}
-
-**Cause:** {why it happens}
-
-**Solution:** {how to fix}
-
-#### {Issue 2}
-
-{Repeat}
-
-### Error Messages
-
-| Error | Meaning | Solution |
-|-------|---------|----------|
-
-{From discovered error messages:} | {error} | {meaning} | {fix} |
-
-## FAQ
-
-### General Questions
-
-**Q: {Question based on common patterns}**
-
-A: {Answer}
-
-**Q: {Question}**
-
-A: {Answer}
-
-### Technical Questions
-
-**Q: {Question}**
-
-A: {Answer}
+| ------- | ----------- | -------- |
+| {name}  | {description} | {page/command/endpoint} |
 ```
 
-### CLI Tool Template
+### Product-type-specific guidance
 
-```markdown
-# User Guide
+**Web Apps — Pages section.** For each page: URL, purpose (inferred from controller/view), what the user sees on landing, then a "What You Can Do Here" subsection listing each action with what it does and prerequisites. If a page has a status workflow, document the lifecycle.
 
-## Table of Contents
+**Web Apps — Step-by-Step Guides (CRITICAL formatting rule).** This section MUST be a guided walkthrough, NOT a field table. For each form:
 
-- [Getting Started](#getting-started)
-- [Features](#features)
-- [Commands](#commands)
-- [Options & Flags](#options--flags)
-- [Examples](#examples)
-- [Configuration](#configuration)
-- [Troubleshooting](#troubleshooting)
-- [FAQ](#faq)
+- Open with: "Navigate to **{page}** in the sidebar and click **{button label}**."
+- For each form section discovered in Phase 3: include the section's description text from the UI; if list_items explain enum options, reproduce them as a bulleted guide.
+- For each field in the section, use **numbered steps**:
 
-## Getting Started
+  1. **{Field Label}** — {use the actual `help_text` from the UI verbatim if present; otherwise plain-language explanation}.
+     - For dropdowns/enums, list each option with its description (use `list_items` text from UI).
+- For trigger fields with conditional visibility, document inline:
 
-### Installation
+  > When you check this box / select "{value}", the following fields appear:
+  >
+  > - **{Conditional Field}** — {help text}
 
-{Based on detected package manager}
+- For inverse visibility:
 
-\`\`\`bash {install command} \`\`\`
+  > When you check this box, the {section name} fields below are no longer needed and will be hidden.
 
-### Quick Start
+- Close with "Saving and Next Steps": where the user is redirected, the starting status, and what to do next.
 
-\`\`\`bash {simplest usage example} \`\`\`
+**Web Apps — Workflows.** For each major end-to-end flow: goal, then numbered steps with `Navigate to`, `Action`, `Expected result`.
 
-### Verifying Installation
+**CLI Tools — Commands.** For each command: description, usage line (`command [options] <args>`), arguments table (Argument | Required | Description), one example. Then global Options & Flags table, then per-command flags.
 
-\`\`\`bash {command} --version \`\`\`
+**CLI Tools — Examples.** Basic Usage → Common Workflows (multi-step) → Advanced Usage (complex options).
 
-## Features
+**REST APIs — Authentication.** Method (API Key / OAuth / JWT), how to obtain credentials, header example, query-parameter example.
 
-{Overview of what the CLI can do}
+**REST APIs — Endpoints.** For each: METHOD, path, parameters table (Name | In | Type | Required | Description), example request body (JSON), example response (JSON), status codes table.
 
-## Commands
+**REST APIs — Error Handling.** Error response format, error codes table (Code | HTTP Status | Description | Resolution).
 
-{For each discovered command:}
+**Libraries — Quick Start.** One minimal working example in the project's primary language.
 
-### `{command name}`
+**Libraries — API Reference.** For each public class/function: description from docstring, signature in a fenced block, parameters table, return type, one usage example.
 
-{Description from docstring or inferred}
+**Mobile Apps — Screens.** For each screen: name, navigation entry point, primary actions, what the user sees, screen-specific gestures or shortcuts.
 
-**Usage:**
+### Configuration, Troubleshooting, FAQ (all types)
 
-\`\`\`bash {command} [options] <arguments>
-\`\`\`
+- **Configuration** — settings table (Setting | Description | Default), environment variables table.
+- **Troubleshooting** — Common Issues (Symptom / Cause / Solution), Error Messages table.
+- **FAQ** — questions grounded in real user scenarios from issue templates, support patterns, or Phase 3 findings. Don't invent generic Q&As.
 
-**Arguments:**
+## Phase 7: Run Linters
 
-| Argument | Required | Description |
-|----------|----------|-------------|
-| {arg} | {yes/no} | {description} |
-
-**Example:**
-
-\`\`\`bash {command} {example args} \`\`\`
-
-## Options & Flags
-
-### Global Options
-
-| Option | Short | Description | Default |
-|--------|-------|-------------|---------|
-
-{For each global option:} | `--{option}` | `-{short}` | {description} | {default} |
-
-### Command-Specific Options
-
-{Grouped by command}
-
-## Examples
-
-### Basic Usage
-
-\`\`\`bash
-
-# {Description of what this does}
-
-{command} \`\`\`
-
-### Common Workflows
-
-#### {Workflow 1}
-
-\`\`\`bash
-
-# Step 1: {description}
-
-{command}
-
-# Step 2: {description}
-
-{command} \`\`\`
-
-### Advanced Usage
-
-\`\`\`bash
-
-# {Advanced example}
-
-{command with complex options} \`\`\`
-
-## Configuration
-
-### Configuration File
-
-**Location:** `{config file path}`
-
-**Format:** {JSON/YAML/TOML}
-
-\`\`\`{format} {example config} \`\`\`
-
-### Configuration Options
-
-| Option | Type | Description | Default |
-|--------|------|-------------|---------|
-| {option} | {type} | {description} | {default} |
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| {var} | {description} | {default} |
-
-## Troubleshooting
-
-### Common Errors
-
-#### {Error message}
-
-**Cause:** {why it happens}
-
-**Solution:**
-
-\`\`\`bash {fix command} \`\`\`
-
-### Debug Mode
-
-\`\`\`bash {command} --verbose
-
-# or
-
-{command} --debug \`\`\`
-
-## FAQ
-
-**Q: How do I {common task}?**
-
-A: {Answer with example}
-
-\`\`\`bash {example} \`\`\`
-```
-
-### API Template
-
-```markdown
-# User Guide
-
-## Table of Contents
-
-- [Getting Started](#getting-started)
-- [Features](#features)
-- [Authentication](#authentication)
-- [Endpoints](#endpoints)
-- [Request/Response Examples](#requestresponse-examples)
-- [Error Handling](#error-handling)
-- [Configuration](#configuration)
-- [Troubleshooting](#troubleshooting)
-- [FAQ](#faq)
-
-## Getting Started
-
-### Base URL
-
-\`\`\`text {base URL or how to determine it} \`\`\`
-
-### Quick Start
-
-\`\`\`bash
-
-# Get your API key
-
-# Then make your first request:
-
-curl -X GET "{base_url}/endpoint" \\ -H "Authorization: Bearer YOUR_API_KEY"
-\`\`\`
-
-## Features
-
-{Overview of API capabilities}
-
-## Authentication
-
-### Authentication Method
-
-{Based on discovered auth: API Key / OAuth / JWT / etc.}
-
-### Getting Credentials
-
-1. {Step to get credentials}
-2. {Step}
-
-### Using Credentials
-
-**Header Authentication:**
-
-\`\`\`bash curl -H "Authorization: Bearer {token}" {url} \`\`\`
-
-**Query Parameter:**
-
-\`\`\`bash curl "{url}?api_key={key}"
-\`\`\`
-
-## Endpoints
-
-{For each discovered endpoint:}
-
-### {Endpoint Name}
-
-**{METHOD}** `{path}`
-
-{Description}
-
-**Parameters:**
-
-| Name | In | Type | Required | Description |
-|------|----|----- |----------|-------------|
-| {param} | {path/query/body} | {type} | {yes/no} | {description} |
-
-**Request Body:**
-
-\`\`\`json {example request body} \`\`\`
-
-**Response:**
-
-\`\`\`json {example response} \`\`\`
-
-**Status Codes:**
-
-| Code | Description |
-|------|-------------|
-| 200 | Success |
-| 400 | Bad Request |
-| 401 | Unauthorized |
-| 404 | Not Found |
-
-## Request/Response Examples
-
-### {Use Case 1}
-
-**Request:**
-
-\`\`\`bash curl -X {METHOD} "{base_url}{path}" \\ -H "Authorization: Bearer {token}" \\ -H "Content-Type: application/json" \\ -d '{request body}' \`\`\`
-
-**Response:**
-
-\`\`\`json {response} \`\`\`
-
-## Error Handling
-
-### Error Response Format
-
-\`\`\`json {
-"error": {
-"code": "{error_code}",
-"message": "{human readable message}"
-} } \`\`\`
-
-### Error Codes
-
-| Code | HTTP Status | Description | Resolution |
-|------|-------------|-------------|------------|
-
-{For each error code:} | {code} | {status} | {description} | {how to fix} |
-
-## Configuration
-
-### Rate Limiting
-
-{Based on discovered rate limiting}
-
-### Pagination
-
-{Based on discovered pagination patterns}
-
-## Troubleshooting
-
-### Common Issues
-
-{Based on error handling code}
-
-## FAQ
-
-**Q: What is the rate limit?**
-
-A: {answer}
-
-**Q: How do I handle pagination?**
-
-A: {answer with example}
-```
-
-### Library Template
-
-```markdown
-# User Guide
-
-## Table of Contents
-
-- [Getting Started](#getting-started)
-- [Features](#features)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [API Reference](#api-reference)
-- [Examples](#examples)
-- [Configuration](#configuration)
-- [Troubleshooting](#troubleshooting)
-- [FAQ](#faq)
-
-## Getting Started
-
-### Requirements
-
-{Based on detected requirements}
-
-### Installation
-
-{Based on package manager}
-
-\`\`\`bash {install command} \`\`\`
-
-## Features
-
-{Overview of library capabilities}
-
-## Quick Start
-
-\`\`\`{language} {minimal working example} \`\`\`
-
-## API Reference
-
-{For each public class/function:}
-
-### `{name}`
-
-{Description from docstring}
-
-**Signature:**
-
-\`\`\`{language} {function/class signature} \`\`\`
-
-**Parameters:**
-
-| Name | Type | Required | Description |
-|------|------|----------|-------------|
-| {param} | {type} | {yes/no} | {description} |
-
-**Returns:**
-
-{Return type and description}
-
-**Example:**
-
-\`\`\`{language} {usage example} \`\`\`
-
-## Examples
-
-### Basic Usage
-
-\`\`\`{language} {example} \`\`\`
-
-### {Use Case 1}
-
-\`\`\`{language} {example} \`\`\`
-
-### {Use Case 2}
-
-\`\`\`{language} {example} \`\`\`
-
-## Configuration
-
-### Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| {option} | {type} | {default} | {description} |
-
-## Troubleshooting
-
-### Common Issues
-
-{Based on error patterns}
-
-## FAQ
-
-**Q: {Common question}**
-
-A: {Answer}
-```
-
-## Step 11: Run Linters
-
-After making changes to docs/user-guide.md, run the linters skill:
-
-```text
-/co-dev:run-linters
-```
-
-Fix any linting errors before considering the task complete.
+After writing/updating the guide, run `/co-dev:run-linters` and fix any errors before reporting completion.
 
 ## Validation Checklist
 
-Before completing, verify:
+Before completing, confirm:
 
-- [ ] H1 title is exactly `# User Guide`
-- [ ] All required H2 sections present
-- [ ] Table of Contents links work
+- [ ] H1 is exactly `# User Guide`
+- [ ] All required H2 sections present in correct order
+- [ ] TOC links resolve
 - [ ] Getting Started actually gets users started
-- [ ] All user-facing features are documented
-- [ ] All documented features exist in code
-- [ ] Examples are tested and working
-- [ ] Configuration options match code
-- [ ] Error messages and troubleshooting are accurate
-- [ ] Step-by-step guides use walkthrough style (not field tables)
-- [ ] Help text from the UI code is incorporated into the guides
-- [ ] Conditional field visibility is documented (which fields appear/disappear and when)
+- [ ] All user-facing features documented; nothing fabricated
+- [ ] Examples tested against actual code
+- [ ] Configuration matches code
+- [ ] Step-by-Step Guides use walkthrough style (not field tables)
+- [ ] UI help text incorporated verbatim
+- [ ] Conditional field visibility documented with callout blocks
 
 ## Important Rules
 
-1. **Write for end-users** - Not developers; assume no code knowledge
-2. **Never fabricate features** - Only document what exists
-3. **Include real examples** - Examples must work with actual code
-4. **Keep language simple** - Avoid jargon; explain technical terms
-5. **Show, don't tell** - Use screenshots, code examples, step-by-step guides
-6. **Document the happy path first** - Then edge cases
-7. **Cross-reference with code** - Every feature documented must exist
-8. **Ask before modifying** - Show proposed changes and get approval
-9. **Preserve existing content** - Only update, don't remove valid content
-10. **Run linters after changes** - Always run `/co-dev:run-linters`
-11. **Complete ALL steps** - Never skip analysis steps. Each step may reveal features not visible in other steps
-12. **Output checkpoint log** - Include the completed checkpoint log in your final report to prove all steps were executed
-13. **Never validate against world knowledge alone** - Do NOT use your training data to fact-check version numbers, release dates, or external claims. If uncertain about something, use web search to verify before flagging. Only validate things that can be cross-referenced against actual files in the repository or verified online.
-14. **Write guided walkthroughs, not field tables** - For web application forms, NEVER output field tables (Field | Type | Required | Description). Instead, write numbered step-by-step instructions that walk the user through each form section, using the actual help text from the UI code. The tone should feel like a knowledgeable colleague guiding them through the screen.
-15. **Document conditional field visibility** - When a checkbox, dropdown, or other field controls the visibility of other fields, explicitly document this behavior using callout blocks (e.g., "When you check this box, the following fields appear:"). Users need to know that form sections will change based on their selections.
-16. **Reuse UI help text** - Extract and incorporate the actual help text, section descriptions, and list_items from the application's form views. This ensures the user guide matches what users see on screen.
+1. **Write for end-users.** Assume no code knowledge. Explain technical terms.
+2. **Never fabricate features.** Only document what exists in code.
+3. **Cross-reference always.** Every documented feature must have a code-evidence pair.
+4. **Examples must work** with actual code — test them.
+5. **Document the happy path first**, then edge cases.
+6. **Ask before modifying.** Show proposed changes and get approval.
+7. **Preserve existing valid content** — only update or add, don't strip.
+8. **Walkthrough style, not field tables** — for web app forms (rule 14 is non-negotiable).
+9. **Reuse UI help text verbatim** — extract from `help_text:`, `helperText`, `placeholder:`, `list_items:` in the actual code.
+10. **Document conditional visibility** with explicit callouts ("When you check this box, the following fields appear").
+11. **Run linters after changes** — always.
+12. **Never validate against world knowledge alone.** Don't fact-check version numbers or external claims from training data — use web search or repo files.
+13. **Complete all phases** — skipping reveals nothing; cross-referencing reveals everything.
