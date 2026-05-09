@@ -6,100 +6,28 @@ allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:
 
 # Review Architecture Documentation
 
-Review the `docs/architecture.md` file in a repository and create or update it to match organizational standards. This skill deeply analyzes the codebase to ensure architecture documentation is accurate, complete, and reflects the actual implementation. Works for all repository types and languages.
+Review or create `docs/architecture.md` to match organizational standards. Works for all repository types and languages.
 
-## CRITICAL: Mandatory Analysis Tracking
+## Phase Tracking
 
-**You MUST maintain an analysis checklist throughout execution.** At each step, record what was found. This ensures consistent, reproducible results.
+Use `TaskCreate` to track each phase below. Mark `in_progress` on entry, `completed` when results are recorded. Do NOT include the task list in the final output.
 
-**Before starting, create this tracking structure and update it as you progress:**
+**Required phases:**
 
-```text
-=== ANALYSIS CHECKPOINT LOG ===
-[ ] Step 1: Repository Information
-    - organization: (pending)
-    - repository: (pending)
-    - has_architecture_doc: (pending)
-    - has_docs_dir: (pending)
-    - doc_last_modified: (pending)
-    - code_last_modified: (pending)
+1. Repository info gathered
+2. Exemption check (skip-or-proceed decision)
+3. Project type detected (standard vs ML/DL)
+4. Read existing doc + extract claims inventory
+5. Deep codebase analysis (relevant sub-phases per project type)
+6. Existing doc structure validated
+7. Report generated
+8. Doc written/updated (if approved)
 
-[ ] Step 2: Exemption Check
-    - existing_exemption: (pending)
-    - exempt_type_detected: (pending)
-
-[ ] Step 3: Project Type Detection
-    - project_type: (pending)
-    - ml_frameworks: (pending)
-    - has_model_files: (pending)
-
-[ ] Step 4/5: Deep Codebase Analysis (complete ALL applicable sub-checks)
-    For Standard Projects:
-    [ ] 4.1 Architecture Diagram - diagrams_found: (pending), referenced_in_doc: (pending)
-    [ ] 4.2 Software Units - modules_in_code: (pending), modules_in_doc: (pending), missing_from_doc: (pending)
-    [ ] 4.3 SOUP Validation - soup_json_exists: (pending), packages_in_lockfile: (pending), packages_in_soup: (pending), missing: (pending), stale: (pending)
-    [ ] 4.4 Critical Algorithms - algorithms_found: (pending), documented: (pending), undocumented: (pending)
-    [ ] 4.5 Risk Controls - auth_patterns: (pending), validation_patterns: (pending), error_handling: (pending), logging: (pending)
-
-    For ML/DL Projects:
-    [ ] 5.1 Datasets - datasets_found: (pending), documented: (pending)
-    [ ] 5.2 Data Preprocessing - preprocessing_found: (pending), documented: (pending)
-    [ ] 5.3 Data Splits - splits_found: (pending), documented: (pending)
-    [ ] 5.4 Model Architecture - models_found: (pending), documented: (pending)
-    [ ] 5.5 Model Training - training_config_found: (pending), documented: (pending)
-    [ ] 5.6 Model Evaluation - metrics_found: (pending), documented: (pending)
-    [ ] 5.7 Model Deployment - deployment_found: (pending), documented: (pending)
-
-[ ] Step 6: Document Structure Validation
-    - h1_title_correct: (pending)
-    - required_sections_present: (pending)
-    - section_order_correct: (pending)
-    - toc_links_valid: (pending)
-
-[ ] Step 7: Report Generated
-    - all_checks_completed: (pending)
-    - issues_found: (pending)
-=== END CHECKPOINT LOG ===
-```
-
-**COMPLETION REQUIREMENT:** Before generating the final report, you MUST verify that ALL applicable checkpoints show actual values (not "pending"). If any checkpoint is still "pending", go back and complete that analysis step.
-
-**EVIDENCE REQUIREMENT:** For every check, you MUST record:
-
-1. **What was found in docs** - the exact text/claim from architecture.md
-2. **What was found in code** - the actual code evidence (file paths, function names, imports)
-3. **Comparison result** - MATCH, MISMATCH, or MISSING with specific details
-
-A bare "PASS" without evidence is not acceptable. If you cannot provide evidence, the check is incomplete.
-
-**DO NOT SKIP STEPS.** Even if an earlier check seems to suggest no issues, you MUST complete ALL steps. Issues are often only revealed when cross-referencing multiple sources.
-
-## Step 0: Read the Full Architecture Document
-
-**Before any code analysis**, read the entire `docs/architecture.md` (if it exists) and extract every factual claim that needs verification:
-
-```bash
-cat docs/architecture.md 2>/dev/null
-```
-
-Create a **claims inventory** listing every verifiable claim in the document:
-
-- Module names and their stated purposes
-- File paths referenced
-- Dependencies listed
-- Algorithms described
-- Security measures claimed
-- Diagram components shown
-
-This claims inventory becomes your verification checklist for Steps 4-5. Every claim must be checked against actual code.
+**Evidence rule:** Every check must record (a) what the doc claims, (b) what the code shows (file:function), (c) MATCH / MISMATCH / MISSING. Bare "PASS" without code evidence is invalid.
 
 ## Architecture Document Types
 
-There are two types of architecture documents based on project type:
-
-### Standard Projects
-
-Required H2 sections:
+### Standard Projects — required H2 sections
 
 ```text
 ## Table of Contents
@@ -110,9 +38,7 @@ Required H2 sections:
 ## Risk controls
 ```
 
-### ML/DL Projects
-
-For machine learning and deep learning projects, required H2 sections:
+### ML/DL Projects — required H2 sections
 
 ```text
 ## Table of Contents
@@ -129,177 +55,45 @@ For machine learning and deep learning projects, required H2 sections:
 
 ## MCP Tools with Fallbacks
 
-This skill uses MCP tools when available and falls back gracefully if they are unavailable or return errors.
+Prefer MCP tools when available; fall back to CLI on errors.
 
-### GitHub Access
-
-**Prefer MCP tools** (`mcp__github__*`) when available. If MCP tools are not available (tool not found errors), **fall back to the `gh` CLI**.
-
-| Operation | MCP Tool | CLI Fallback |
+| Operation | Preferred | Fallback |
 | --- | --- | --- |
-| Get repo metadata | `mcp__github__get_file_contents` (path: `/`) for top-level structure; for richer metadata use the CLI fallback | `gh repo view --json owner,name,visibility,description` |
 | Get file contents | `mcp__github__get_file_contents` | `cat <file>` |
-| Get repo owner/name | Parse from `git remote get-url origin` | `gh repo view --json owner,name` |
+| Repo metadata | `gh repo view --json owner,name,visibility,description` | n/a |
+| Library docs | `mcp__context7__*` | `WebSearch` → `mcp__fetch__fetch` |
 
-### Library Documentation (Context7)
-
-Use `mcp__context7__resolve-library-id` then `mcp__context7__query-docs` to look up current documentation for libraries and frameworks found in the project. If Context7 is unavailable or returns errors (quota exceeded, timeouts), **fall back to `WebSearch`** and then `mcp__fetch__fetch` to retrieve documentation from official sources. Do not let Context7 failures block the review.
-
-## Step 1: Gather Repository Information
-
-Run these commands to collect repository metadata:
+## Phase 1: Repository Info
 
 ```bash
-# Get organization and repository name (fallback if MCP tools unavailable)
 gh repo view --json owner,name,visibility,description
+ls -la docs/architecture.md docs/ 2>/dev/null
+git log -1 --format="%ci" -- docs/architecture.md 2>/dev/null
+git log -1 --format="%ci" -- src lib app pkg internal cmd 2>/dev/null | head -1
 ```
 
-```bash
-# Check if docs/architecture.md exists
-ls -la docs/architecture.md 2>/dev/null || echo "No docs/architecture.md found"
-```
+Record: organization, repository, has_architecture_doc, has_docs_dir, doc_last_modified, code_last_modified. Flag as STALE if code changed significantly after the last doc update.
 
-```bash
-# Check if docs directory exists
-ls -la docs/ 2>/dev/null || echo "No docs directory found"
-```
+## Phase 2: Exemption Check
 
-```bash
-# Get last modified date of architecture.md vs source code
-git log -1 --format="%ci" -- docs/architecture.md 2>/dev/null || echo "N/A"
-git log -1 --format="%ci" -- src lib app pkg internal cmd 2>/dev/null | head -5
-```
+If `docs/architecture.md` already starts with "Architecture documentation is not required", **stop here**.
 
-Store these values:
+Otherwise check whether the repo qualifies for an exemption:
 
-- `organization`: The owner/organization name
-- `repository`: The repository name
-- `has_architecture_doc`: true/false
-- `has_docs_dir`: true/false
-- `doc_last_modified`: Date of last architecture.md change
-- `code_last_modified`: Date of most recent source code change
+| Exempt Type | Detection signal(s) | Reason |
+| ----------- | ------------------- | ------ |
+| Homebrew Tap | Repo name `homebrew-*`; `Formula/` or `Casks/` dirs | Package distribution, no application logic |
+| Claude Code Plugin | `.claude-plugin/plugin.json`; `skills/` and/or `commands/` dirs | Plugin config/prompts, no application logic |
+| Dotfiles / Config | >80% config files (yaml/json/toml/dotfiles), no source code | Configuration only |
+| Documentation-only | Only `.md` files, no source files | No software architecture |
+| GitHub Profile | Repo name equals owner name | Profile README only |
+| GitHub Action | `action.yml` / `action.yaml` with `runs:` | Simple action wrapper |
+| Terraform Module | Only `.tf` files (no `.terraform/`), no app | Infrastructure as code |
+| Ansible Role | `playbooks/`, `roles/`, `tasks/`, `ansible.cfg` | Automation, not software |
+| Helm Chart | `Chart.yaml`, `templates/` | K8s deployment config |
+| Meta Repository | Name matches `.github`, `meta`, `org-*`, `*-config`, `*-settings` | Org settings, no application |
 
-## Step 2: Check if Architecture Documentation is Required
-
-Some repository types do not require architecture documentation. Detect these and create an exemption file instead of nonsensical documentation.
-
-### Check for Existing Exemption
-
-```bash
-# Check if already marked as not required
-head -5 docs/architecture.md 2>/dev/null | grep -q "Architecture documentation is not required" && echo "EXEMPT" ||
-  echo "NOT_EXEMPT"
-```
-
-If the file already contains the exemption marker, **stop here** - no further action needed.
-
-### Detect Exempt Repository Types
-
-**Homebrew Taps:**
-
-```bash
-# Check for Homebrew tap pattern
-gh repo view --json name --jq '.name' | grep -qE "^homebrew-" && echo "HOMEBREW_TAP"
-ls -la Formula/ Casks/ 2>/dev/null
-```
-
-**Claude Code Plugins:**
-
-```bash
-# Check for Claude Code plugin
-ls -la .claude-plugin/plugin.json skills/ commands/ 2>/dev/null
-```
-
-**Configuration/Dotfiles Repositories:**
-
-```bash
-# Check if repo is mostly config files
-find . -maxdepth 2 -type f \( -name "*.yml" -o -name "*.yaml" -o -name "*.json" -o -name "*.toml" -o -name ".*" \) 2>/dev/null |
-  wc -l
-find . -maxdepth 2 -type f \( -name "*.py" -o -name "*.js" -o -name "*.ts" -o -name "*.go" -o -name "*.rs" -o -name "*.rb" -o -name "*.java" \) 2>/dev/null |
-  wc -l
-```
-
-**Documentation-Only Repositories:**
-
-```bash
-# Check if repo is only documentation
-find . -maxdepth 3 -type f -name "*.md" 2>/dev/null | wc -l
-find . -maxdepth 3 -type f \( -name "*.py" -o -name "*.js" -o -name "*.ts" -o -name "*.go" -o -name "*.rs" -o -name "*.rb" \) 2>/dev/null |
-  wc -l
-```
-
-**GitHub Profile Repositories:**
-
-```bash
-# Check if repo name matches owner (profile README repo)
-OWNER=$(gh repo view --json owner --jq '.owner.login')
-NAME=$(gh repo view --json name --jq '.name')
-[ "$OWNER" = "$NAME" ] && echo "PROFILE_REPO"
-```
-
-**GitHub Actions:**
-
-```bash
-# Check for GitHub Action
-ls -la action.yml action.yaml 2>/dev/null
-cat action.yml action.yaml 2>/dev/null | grep -q "runs:" && echo "GITHUB_ACTION"
-```
-
-**Terraform Modules:**
-
-```bash
-# Check for Terraform module (no main application)
-ls -la *.tf modules/ 2>/dev/null
-find . -name "*.tf" -not -path "*/.terraform/*" 2>/dev/null | head -5
-```
-
-**Ansible Roles/Playbooks:**
-
-```bash
-# Check for Ansible
-ls -la playbooks/ roles/ tasks/ handlers/ ansible.cfg 2>/dev/null
-```
-
-**Kubernetes/Helm Charts:**
-
-```bash
-# Check for Helm chart or K8s manifests only
-ls -la Chart.yaml values.yaml templates/ 2>/dev/null
-find . -name "*.yaml" -path "*/templates/*" 2>/dev/null | head -5
-```
-
-**Meta/Organization Repositories:**
-
-```bash
-# Check for org-wide config repos
-gh repo view --json name --jq '.name' | grep -qiE "^\.github$|^meta$|^org-|^team-|^-config$|-settings$" && echo "META_REPO"
-```
-
-### Exempt Repository Types
-
-| Type               | Detection                                      | Reason                                      |
-|--------------------|------------------------------------------------|---------------------------------------------|
-| Homebrew Tap       | `homebrew-*` name, `Formula/` or `Casks/` dirs | Package distribution, no application logic  |
-| Claude Code Plugin | `.claude-plugin/`, `skills/`, `commands/` dirs | Plugin config/prompts, no application logic |
-| Dotfiles/Config    | >80% config files, no source code              | Configuration only                          |
-| Documentation      | Only `.md` files, no source code               | No software architecture                    |
-| GitHub Profile     | Repo name matches owner                        | Profile README only                         |
-| GitHub Action      | `action.yml` with `runs:`                      | Simple action wrapper                       |
-| Terraform Module   | Only `.tf` files, no application               | Infrastructure as code, not software        |
-| Ansible Role       | `playbooks/`, `roles/`, `tasks/`               | Automation scripts, not software            |
-| Helm Chart         | `Chart.yaml`, `templates/`                     | K8s deployment config                       |
-| Meta Repository    | `.github`, `meta`, `org-*`, `*-config`         | Org settings, no application                |
-
-### Create Exemption File
-
-If the repository matches an exempt type, create the exemption file:
-
-```bash
-mkdir -p docs
-```
-
-**Exemption Template:**
+If exempt, write `docs/architecture.md` with this content (substitute `{type}` and the message/link from the table below) and STOP:
 
 ```markdown
 # Architecture Design
@@ -312,13 +106,11 @@ This repository is a **{type}** which does not contain application software requ
 
 ### Repository Type: {type}
 
-{Description of why this type doesn't need architecture docs}
+{Reason from table below}
 
 ## Documentation
 
-For more information about this repository type, see:
-
-{Link to relevant documentation}
+For more information about this repository type, see {link from table below}.
 
 ## When This Might Change
 
@@ -332,14 +124,12 @@ Architecture documentation would be required if this repository evolves to inclu
 If the repository scope changes, remove this file and run the architecture review again.
 ```
 
-**Exemption Messages and Documentation Links by Type:**
-
-| Type | Message | Documentation |
-| ---- | ------- | ------------- |
+| Type | Reason text | Link |
+| ---- | ----------- | ---- |
 | Homebrew Tap | Homebrew taps contain package formulae for distribution, not application source code. | [Homebrew Taps](https://docs.brew.sh/Taps) |
 | Claude Code Plugin | Claude Code plugins contain skill definitions and prompts, not application architecture. | [Claude Code Extensions](https://docs.anthropic.com/en/docs/claude-code/extensions) |
-| Dotfiles/Config | This repository contains configuration files only, with no application logic to document. | N/A |
-| Documentation | This repository contains documentation only, with no software architecture. | N/A |
+| Dotfiles/Config | This repository contains configuration files only, with no application logic to document. | n/a |
+| Documentation | This repository contains documentation only, with no software architecture. | n/a |
 | GitHub Profile | This is a GitHub profile README repository, not a software project. | [GitHub Profile README](https://docs.github.com/en/account-and-profile/setting-up-and-managing-your-github-profile/customizing-your-profile/managing-your-profile-readme) |
 | GitHub Action | GitHub Actions are simple workflow wrappers, not applications requiring architecture docs. | [Creating Actions](https://docs.github.com/en/actions/sharing-automations/creating-actions) |
 | Terraform Module | Terraform modules define infrastructure, not software architecture. | [Terraform Modules](https://developer.hashicorp.com/terraform/language/modules) |
@@ -347,1113 +137,255 @@ If the repository scope changes, remove this file and run the architecture revie
 | Helm Chart | Helm charts define Kubernetes deployments, not software architecture. | [Helm Charts](https://helm.sh/docs/topics/charts/) |
 | Meta Repository | Meta repositories contain organization settings, not software projects. | [GitHub Organizations](https://docs.github.com/en/organizations) |
 
-**After creating the exemption file, STOP** - do not proceed with architecture documentation steps.
+## Phase 3: Detect Project Type (Standard vs ML/DL)
 
-## Step 3: Detect Project Type (Standard vs ML/DL)
+Classify as **ML/DL** if ANY of:
 
-Determine if this is a Machine Learning / Deep Learning project.
+- Repo name contains `-ml`, `-dl`, `-ai`, `-model`, `machine-learning`, or `deep-learning`.
+- Dependencies include any of: `tensorflow`, `pytorch`/`torch`, `keras`, `scikit-learn`/`sklearn`, `xgboost`, `lightgbm`, `transformers`, `huggingface`, `jax`, `mlflow`, `wandb`, `optuna`. Check `requirements.txt`, `pyproject.toml`, `poetry.lock`, `package.json`.
+- ML directories with content: `models/`, `training/`, `datasets/`, `notebooks/`, `checkpoints/`, `weights/`, `experiments/`.
+- 3+ Jupyter notebooks anywhere.
+- Model checkpoint files: `*.h5`, `*.pkl`, `*.pt`, `*.pth`, `*.onnx`, `*.pb`, `*.safetensors`.
+- 5+ files match patterns: `model\.fit`, `model\.train`, `DataLoader`, `tf\.keras`, `torch\.nn`, `sklearn\.`.
 
-### Detection Method 1: Repository Name Patterns
+Otherwise classify as **standard**. Record: `project_type`, `ml_frameworks`, `has_model_files`.
+
+## Phase 4: Read Doc + Build Claims Inventory
 
 ```bash
-gh repo view --json name --jq '.name'
+cat docs/architecture.md 2>/dev/null
 ```
 
-ML/DL indicators in repository name:
+Build a verifiable claims list from the doc — for every entry, you'll cross-check against code in Phase 5:
 
-- Contains `-ml`, `-dl`, `-ai`
-- Ends with `-model`, `-models`
-- Contains `machine-learning`, `deep-learning`
+- Module names + stated purposes
+- File paths referenced
+- Listed dependencies
+- Algorithms described
+- Security measures claimed
+- Diagram components
 
-### Detection Method 2: ML/DL Framework Dependencies
+## Phase 5: Deep Codebase Analysis
 
-**Python projects:**
+Run only the sub-phases matching the project type. Record exact counts and file:function evidence.
 
-```bash
-# Check requirements.txt
-cat requirements.txt 2>/dev/null | grep -iE "tensorflow|pytorch|torch|keras|scikit-learn|sklearn|xgboost|lightgbm|transformers|huggingface|jax|mlflow|wandb|optuna|numpy|pandas|scipy"
-```
+### 5.A Standard Projects
 
-```bash
-# Check pyproject.toml
-cat pyproject.toml 2>/dev/null | grep -iE "tensorflow|pytorch|torch|keras|scikit-learn|sklearn|xgboost|lightgbm|transformers|huggingface|jax|mlflow|wandb|optuna"
-```
+**5.A.1 Architecture diagram.** Find existing diagrams: `*.png`/`*.svg`/`*.drawio`/`*.mmd`/`*.mermaid`/`*.puml` matching `arch|diagram|overview|system|structure`; check if referenced in `architecture.md` (`![...](...)` or ` ```mermaid`). Compare modification dates — flag if diagram is older than significant code changes. List components shown vs actual modules.
 
-```bash
-# Check poetry.lock or requirements for ML framework presence
-cat poetry.lock requirements.txt 2>/dev/null | grep -iE "^(tensorflow|torch|keras|scikit-learn)==" | head -10
-```
+**5.A.2 Software units.** Discover module structure:
 
-**Node.js projects:**
+- Python: `find . -name "__init__.py" -not -path "*/venv/*" -not -path "*/.venv/*"` → take parent dirs.
+- Node/TypeScript: `package.json` `main`/`exports`; `src/`, `lib/`.
+- Go: parent dirs of `*.go` (excluding `vendor/`).
+- Rust: parent dirs of `Cargo.toml`.
 
-```bash
-cat package.json 2>/dev/null | jq -r '.dependencies, .devDependencies | keys[]' 2>/dev/null | grep -iE "tensorflow|brain|ml5|synaptic"
-```
+For each module, extract docstring (head of `__init__.py`), exported symbols (`^class`, `^def`, `export`, `func [A-Z]`).
 
-### Detection Method 3: ML/DL Directory Structure
+**Cross-reference (mandatory):** two-column table of modules-in-doc vs modules-in-code; record specific mismatches with names, not just counts.
+
+**5.A.3 SOUP validation.** `soup.json` is the source of truth; `soup.md` is auto-generated and must never be edited.
 
 ```bash
-# Check for ML-specific directories
-ls -la models/ model/ training/ train/ data/ datasets/ notebooks/ checkpoints/ weights/ experiments/ 2>/dev/null
-```
-
-```bash
-# Check for Jupyter notebooks
-find . -maxdepth 3 -name "*.ipynb" 2>/dev/null | wc -l
-```
-
-```bash
-# Check for model files
-find . -maxdepth 3 \( -name "*.h5" -o -name "*.pkl" -o -name "*.pt" -o -name "*.pth" -o -name "*.onnx" -o -name "*.pb" -o -name "*.safetensors" \) 2>/dev/null |
-  head -5
-```
-
-### Detection Method 4: Code Pattern Analysis
-
-```bash
-# Search for ML patterns in Python files
-grep -rl "model\.fit\|model\.train\|DataLoader\|tf\.keras\|torch\.nn\|sklearn\." --include="*.py" . 2>/dev/null | wc -l
-```
-
-### Classification Rules
-
-**Classify as ML/DL project if ANY of these are true:**
-
-- Repository name matches ML/DL patterns
-- ML frameworks found in dependencies (tensorflow >= any, pytorch/torch, keras, scikit-learn)
-- Has `models/`, `training/`, `datasets/` directories with content
-- Contains 3+ Jupyter notebooks
-- Has model checkpoint files (.h5, .pt, .pth, .onnx, .pkl)
-- 5+ files contain ML code patterns
-
-**Otherwise, classify as Standard project.**
-
-Store:
-
-- `project_type`: "ml_dl" or "standard"
-- `ml_frameworks`: List of detected ML frameworks
-- `has_model_files`: true/false
-
-## Step 4: Deep Codebase Analysis - Standard Projects
-
-### 4.1 Architecture Diagram Verification
-
-```bash
-# Find existing diagram files
-find . -maxdepth 3 \( -name "*.png" -o -name "*.svg" -o -name "*.drawio" -o -name "*.mmd" -o -name "*.mermaid" -o -name "*.puml" \) 2>/dev/null |
-  grep -iE "arch|diagram|overview|system|structure"
-```
-
-```bash
-# Check if diagrams are referenced in architecture.md
-grep -iE "\!\[.*\]\(.*\.(png|svg|drawio)\)" docs/architecture.md 2>/dev/null
-grep -iE "```mermaid" docs/architecture.md 2>/dev/null
-```
-
-**Verification:**
-
-- If diagram exists, check modification date vs code changes
-- Flag if diagram is older than significant code changes
-- List components shown in diagram vs actual modules
-
-### 4.2 Software Units Deep Analysis
-
-**Discover actual module structure:**
-
-```bash
-# Python packages
-find . -name "__init__.py" -not -path "*/venv/*" -not -path "*/.venv/*" -not -path "*/node_modules/*" 2>/dev/null |
-  sed 's|/[^/]*$||' | sort -u
-```
-
-```bash
-# Node.js/TypeScript modules
-cat package.json 2>/dev/null | jq -r '.main, .exports | if type == "object" then keys[] else . end' 2>/dev/null
-ls -la src/ lib/ 2>/dev/null
-```
-
-```bash
-# Go packages
-find . -name "*.go" -not -path "*/vendor/*" 2>/dev/null | xargs -I {} dirname {} | sort -u
-```
-
-```bash
-# Rust crates
-find . -name "Cargo.toml" 2>/dev/null | xargs -I {} dirname {}
-```
-
-**For each discovered module, extract:**
-
-```bash
-# Python: Get module docstring and main classes/functions
-head -30 {module}/__init__.py 2>/dev/null
-grep -E "^class |^def |^async def " {module}/*.py 2>/dev/null | head -20
-```
-
-```bash
-# Node.js: Get exports
-grep -E "^export |^module\.exports" {module}/index.{js,ts} {module}.{js,ts} 2>/dev/null | head -20
-```
-
-```bash
-# Go: Get package doc and exported functions
-head -20 {module}/*.go 2>/dev/null | grep -E "^package |^// |^func [A-Z]"
-```
-
-**Cross-reference with documentation (MANDATORY - do not skip):**
-
-- Read the "Software units" section from docs/architecture.md
-- Create a two-column comparison: modules listed in docs vs modules found in code
-- For EACH module in docs: verify it exists in code and its description matches actual functionality
-- For EACH module in code: verify it is documented
-- Record the specific mismatches found (not just counts)
-
-### 4.3 Software of Unknown Provenance (SOUP) Validation
-
-**IMPORTANT:** The source of truth for SOUP data is `soup.json` (not `soup.md`). The `soup.md` file is auto-generated from `soup.json` and must never be edited directly. All validation and changes must target `soup.json`.
-
-**Verify soup.json exists:**
-
-```bash
-ls -la docs/soup.json soup.json 2>/dev/null || echo "No soup.json found"
-```
-
-**Extract dependency list from lock files for comparison:**
-
-```bash
-# Python
-cat poetry.lock 2>/dev/null | grep -E "^name = " | sed 's/name = "//;s/"//' | head -50
-cat requirements.txt 2>/dev/null | grep -v "^#" | cut -d'=' -f1 | cut -d'>' -f1 | cut -d'<' -f1 | head -50
-```
-
-```bash
-# Node.js
-cat package.json 2>/dev/null | jq -r '.dependencies, .devDependencies | keys[]' 2>/dev/null | head -50
-```
-
-```bash
-# Ruby
-cat Gemfile.lock 2>/dev/null | grep -E "^    [a-z]" | awk '{print $1}' | head -50
-```
-
-```bash
-# Go
-cat go.mod 2>/dev/null | grep -E "^\t" | awk '{print $1}' | head -50
-```
-
-**Validate soup.json content against actual code usage:**
-
-**Step 1: Read soup.json and extract all package entries:**
-
-```bash
-# Read soup.json to see all documented packages with their Risk Level, Requirements, and Verification Reasoning
+ls -la docs/soup.json soup.json 2>/dev/null
 cat docs/soup.json soup.json 2>/dev/null
 ```
 
-**Step 2: For EACH package in soup.json, validate the three fields:**
+Extract dependency lists from lock files: `poetry.lock`, `requirements.txt`, `package.json`, `Gemfile.lock`, `go.mod`, `Cargo.lock`.
 
-**You MUST validate EVERY package, not a sample.** For each package, record:
+For **every** package in `soup.json` (not a sample), validate three fields:
 
-- Package name
-- Stated Requirements vs actual code usage found
-- Stated Risk Level vs expected risk level for this type of package
-- Stated Verification Reasoning vs whether it explains the specific choice
+1. **Requirements** — does the stated purpose match how the package is actually used? Use `grep -rn "require.*{pkg}\|import.*{pkg}\|from {pkg}\|use {pkg}" --include="*.py" --include="*.js" --include="*.ts" --include="*.rb" --include="*.go" --include="*.rs" .` to find actual usage, then compare:
 
-For each package entry, run these commands to verify accuracy:
+   - BAD: AWS SDK with Requirements "image processing"
+   - GOOD: AWS SDK with Requirements "Cloud infrastructure API access"
 
-```bash
-# Find how the package is actually used in the codebase
-grep -rn "require.*{package}\|import.*{package}\|from {package}\|use {package}" --include="*.py" --include="*.js" --include="*.ts" --include="*.rb" --include="*.go" --include="*.rs" . 2>/dev/null | grep -v node_modules | grep -v vendor | head -20
-```
+2. **Risk Level** — appropriate for what the package does:
 
-Then validate:
+   | Package type | Expected Risk Level |
+   | ------------ | ------------------- |
+   | Auth, crypto, security | High |
+   | Network, HTTP, API clients | High |
+   | Database, data storage | High |
+   | File system access | Medium |
+   | Logging, monitoring | Medium |
+   | UI, formatting, colors | Low |
+   | Dev tools, linters, test utilities | Low |
 
-1. **Requirements field:** Does the stated purpose match the actual usage found above?
-   - BAD: AWS SDK with Requirements saying "image processing"
-   - GOOD: AWS SDK with Requirements saying "Cloud infrastructure API access"
+3. **Verification Reasoning** — explains why THIS specific package was chosen:
+   - BAD: "popular library"
+   - GOOD: "Official AWS SDK maintained by Amazon", "Only library supporting protocol X"
 
-2. **Risk Level:** Is it appropriate for what the package does?
+**Completeness/staleness:** every package in lock files must be in `soup.json`; packages removed from lock files must be removed from `soup.json`.
 
-   | Package Type                       | Expected Risk Level |
-   | ---------------------------------- | ------------------- |
-   | Auth, crypto, security             | High                |
-   | Network, HTTP, API clients         | High                |
-   | Database, data storage             | High                |
-   | File system access                 | Medium              |
-   | Logging, monitoring                | Medium              |
-   | UI, formatting, colors             | Low                 |
-   | Dev tools, linters, test utilities | Low                 |
+**Architecture.md duplication check:** flag any version numbers or dependency tables in `architecture.md` for removal — it must reference `soup.md`, not duplicate it.
 
-3. **Verification Reasoning:** Does it explain why THIS package was chosen?
-   - BAD: Generic "popular library"
-   - GOOD: "Official AWS SDK maintained by Amazon" or "Only library supporting X protocol"
-
-**Step 3: Check completeness and staleness:**
-
-- All packages in lock files must be in soup.json
-- Packages removed from lock files must be removed from soup.json
-
-**Cross-reference with architecture.md:**
-
-- Verify architecture.md references soup.md (the auto-generated file) and does not duplicate its content
-- Flag any version numbers or dependency tables in architecture.md for removal
-
-### 4.4 Critical Algorithms Deep Analysis
-
-**Discover algorithm implementations:**
+**5.A.4 Critical algorithms.** Find candidates:
 
 ```bash
-# Search for algorithm-related files
-find . -name "*algorithm*" -o -name "*crypto*" -o -name "*hash*" -o -name "*sort*" -o -name "*search*" -o -name "*calculate*" -o -name "*compute*" -o -name "*process*" -o -name "*engine*" 2>/dev/null |
-  grep -v node_modules | grep -v venv
+find . \( -name "*algorithm*" -o -name "*crypto*" -o -name "*hash*" -o -name "*engine*" -o -name "*compute*" \) -not -path "*/node_modules/*" -not -path "*/venv/*"
+grep -rn "encrypt\|decrypt\|hash\|hmac\|sha\|aes\|rsa" --include="*.py" --include="*.js" --include="*.ts" --include="*.go" --include="*.rs" . | grep -v node_modules | grep -v venv
 ```
 
-```bash
-# Search for cryptographic operations
-grep -rn "crypto\|encrypt\|decrypt\|hash\|hmac\|sha\|md5\|aes\|rsa" --include="*.py" --include="*.js" --include="*.ts" --include="*.go" --include="*.rs" . 2>/dev/null |
-  grep -v node_modules | grep -v venv | head -20
-```
-
-```bash
-# Search for complex mathematical operations
-grep -rn "matrix\|vector\|gradient\|derivative\|integral\|fourier\|transform" --include="*.py" --include="*.js" --include="*.ts" --include="*.go" --include="*.rs" . 2>/dev/null |
-  grep -v node_modules | grep -v venv | head -20
-```
-
-```bash
-# Search for custom data structures
-grep -rn "class.*Tree\|class.*Graph\|class.*Queue\|class.*Stack\|class.*Heap" --include="*.py" --include="*.js" --include="*.ts" --include="*.go" --include="*.rs" . 2>/dev/null |
-  head -20
-```
-
-**For each discovered algorithm, extract details:**
-
-- Read the file containing the algorithm
-- Extract function/class signature
-- Extract docstring/comments explaining the algorithm
-- Note time/space complexity if documented
-
-**Cross-reference with documentation:**
-
-- Compare documented algorithms vs discovered implementations
-- Flag undocumented critical algorithms
-- Verify file paths in docs match actual locations
-- Check if complexity claims are accurate
-
-### 4.5 Risk Controls Deep Analysis
-
-**Discover security measures:**
-
-```bash
-# Authentication/Authorization patterns
-grep -rn "auth\|login\|session\|token\|jwt\|oauth\|permission\|role\|acl" --include="*.py" --include="*.js" --include="*.ts" --include="*.go" . 2>/dev/null |
-  grep -v node_modules | grep -v test | head -20
-```
-
-```bash
-# Input validation patterns
-grep -rn "validate\|sanitize\|escape\|filter\|whitelist\|blacklist" --include="*.py" --include="*.js" --include="*.ts" --include="*.go" . 2>/dev/null |
-  grep -v node_modules | head -20
-```
-
-```bash
-# Error handling patterns
-grep -rn "try:\|catch\|except\|error\|throw\|panic\|recover" --include="*.py" --include="*.js" --include="*.ts" --include="*.go" . 2>/dev/null |
-  grep -v node_modules | grep -v test | wc -l
-```
-
-```bash
-# Logging patterns
-grep -rn "log\.\|logger\.\|logging\.\|console\.log\|fmt\.Print" --include="*.py" --include="*.js" --include="*.ts" --include="*.go" . 2>/dev/null |
-  grep -v node_modules | grep -v test | head -20
-```
-
-**Check for security configurations:**
-
-```bash
-# Environment variables
-grep -rn "process\.env\|os\.environ\|os\.Getenv\|env::" --include="*.py" --include="*.js" --include="*.ts" --include="*.go" --include="*.rs" . 2>/dev/null |
-  grep -v node_modules | head -20
-```
-
-```bash
-# Security headers/middleware
-grep -rn "helmet\|cors\|csrf\|xss\|rate.limit\|security" --include="*.py" --include="*.js" --include="*.ts" --include="*.go" . 2>/dev/null |
-  grep -v node_modules | head -10
-```
-
-## Step 5: Deep Codebase Analysis - ML/DL Projects
-
-### 5.1 Datasets Deep Analysis
-
-**Discover dataset definitions:**
-
-```bash
-# Find dataset classes/loaders
-grep -rn "class.*Dataset\|DataLoader\|tf\.data\|torch\.utils\.data" --include="*.py" . 2>/dev/null | grep -v venv |
-  head -20
-```
-
-```bash
-# Find data directories and files
-find data datasets raw processed -type f 2>/dev/null | head -30
-ls -la data/ datasets/ 2>/dev/null
-```
-
-```bash
-# Extract dataset statistics
-wc -l data/*.csv datasets/*.csv 2>/dev/null
-find data datasets -name "*.json" -exec wc -l {} \; 2>/dev/null | head -10
-```
-
-**For each dataset, extract:**
-
-- Read dataset class implementation
-- Extract data loading logic
-- Note data format, features, labels
-- Extract any data validation rules
+Also check for custom data structures (`class .*Tree|Graph|Queue|Stack|Heap`) and complex math (`matrix`, `gradient`, `fourier`, etc.).
 
-**Cross-reference with documentation:**
+For each: signature, docstring, complexity if documented. Flag undocumented critical algorithms; verify file paths in doc match actual locations.
 
-- Compare documented datasets vs actual data files
-- Verify dataset sizes/statistics
-- Check data source URLs are still valid
-- Flag undocumented datasets
+**5.A.5 Risk controls.** Discover security measures:
 
-### 5.2 Data Preprocessing Deep Analysis
+- **Auth/authz:** `auth`, `login`, `session`, `token`, `jwt`, `oauth`, `permission`, `role`, `acl`.
+- **Input validation:** `validate`, `sanitize`, `escape`, `filter`, `whitelist`.
+- **Error handling:** `try:`, `catch`, `except`, `throw`, `panic`/`recover`.
+- **Logging:** `logger.`, `logging.`, `console.log`, `fmt.Print`.
+- **Security middleware/headers:** `helmet`, `cors`, `csrf`, `xss`, `rate.limit`.
+- **Env vars / secrets:** `process.env`, `os.environ`, `os.Getenv`, `env::`.
 
-**Discover preprocessing code:**
+### 5.B ML/DL Projects
 
-```bash
-# Find preprocessing functions/classes
-grep -rn "def preprocess\|def transform\|def normalize\|def augment\|def clean\|class.*Transform\|class.*Preprocess" --include="*.py" . 2>/dev/null |
-  grep -v venv | head -20
-```
+**5.B.1 Datasets.** Find dataset classes/loaders (`class .*Dataset`, `DataLoader`, `tf.data`, `torch.utils.data`); list `data/`, `datasets/`, `raw/`, `processed/` with file counts and sizes. For each: data format, features, labels, validation rules. Verify documented sources/sizes; flag undocumented.
 
-```bash
-# Find preprocessing pipelines
-grep -rn "Pipeline\|Compose\|Sequential.*transform" --include="*.py" . 2>/dev/null | grep -v venv | head -10
-```
+**5.B.2 Data preprocessing.** Find `def preprocess`, `def transform`, `def normalize`, `def augment`, `class .*Transform`, `Pipeline`, `Compose`. For each: input/output specs, parameters, augmentation techniques. Verify documented order matches code; check parameter defaults.
 
-**For each preprocessing step, extract:**
+**5.B.3 Data splits.** Find `train_test_split`, `StratifiedKFold`, `KFold`, `random_split`. Extract ratios from `test_size`, `val_size`, `train_size` and config files (`config.yaml`/`yml`/`json`). Check for random seed.
 
-- Read the preprocessing function/class
-- Extract input/output specifications
-- Note any parameters or configurations
-- Check for data augmentation techniques
-
-**Cross-reference with documentation:**
+**5.B.4 Model architecture.** Find `class .*Model`, `class .*Net`, `nn.Module`, `tf.keras.Model`. Extract layers (`nn.Linear`, `nn.Conv`, `Dense`, `Conv2D`, `LSTM`, `Transformer`, `Attention`); read forward pass; record input/output shapes. Verify documented layers match code.
 
-- Compare documented preprocessing steps vs actual code
-- Verify transformation order matches implementation
-- Check if parameters in docs match code defaults
+**5.B.5 Model training.** Find training scripts (`train*.py`, `*training*.py`, `main.py`). Extract hyperparameters: `learning_rate`/`lr`, `batch_size`, `epochs`, `optimizer` (Adam/SGD/etc.), `loss`. Check argparse defaults and config files (`training_config.*`, `hyperparameters.*`). Verify docs match.
 
-### 5.3 Data Splits Deep Analysis
+**5.B.6 Model evaluation.** Find `eval*.py`, `*evaluate*.py`. Extract metrics: `accuracy`, `precision`, `recall`, `f1`, `auc`, `roc`, `mse`, `mae`. Look for `sklearn.metrics`, `torchmetrics`, `tf.keras.metrics`. Read saved results: `results.json`, `metrics.json`, `*evaluation*.json`. Verify documented benchmarks.
 
-**Discover split implementation:**
+**5.B.7 Model deployment.** Find `deploy/`, `deployment/`, `serving/`, `inference/`, `Dockerfile`, `docker-compose*`, K8s manifests. Find inference code (`def predict`, `def inference`, `@app.route`, `@api`, FastAPI/Flask). Extract hardware requirements (`cuda`, `gpu`, `device`, `memory`). Verify deployment matches docs.
 
-```bash
-# Find train/test split code
-grep -rn "train_test_split\|split\|StratifiedKFold\|KFold\|random_split" --include="*.py" . 2>/dev/null | grep -v venv |
-  head -15
-```
+## Phase 6: Validate Existing Doc Structure
 
-```bash
-# Extract split ratios from code
-grep -rn "test_size\|val_size\|train_size\|split.*=" --include="*.py" . 2>/dev/null | grep -v venv | head -15
-```
+If `docs/architecture.md` exists:
 
-```bash
-# Check for split configuration files
-cat config.yaml config.yml config.json 2>/dev/null | grep -iE "split|train|val|test"
-```
+1. **H1 must be exactly `# Architecture Design`.**
+2. **Required H2 sections present in correct order** (per project type — see "Architecture Document Types" above). Additional H2 sections after the required ones are allowed.
+3. **TOC links resolve** to actual headings.
+4. **No version numbers or dep tables in architecture.md** — those belong in `soup.json`/`soup.md` only.
 
-**Cross-reference with documentation:**
+## Phase 7: Generate Report
 
-- Compare documented split ratios vs actual code
-- Verify split methodology description
-- Check if cross-validation strategy matches
-
-### 5.4 Model Architecture Deep Analysis
-
-**Discover model definitions:**
-
-```bash
-# Find model classes
-grep -rn "class.*Model\|class.*Net\|class.*Network\|nn\.Module\|tf\.keras\.Model" --include="*.py" . 2>/dev/null |
-  grep -v venv | head -20
-```
-
-```bash
-# Find model configuration
-cat model_config.json model_config.yaml config/model.* 2>/dev/null
-```
-
-**For each model, extract architecture details:**
-
-```bash
-# Read model class definition (first 100 lines)
-# For each model file found above, read it to extract:
-# - Layer definitions
-# - Forward pass logic
-# - Input/output shapes
-```
-
-```bash
-# Extract layer specifications from code
-grep -rn "nn\.Linear\|nn\.Conv\|Dense\|Conv2D\|LSTM\|Transformer\|Attention" --include="*.py" . 2>/dev/null |
-  grep -v venv | head -30
-```
-
-```bash
-# Check for model summary/print
-grep -rn "model\.summary\|print.*model\|torchsummary" --include="*.py" . 2>/dev/null | grep -v venv | head -5
-```
-
-**Cross-reference with documentation:**
-
-- Compare documented architecture vs actual model code
-- Verify layer specifications match implementation
-- Check input/output shapes are accurate
-- Flag architecture changes not reflected in docs
-
-### 5.5 Model Training Deep Analysis
-
-**Discover training configuration:**
-
-```bash
-# Find training scripts
-find . -name "train*.py" -o -name "*training*.py" -o -name "main.py" 2>/dev/null | grep -v venv
-```
-
-```bash
-# Extract hyperparameters from code
-grep -rn "learning_rate\|lr\|batch_size\|epochs\|optimizer\|Adam\|SGD\|loss" --include="*.py" . 2>/dev/null |
-  grep -v venv | head -30
-```
-
-```bash
-# Check for config files
-cat config.yaml config.yml config.json training_config.* hyperparameters.* 2>/dev/null | head -50
-```
-
-```bash
-# Find argument parsers for hyperparameters
-grep -rn "add_argument.*lr\|add_argument.*batch\|add_argument.*epoch" --include="*.py" . 2>/dev/null | head -15
-```
-
-**Extract actual training parameters:**
-
-- Default values in code
-- Values in config files
-- Command-line argument defaults
-
-**Cross-reference with documentation:**
-
-- Compare documented hyperparameters vs actual code
-- Check if optimizer, loss function, lr match
-- Verify batch size, epochs are accurate
-- Flag any training procedure changes
-
-### 5.6 Model Evaluation Deep Analysis
-
-**Discover evaluation code:**
-
-```bash
-# Find evaluation scripts/functions
-find . -name "eval*.py" -o -name "*evaluate*.py" -o -name "test*.py" 2>/dev/null | grep -v venv | grep -v __pycache__
-```
-
-```bash
-# Extract metrics used
-grep -rn "accuracy\|precision\|recall\|f1\|auc\|roc\|confusion\|mse\|mae\|loss" --include="*.py" . 2>/dev/null |
-  grep -v venv | head -30
-```
-
-```bash
-# Find metric computation
-grep -rn "sklearn\.metrics\|torchmetrics\|tf\.keras\.metrics" --include="*.py" . 2>/dev/null | grep -v venv | head -15
-```
-
-```bash
-# Check for saved evaluation results
-find . -name "*results*.json" -o -name "*metrics*.json" -o -name "*eval*.json" 2>/dev/null | head -5
-cat results.json metrics.json evaluation_results.json 2>/dev/null | head -30
-```
-
-**Cross-reference with documentation:**
-
-- Compare documented metrics vs actual evaluation code
-- Check if benchmark results are up-to-date
-- Verify evaluation methodology matches implementation
-
-### 5.7 Model Deployment Deep Analysis
-
-**Discover deployment configuration:**
-
-```bash
-# Find deployment files
-ls -la deploy/ deployment/ serving/ inference/ 2>/dev/null
-find . -name "Dockerfile*" -o -name "docker-compose*" -o -name "*deploy*" -o -name "*serve*" 2>/dev/null |
-  grep -v node_modules | head -15
-```
-
-```bash
-# Find inference code
-grep -rn "def predict\|def inference\|@app\.route\|@api\|FastAPI\|Flask" --include="*.py" . 2>/dev/null | grep -v venv |
-  head -15
-```
-
-```bash
-# Check for model serving configs
-cat serve.yaml serving.yaml deployment.yaml kubernetes/*.yaml 2>/dev/null | head -50
-```
-
-```bash
-# Find hardware requirements
-grep -rn "cuda\|gpu\|device\|cpu\|memory" --include="*.py" --include="*.yaml" --include="*.yml" . 2>/dev/null |
-  grep -v venv | head -15
-```
-
-**Cross-reference with documentation:**
-
-- Compare documented deployment vs actual configuration
-- Verify inference requirements match code
-- Check if serving infrastructure is accurate
-
-## Step 6: Validate Existing Architecture Document Structure
-
-If `docs/architecture.md` exists, validate its structure.
-
-### Check H1 Title
-
-```bash
-head -5 docs/architecture.md
-grep "^# " docs/architecture.md | head -1
-```
-
-**Expected:** `# Architecture Design` (exactly this)
-
-### Check H2 Sections
-
-```bash
-grep "^## " docs/architecture.md
-```
-
-**For Standard projects, must start with (in order):**
-
-```text
-## Table of Contents
-## Architecture diagram
-## Software units
-## Software of Unknown Provenance
-## Critical algorithms
-## Risk controls
-```
-
-**For ML/DL projects, must start with (in order):**
-
-```text
-## Table of Contents
-## Datasets
-## Data Preprocessing
-## Data Splits
-## Model Architecture
-## Model Training
-## Model Evaluation
-## Software of Unknown Provenance
-## Risk controls
-## Model Deployment
-```
-
-Additional H2 sections may appear after the required ones.
-
-### Check Table of Contents Links
-
-```bash
-# Extract TOC links
-grep -E "^\s*-\s*\[.*\]\(#" docs/architecture.md
-```
-
-Verify each link resolves to an actual heading in the document.
-
-## Step 7: Generate Comprehensive Accuracy Report
-
-**MANDATORY PRE-REPORT VERIFICATION:**
-
-Before generating the report, you MUST:
-
-1. Review your checkpoint log from the start of analysis
-2. Verify ALL applicable checkpoints have actual values (not "pending")
-3. If ANY checkpoint is still pending, STOP and complete that step first
-4. Cross-reference findings: issues found in code analysis MUST appear in the report
-
-**If you skipped any step, the review is incomplete and results will be inconsistent.**
-
-After deep analysis, provide a detailed report:
-
-### Report Format
+Pre-report verification: every applicable phase task is complete; cross-reference evidence is recorded; counts are exact.
 
 ```text
 ## Architecture Documentation Review Report
 
-### Analysis Checkpoint Log
-
-{Include your completed checkpoint log here - ALL values must be filled in, none should say "pending"}
-
 ### Repository Info
-- **Organization:** {org}
-- **Repository:** {repo}
-- **Project Type:** {standard/ml_dl}
-- **Document Status:** {exists/missing}
-- **Last Doc Update:** {date}
-- **Last Code Update:** {date}
-- **Documentation Freshness:** {CURRENT/STALE - code changed since last doc update}
+- Organization: {org}
+- Repository: {repo}
+- Project Type: {standard / ml_dl}
+- Document Status: {exists / missing / exempt}
+- Last Doc Update: {date}
+- Last Code Update: {date}
+- Documentation Freshness: {CURRENT / STALE}
 
 ### Structure Checks
-- [ ] H1 title "# Architecture Design": {PASS/FAIL - found: "{actual}"}
-- [ ] Required H2 sections present: {PASS/FAIL}
-- [ ] Section order correct: {PASS/FAIL}
-- [ ] Table of Contents links valid: {PASS/FAIL}
+- H1 title `# Architecture Design`: {PASS / FAIL — found "{actual}"}
+- Required H2 sections present: {PASS / FAIL — list missing}
+- Section order correct: {PASS / FAIL}
+- TOC links valid: {PASS / FAIL}
 
-### Content Accuracy Checks
+### Content Accuracy (per section)
+For each required section:
+- Status: {PASS / NEEDS UPDATE / MISSING}
+- Issues: {specific problems}
+- Discovered in code: {evidence}
+- Documented: {claim from doc}
 
-#### {For Standard: "Architecture Diagram" / For ML: "Datasets"}
-- **Status:** {PASS/FAIL/NEEDS UPDATE/MISSING}
-- **Issues:**
-  - {Specific issue 1}
-  - {Specific issue 2}
-- **Discovered in code:** {what was actually found}
-- **Documented:** {what's currently in docs}
-
-{Repeat for each section}
-
-#### Software of Unknown Provenance
-- **Status:** {PASS/FAIL/NEEDS UPDATE}
-- **soup.json exists:** {yes/no}
-- **architecture.md references soup.md:** {yes/no - flag if duplicating content}
-- **Total dependencies in lock files:** {n}
-- **Documented in soup.json:** {n}
-- **Missing from soup.json:** {list}
-- **In soup.json but not in code:** {list}
-- **Inaccurate Requirements fields:** {list packages where stated purpose doesn't match actual code usage}
-- **Misclassified Risk Levels:** {list packages with inappropriate risk level for their function}
-- **Weak Verification Reasoning:** {list packages with generic reasoning like "popular library"}
+### SOUP
+- soup.json exists: {yes / no}
+- architecture.md references soup.md (not duplicates): {yes / no}
+- Total deps in lock files: {n}
+- Documented in soup.json: {n}
+- Missing from soup.json: {list}
+- In soup.json but not in code: {list}
+- Inaccurate Requirements: {list}
+- Misclassified Risk Levels: {list}
+- Weak Verification Reasoning: {list}
 
 ### Summary
-- **Sections accurate:** {n}/{total}
-- **Sections need update:** {n}
-- **Sections missing:** {n}
-- **Critical issues:** {list of high-priority fixes}
+- Sections accurate: {n}/{total}
+- Sections need update: {n}
+- Sections missing: {n}
+- Critical issues: {high-priority list}
 
 ### Proposed Changes
-{Show exact changes needed with before/after for each section}
+{Specific edits with before/after for each section}
 ```
 
-**Ask the user before making changes:**
+Ask before modifying: "I found the following issues with `docs/architecture.md`. Want me to fix them?"
 
-> "I found the following issues with docs/architecture.md. Would you like me to fix them?"
+## Phase 8: Write or Update the Doc
 
-## Step 8: Create or Update Architecture Document
+After approval, write `docs/architecture.md` (`mkdir -p docs` first if needed). **Do not paste the templates verbatim — fill them with content discovered in Phase 5.**
 
-### If Creating New Document
-
-First create the docs directory if needed:
-
-```bash
-mkdir -p docs
-```
-
-### Standard Project Template
+### Common skeleton (both project types)
 
 ```markdown
 # Architecture Design
 
 ## Table of Contents
 
-- [Architecture diagram](#architecture-diagram)
-- [Software units](#software-units)
-- [Software of Unknown Provenance](#software-of-unknown-provenance)
-- [Critical algorithms](#critical-algorithms)
-- [Risk controls](#risk-controls)
+- [{Each required section as a link}](#...)
 
-## Architecture diagram
-
-{Include or reference architecture diagram - create if missing}
-
-![Architecture Diagram](./images/architecture.png)
-
-### System Overview
-
-{High-level description based on discovered modules and their interactions}
-
-### Component Interactions
-
-{Description of how components interact - based on imports/dependencies analysis}
-
-## Software units
-
-{For each discovered module:}
-
-### {Module Name}
-
-**Purpose:** {Extracted from docstring or inferred from code}
-
-**Location:** `{actual/path/to/module}`
-
-**Key Components:**
-
-- `{ClassName}`: {description from docstring}
-- `{function_name}`: {description from docstring}
-
-**Internal Dependencies:**
-
-- {Other modules this depends on}
-
-**External Dependencies:**
-
-- {Third-party packages used}
-
-## Software of Unknown Provenance
-
-See [soup.md](soup.md) for the complete list of third-party dependencies.
-
-**Verification:** Cross-reference soup.md entries against actual code usage to ensure accuracy:
-
-### Risk Level
-
-Classify the potential harm if the library has a vulnerability (per IEC 62304):
-
-| Level | Definition |
-|-------|------------|
-| Low | Cannot lead to harm |
-| Medium | Can lead to reversible harm |
-| High | Can lead to irreversible harm |
-
-### Requirements
-
-Answer: "Why do you need this library in your project?"
-
-Examples:
-- "HTTP client for REST API communication"
-- "CLI argument parsing and validation"
-- "YAML/JSON configuration file parsing"
-- "Dependency" (for transitive dependencies only)
-
-### Verification Reasoning
-
-Answer: "Why did you select this library among alternatives?"
-
-Examples:
-- "Industry standard with active maintenance and security updates"
-- "Official SDK provided by the service vendor"
-- "Recommended by framework documentation"
-- "Dependency" (for transitive dependencies only)
-
-### Validation Checks
-
-1. **Accuracy:** Verify each package's Requirements field matches its actual usage in the codebase (e.g., an AWS SDK should not say "image processing")
-2. **Completeness:** All packages in lock files must be in soup.json
-3. **Staleness:** Packages removed from lock files must be removed from soup.json
-4. **Risk Level:** Verify risk classifications are appropriate (e.g., crypto/auth libraries should be High)
-
-**Note:** `soup.md` is auto-generated from `soup.json`. All edits must be made to `soup.json`.
-
-## Critical algorithms
-
-{For each discovered algorithm:}
-
-### {Algorithm/Function Name}
-
-**Purpose:** {From docstring or inferred}
-
-**Location:** `{actual/path/to/file}` in `{ClassName}` or `{function_name}`
-
-**Implementation:**
-{Brief description of how it works}
-
-**Complexity:** {If documented or inferrable}
-
-**Security Considerations:** {If applicable}
-
-## Risk controls
-
-### Security Measures
-
-{Based on discovered security patterns:}
-
-- **Authentication:** {Discovered auth mechanisms}
-- **Authorization:** {Discovered authz patterns}
-- **Input Validation:** {Discovered validation}
-- **Encryption:** {Discovered crypto usage}
-
-### Error Handling
-
-{Based on discovered error handling patterns}
-
-### Logging & Monitoring
-
-{Based on discovered logging patterns}
-
-### Failure Modes
-
-| Failure Mode | Impact | Mitigation |
-|--------------|--------|------------|
-| {Inferred from error handling} | {Impact} | {Mitigation} |
+{Required sections per project type — see structure above}
 ```
 
-### ML/DL Project Template
-
-```markdown
-# Architecture Design
-
-## Table of Contents
-
-- [Datasets](#datasets)
-- [Data Preprocessing](#data-preprocessing)
-- [Data Splits](#data-splits)
-- [Model Architecture](#model-architecture)
-- [Model Training](#model-training)
-- [Model Evaluation](#model-evaluation)
-- [Software of Unknown Provenance](#software-of-unknown-provenance)
-- [Risk controls](#risk-controls)
-- [Model Deployment](#model-deployment)
-
-## Datasets
-
-### Data Sources
-
-| Dataset | Source | Size | Format |
-|---------|--------|------|--------|
-
-{For each discovered dataset:} | {name} | {source if found} | {actual size} | {format} |
-
-### Data Description
-
-{Based on discovered dataset classes and data files}
-
-**Features:**
-{Extracted from data loading code}
-
-**Labels:**
-{Extracted from data loading code}
-
-### Data Statistics
-
-{Based on actual data file analysis}
-
-## Data Preprocessing
-
-### Preprocessing Pipeline
-
-{Based on discovered preprocessing code:}
-
-1. **{Step from code}**: {Description}
-  - Implementation: `{file}:{function}`
-  - Parameters: {extracted parameters}
-
-### Data Transformations
-
-| Transformation | Purpose | Implementation |
-|----------------|---------|----------------|
-
-{For each discovered transform:} | {transform_name} | {from docstring} | `{file}` in `{class/function}` |
-
-### Data Augmentation
-
-{Based on discovered augmentation code}
-
-## Data Splits
-
-### Split Configuration
-
-| Split | Ratio | Size | Method |
-|-------|-------|------|--------|
-| Training | {from code}% | {n} samples | {method} |
-| Validation | {from code}% | {n} samples | {method} |
-| Test | {from code}% | {n} samples | {method} |
-
-### Split Implementation
-
-**Location:** `{file}` in `{function_name}`
-
-**Method:** {random/stratified/temporal/custom}
-
-**Random Seed:** {if found}
-
-## Model Architecture
-
-### Architecture Overview
-
-{Based on discovered model class}
-
-**Model Type:** {CNN/RNN/Transformer/etc.}
-
-**Framework:** {PyTorch/TensorFlow/etc.}
-
-### Architecture Diagram
-
-{Generate or reference based on model structure}
-
-### Layer Specifications
-
-| Layer | Type | Parameters | Output Shape |
-|-------|------|------------|--------------|
-
-{For each layer discovered in model:} | {layer_name} | {layer_type} | {params} | {shape if inferrable} |
-
-### Model Configuration
-
-**Location:** `{model_file}` in `{ClassName}`
-
-~~~python
-{Actual model class signature and key layers}
-~~~
-
-### Input/Output Specifications
-
-- **Input:** {shape, dtype from code}
-- **Output:** {shape, dtype from code}
-
-## Model Training
-
-### Training Configuration
-
-| Parameter | Value | Source |
-|-----------|-------|--------|
-| Optimizer | {actual optimizer} | `{file}` in `{function/class}` |
-| Learning Rate | {actual lr} | `{file}` in `{function/class}` |
-| Batch Size | {actual batch_size} | `{file}` in `{function/class}` |
-| Epochs | {actual epochs} | `{file}` in `{function/class}` |
-| Loss Function | {actual loss} | `{file}` in `{function/class}` |
-| LR Scheduler | {if found} | `{file}` in `{function/class}` |
-
-### Training Script
-
-**Location:** `{training_script}`
-
-### Training Procedure
-
-{Based on actual training loop analysis}
-
-### Checkpointing
-
-{Based on discovered checkpoint saving code}
-
-## Model Evaluation
-
-### Evaluation Metrics
-
-| Metric | Implementation | Latest Value |
-|--------|----------------|--------------|
-| {metric_name} | `{file}` in `{function/class}` | {from results file if exists} |
-
-### Evaluation Script
-
-**Location:** `{eval_script}`
-
-### Benchmark Results
-
-{From discovered results files}
-
-| Dataset | Metric | Value | Date |
-|---------|--------|-------|------|
-| {dataset} | {metric} | {value} | {date} |
-
-## Software of Unknown Provenance
-
-See [soup.md](soup.md) for the complete list of third-party dependencies including ML frameworks and data processing libraries.
-
-**Verification:** Cross-reference soup.json entries against actual code usage. See the Standard Project Template above for Risk Level, Requirements, and Verification Reasoning guidelines. Note that `soup.md` is auto-generated from `soup.json`; all edits must target `soup.json`.
-
-## Risk controls
-
-### Model Risks
-
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| Model drift | {assess} | {assess} | {from code} |
-| Data leakage | {assess} | {assess} | {from code} |
-| Overfitting | {assess} | {assess} | {from code} |
-
-### Data Risks
-
-{Based on data handling code analysis}
-
-### Operational Risks
-
-{Based on deployment code analysis}
-
-## Model Deployment
-
-### Deployment Architecture
-
-{Based on discovered deployment configs}
-
-### Inference Implementation
-
-**Location:** `{inference_file}`
-
-**Entry Point:** `{function/endpoint}`
-
-### Hardware Requirements
-
-| Requirement | Specification | Source |
-|-------------|---------------|--------|
-| GPU | {from code} | `{file}` |
-| Memory | {from code/config} | `{file}` |
-| Storage | {estimated} | - |
-
-### Serving Configuration
-
-{From discovered serving configs}
-
-### Monitoring
-
-{Based on discovered monitoring/logging code}
-```
+### Standard project — section content guidance
+
+- **Architecture diagram** — embed image (`![Architecture Diagram](./images/architecture.png)`) or fenced ` ```mermaid` block. Add a System Overview paragraph and a Component Interactions paragraph based on discovered modules and their imports.
+- **Software units** — for each discovered module: Purpose (from docstring), Location (`path/to/module`), Key Components (classes/functions with docstring summaries), Internal Dependencies (other modules), External Dependencies (third-party packages).
+- **Software of Unknown Provenance** — link to `soup.md` (auto-generated). Do NOT duplicate version numbers or dep tables. Include the SOUP fields explainer:
+  - **Risk Level** (per IEC 62304): Low (cannot lead to harm), Medium (reversible harm), High (irreversible harm).
+  - **Requirements**: "Why do you need this library?" — examples: "HTTP client for REST API", "CLI argument parsing", "Dependency" (transitive only).
+  - **Verification Reasoning**: "Why this library among alternatives?" — examples: "Industry standard with active maintenance", "Official SDK provided by vendor", "Dependency" (transitive only).
+  - Validation: Accuracy (Requirements match actual usage), Completeness (all lock-file packages present), Staleness (removed packages absent), Risk Level (appropriate for function).
+- **Critical algorithms** — for each: Purpose, Location (`file` in `ClassName`/`function_name`), Implementation (brief description), Complexity (if documented), Security Considerations (if applicable).
+- **Risk controls** — Security Measures (auth/authz, input validation, encryption), Error Handling (patterns from code), Logging & Monitoring, Failure Modes table (Failure Mode | Impact | Mitigation).
+
+### ML/DL project — section content guidance
+
+- **Datasets** — Data Sources table (Dataset | Source | Size | Format), Description (features, labels), Statistics from actual file analysis.
+- **Data Preprocessing** — Pipeline (numbered steps with `file:function`), Transformations table (Transformation | Purpose | Implementation), Augmentation if applicable.
+- **Data Splits** — Split table (Split | Ratio | Size | Method), Implementation location, random seed if found.
+- **Model Architecture** — Model Type, Framework, Layer Specifications table (Layer | Type | Parameters | Output Shape), Configuration with the actual model class signature in a fenced code block, Input/Output specs.
+- **Model Training** — Training Configuration table (Parameter | Value | Source) covering Optimizer, Learning Rate, Batch Size, Epochs, Loss Function, LR Scheduler. Training Script location, Procedure summary, Checkpointing approach.
+- **Model Evaluation** — Metrics table (Metric | Implementation | Latest Value), Evaluation Script location, Benchmark Results table (Dataset | Metric | Value | Date).
+- **Software of Unknown Provenance** — same as Standard, plus call out ML frameworks and data libraries.
+- **Risk controls** — Model Risks table (Model drift, Data leakage, Overfitting — each with Likelihood | Impact | Mitigation), Data Risks, Operational Risks.
+- **Model Deployment** — Deployment Architecture, Inference Implementation (`file`, entry point), Hardware Requirements table (GPU | Memory | Storage with Source column), Serving Configuration, Monitoring.
+
+## Phase 9: Run Linters
+
+After writing/updating, run `/co-dev:run-linters` and fix any errors.
 
 ## Validation Checklist
 
-Before completing, verify:
-
-- [ ] H1 title is exactly `# Architecture Design`
+- [ ] H1 is exactly `# Architecture Design`
 - [ ] All required H2 sections present in correct order
-- [ ] Table of Contents links all work
-- [ ] All documented modules exist in codebase
-- [ ] All codebase modules are documented
-- [ ] soup.json exists and is referenced (not duplicated) in architecture.md
-- [ ] soup.json Requirements fields match actual code usage
-- [ ] soup.json Risk Levels are appropriate for each package's function
-- [ ] File paths in docs point to actual files
-- [ ] For ML/DL: Hyperparameters match actual code
-- [ ] For ML/DL: Model architecture matches implementation
-- [ ] For ML/DL: Metrics match evaluation code
+- [ ] TOC links resolve
+- [ ] All documented modules exist in code; all code modules are documented
+- [ ] `soup.json` exists; `architecture.md` references `soup.md` without duplicating
+- [ ] `soup.json` Requirements match actual usage
+- [ ] `soup.json` Risk Levels appropriate for each package's function
+- [ ] File paths in doc point to actual files
+- [ ] (ML/DL) hyperparameters / model architecture / metrics match implementation
 - [ ] Risk controls reflect actual security measures
-
-## Step 9: Run Linters
-
-After making changes to docs/architecture.md, run the linters skill to ensure the file passes all markdown linting rules:
-
-```text
-/co-dev:run-linters
-```
-
-Fix any linting errors before considering the task complete.
 
 ## Important Rules
 
-1. **Never fabricate information** - Only document what actually exists in the code
-2. **Use stable code references** - Reference classes, methods, and functions instead of line numbers (line numbers change too quickly)
-3. **Never document versions or duplicate SOUP data** - Do not include version numbers or dependency tables in architecture.md. Reference soup.md instead (which is auto-generated from soup.json). Lock files are the source of truth for versions. All SOUP edits must be made to soup.json. If versions or dependency tables are found in architecture.md, flag them for removal.
-4. **Verify all paths** - Every file path must exist
-5. **Never remove existing content** - Only add missing sections or fix inaccuracies
-6. **Preserve custom sections** - Additional H2/H3 sections after required ones should be kept
-7. **Ask before modifying** - Always show proposed changes and get user approval
-8. **Flag stale documentation** - Warn if code changed significantly since last doc update
-9. **Document security dependencies** - SOUP handling crypto/auth needs extra attention
-10. **Keep metrics current** - If evaluation results exist, include latest values
-11. **Run linters after changes** - Always run `/co-dev:run-linters` after modifying docs/architecture.md
-12. **Complete ALL steps** - Never skip analysis steps. Each step may reveal issues not visible in other steps
-13. **Output checkpoint log** - Include the completed checkpoint log in your final report to prove all steps were executed
-14. **Never validate against world knowledge alone** - Do NOT use your training data to fact-check version numbers, release dates, library existence, or external claims. If uncertain about something, use web search to verify before flagging. Only validate things that can be cross-referenced against actual files in the repository or verified online.
+1. **Never fabricate.** Only document what's in the code.
+2. **Use stable references** — class/method/function names, not line numbers.
+3. **Never duplicate SOUP data in architecture.md** — reference `soup.md`. Lock files are the version source of truth. All edits go to `soup.json`.
+4. **Verify all paths** exist.
+5. **Never remove existing valid content** — only update or add.
+6. **Preserve custom sections** after the required ones.
+7. **Ask before modifying.** Show proposed changes; get approval.
+8. **Flag stale doc** if code changed significantly since last doc update.
+9. **Document security deps with extra care** (crypto, auth).
+10. **Keep metrics current** if results files exist.
+11. **Run linters after changes.**
+12. **Complete every phase** — skipping reveals nothing; cross-referencing reveals everything.
+13. **Never validate against world knowledge alone.** Don't fact-check version numbers or external claims from training data — use web search or repo files.
