@@ -47,3 +47,52 @@ If these are not set, the MCP server will fail to start.
 - **Review responses** — Always show the response text before posting a reply to a customer review
 - **TestFlight** — Confirm before adding/removing testers from beta groups
 - **MCP required** — This skill cannot function without App Store Connect MCP access. If unavailable, inform the user.
+
+## Xcode Cloud build logs / failures (MCP gap)
+
+`asc-mcp` does **not** expose the Xcode Cloud (`ci*`) endpoints. A Xcode Cloud build ID is a `ciBuildRun` UUID, **not** a TestFlight `build` ID — passing it to `mcp__appstore__getBuild` will return `404 NOT_FOUND … type 'builds'`. Don't retry; fall back to the API directly.
+
+`xcrun xcodebuild -exportArchive` does **not** fetch Xcode Cloud logs — it only re-signs a local `.xcarchive` into an `.ipa`. The only programmatic path is the App Store Connect API. Once an `.xcresult` artifact is downloaded, `xcrun xcresulttool` can read it.
+
+**Prereq**: API key must have **Admin** role (or App Manager with "Access to Xcode Cloud" enabled on the key). Same `ASC_KEY_ID` / `ASC_ISSUER_ID` / `ASC_PRIVATE_KEY_PATH` env vars.
+
+**Fallback workflow** — mint a JWT, then curl. One-shot bash:
+
+```bash
+# Mint a 20-min ES256 JWT from the .p8 (requires python3 + cryptography, or use `jwt` CLI)
+JWT=$(python3 - <<EOF
+import jwt, time, os
+print(jwt.encode(
+    {"iss": os.environ["ASC_ISSUER_ID"], "iat": int(time.time()),
+     "exp": int(time.time())+1200, "aud": "appstoreconnect-v1"},
+    open(os.environ["ASC_PRIVATE_KEY_PATH"]).read(),
+    algorithm="ES256",
+    headers={"kid": os.environ["ASC_KEY_ID"]}))
+EOF
+)
+API="https://api.appstoreconnect.apple.com/v1"
+H="Authorization: Bearer $JWT"
+
+# 1. Get the build actions (build / test / archive / analyze) for a ciBuildRun
+curl -s -H "$H" "$API/ciBuildRuns/$RUN_ID/actions" | jq
+
+# 2. For a failing action, fetch its issues (compile errors, test failures)
+curl -s -H "$H" "$API/ciBuildActions/$ACTION_ID/issues" | jq
+
+# 3. Fetch the plain-text log bundle URL, then download it
+LOG_URL=$(curl -s -H "$H" "$API/ciBuildActions/$ACTION_ID/logs" | jq -r '.data[0].attributes.downloadUrl')
+curl -L -o build.log.zip "$LOG_URL"
+
+# 4. For test failures, grab the .xcresult artifact and inspect locally
+curl -s -H "$H" "$API/ciBuildActions/$ACTION_ID/artifacts" | jq
+# pick the .xcresult bundle's downloadUrl, then:
+curl -L -o UnitTests.xcresult.zip "$ARTIFACT_URL"
+unzip UnitTests.xcresult.zip
+xcrun xcresulttool get --path UnitTests.xcresult --format json | jq '.issues'
+```
+
+### Tips
+
+- `jwt` is `pip install pyjwt[crypto]`. If unavailable, the same payload works with `ruby -rjwt`, `node jsonwebtoken`, or `step crypto jwt sign`.
+- Download URLs from `/logs` and `/artifacts` are **pre-signed and short-lived** (~30 min). Don't cache them.
+- `xcresulttool get --format json` is the path to extract failing test names, messages, and stack traces without opening Xcode.
