@@ -18,6 +18,9 @@ name: Build
 permissions:
   contents: read
   pull-requests: read
+concurrency:
+  group: build-${{github.ref}}
+  cancel-in-progress: true
 jobs:
   variables:
     name: Prepare Variables
