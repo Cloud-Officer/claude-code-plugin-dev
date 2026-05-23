@@ -19,6 +19,18 @@ Parse arguments from the user's invocation:
 
 If the user did not pass `--send`, treat the run as a preview. Never send email unless `--send` is present.
 
+## Run from the target repo's directory (direnv)
+
+The CLI / `curl` fallbacks below authenticate with credentials that [direnv](https://direnv.net/) loads from the `.envrc` of the **current working directory**: `GITHUB_TOKEN` for `gh`, and `JIRA_URL`/`JIRA_EMAIL`/`JIRA_API_TOKEN` for `jira`/`curl`. Run one of these from a directory whose `.envrc` belongs to a **different** repo/account and it authenticates as the wrong account — the call fails or silently returns nothing, and the report is built on missing data.
+
+**Before any command that needs these credentials (`gh`, `gh api`, `jira`, `curl` against Jira), make a checkout in the target org the working directory in its own step:**
+
+```bash
+cd /path/to/target-repo        # or, when already inside it: cd "$(git rev-parse --show-toplevel)"
+```
+
+Run the `cd` as a **separate** Bash call — never chain it as `cd … && gh …`. direnv reloads `.envrc` on the next prompt, so the *following* calls get the right token; a command on the same line as the `cd` still runs with the old environment. This report queries many repos at once — run it from a checkout whose `.envrc` token can read all of them (typically a repo in the same GitHub org). MCP tools (`mcp__github__*`, `mcp__atlassian__*`) captured their credentials when Claude started and are unaffected.
+
 ## MCP Tools with Fallbacks
 
 | Operation | MCP Tool | CLI Fallback |
@@ -588,7 +600,7 @@ If run with `--send`:
 - **Throughput table omits non-contributors.** Drop a roster member from the team-at-a-glance and per-member sections if they had zero Jira transitions AND zero authored-merged PRs in the weekly window. Those rows are not contribution activity. They may still show up in the Time-logged table (if they clocked) or the Stalled section (if they hold a sprint ticket that hasn't moved). The report header should state the count of dropped rows.
 - **PR credit goes to the author, never the merger.** A PR counts for whoever opened it, even when someone else hits the merge button. "Merged X PRs for other people" is a separate metric and belongs in a Reviews / merged-for-others column, not in the member's authored-PR count.
 - **Always cite Jira tickets with key + summary.** Every Jira reference rendered in the report — in tables, bullets, why-lines, captions, anywhere — must read `[KEY](.../browse/KEY) — short summary`. A bare `DEV-1234` link is not enough; the reader needs the title to understand without clicking. Truncate summaries to ~80 chars if needed but never omit them.
-- **Releases reconciled across Jira and GitHub.** The Releases-this-week section must compare Jira `released==true` versions in the window with GitHub tags / releases in the same window and surface mismatches. If neither system has releases in the window, render an explicit "_No releases this week._" line — do not silently omit the section.
+- **Releases reconciled across Jira and GitHub.** The Releases-this-week section must compare Jira `released==true` versions in the window with GitHub tags / releases in the same window and surface mismatches. If neither system has releases in the window, render an explicit "*No releases this week.*" line — do not silently omit the section.
 - **No skill / process meta-commentary in the rendered report.** The output is a status report for the team — never include sections like "Skill changes shipped this run", "Implementation notes", "TODOs for the script", or any other description of how the report was produced. Those belong in commit messages and the skill source itself, not in `WEEKLY_REPORT.md`. The report ends after the per-member detail and the trailing "Preview written to WEEKLY_REPORT.md. Re-run with --send to email." line.
 - **Working days.** When computing `days_left` and `expected_hours`, exclude Saturdays and Sundays. Do not attempt to detect holidays.
 - **Env vars referenced** (document at the top of output if any are unset and affect the run):

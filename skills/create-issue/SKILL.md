@@ -8,6 +8,18 @@ allowed-tools: Bash(gh:*), Bash(jira:*), Bash(git:*), Bash(awk:*), Bash(basename
 
 Create an issue in the appropriate tracker (GitHub Issues or Jira).
 
+## Run from the target repo's directory (direnv)
+
+The CLI fallbacks below authenticate with credentials that [direnv](https://direnv.net/) loads from the `.envrc` of the **current working directory**: `GITHUB_TOKEN` for `gh`/`git`, and the Jira credentials for the `jira` CLI. Run one of these from a directory whose `.envrc` belongs to a **different** repo and it authenticates as the wrong account — the command fails, or files the issue in the wrong place.
+
+**Before any command that needs per-repo credentials (`gh`, `jira`), make the target repo the working directory in its own step:**
+
+```bash
+cd /path/to/target-repo        # or, when already inside it: cd "$(git rev-parse --show-toplevel)"
+```
+
+Run the `cd` as a **separate** Bash call — never chain it as `cd … && gh …`. direnv reloads `.envrc` on the next prompt, so the *following* calls get the right token; a command on the same line as the `cd` still runs with the old environment. MCP tools (`mcp__github__*`, `mcp__atlassian__*`) captured their credentials when Claude started and are unaffected.
+
 ## MCP Tools with Fallbacks
 
 This skill uses MCP tools when available and falls back gracefully if they are unavailable or return errors.

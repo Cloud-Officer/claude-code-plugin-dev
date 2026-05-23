@@ -14,6 +14,18 @@ You are a senior staff engineer orchestrating an exhaustive code audit using par
 
 **Web search is opt-in.** Do NOT default to web searches in agent prompts. Use the model's existing knowledge. Only invoke `WebSearch` (or `mcp__context7__*`) for: (a) CVE lookup against a current dependency version, (b) latest stable version checks for outdated-dep flagging, (c) anything the user explicitly asks to verify against current docs. Skip silently on quota/timeout.
 
+## Run from the target repo's directory (direnv)
+
+`gh api` and `gh repo view` read repository metadata (visibility, branch protection, security settings) using the `GITHUB_TOKEN` that [direnv](https://direnv.net/) loads from the `.envrc` of the **current working directory**. Run the review from a directory whose `.envrc` belongs to a **different** repo/org and these calls authenticate as the wrong account — they fail or silently return nothing, and governance findings end up based on missing data.
+
+**Make the repo under review the working directory before any `gh` call — in its own Bash call:**
+
+```bash
+cd /path/to/repo-under-review        # or, when already inside it: cd "$(git rev-parse --show-toplevel)"
+```
+
+Run the `cd` as a **separate** call — never chain it as `cd … && gh …`. direnv reloads `.envrc` on the next prompt, so the *following* calls get the right token; a command on the same line as the `cd` still runs with the old environment.
+
 ## MCP Tools with Fallbacks
 
 Prefer MCP tools (`mcp__github__*`, `mcp__context7__*`) when available; fall back to `gh` CLI / `WebSearch` on errors. Don't let MCP failures block the review.
@@ -61,6 +73,43 @@ Before any analysis, check if `docs/code-review.md` exists. If it does, ask via 
 >
 > 1. **Use existing report** — Skip analysis, summarize findings, await further instructions (e.g., "create issues").
 > 2. **Delete and re-run full analysis** — Remove existing report and proceed with Phase 1.
+
+---
+
+## REPOSITORY CONTEXT (Before Phase 1)
+
+Before any analysis, gather repository context so downstream agents can reason about **what's deliberate vs. what's an oversight**. Run these queries once and propagate the result into every Phase 2 agent prompt.
+
+```bash
+OWNER_REPO=$(gh repo view --json owner,name --jq '"\(.owner.login)/\(.name)"' 2>/dev/null)
+COLLAB_COUNT=$(gh api "repos/${OWNER_REPO}/collaborators" --jq 'length' 2>/dev/null || echo 0)
+ACTIVE_AUTHORS=$(git log --since="6 months ago" --format='%ae' | sort -u | wc -l | tr -d ' ')
+TOTAL_AUTHORS=$(git log --format='%ae' | sort -u | wc -l | tr -d ' ')
+REPO_AGE_DAYS=$(( ($(date +%s) - $(git log --reverse --format=%ct | head -1)) / 86400 ))
+IS_PRIVATE=$(gh repo view --json isPrivate --jq '.isPrivate' 2>/dev/null || echo "unknown")
+```
+
+Compute `team_profile` from the higher of `ACTIVE_AUTHORS` and `COLLAB_COUNT`:
+
+- `solo` — ≤ 1
+- `small` — ≤ 3
+- `medium` — ≤ 10
+- `large` — > 10
+
+**Pass `team_profile`, `active_authors`, `collab_count`, `repo_age_days`, and `is_private` to every Phase 2 agent in its prompt.** They are the deliberateness signal — agents reason about intent from team size, not from hardcoded examples.
+
+### Governance findings on solo / small teams
+
+Solo and small teams **cannot realistically enforce multi-reviewer governance** — they would not be able to merge anything. On `team_profile in {solo, small}`, treat the following as **deliberate trade-offs, not defects**, and **do not generate findings** for them:
+
+- Required reviewers count < 2, or CODEOWNERS pattern that any team member can self-satisfy (e.g., `* @org/MaintainersTeam` where the PR author is on that team).
+- Auto-approve / auto-merge workflows that let a bot or maintainer satisfy review.
+- Named bypass lists in branch protection (specific user logins listed).
+- `enforce_admins: false` on branch protection.
+- `pull_request_target` + bot PAT effectively single-vote review.
+- "Single maintainer can merge."
+
+The fix for these on a small team would be "hire more engineers" — not actionable. Skip silently (do not even surface as INFO). They reappear as findings only when `team_profile` is `medium` or `large`.
 
 ---
 
@@ -122,7 +171,7 @@ Use Phase 1 results to determine which conditional agents apply. Launch all appl
 >
 > **Quantitative counts — REQUIRED, return exact numbers:**
 >
-> - **Linter disables:** count `swiftlint:disable`, `eslint-disable`, `rubocop:disable`/`rubocop:todo`, `# type: ignore`, `# noqa`, `@SuppressWarnings`. Group by rule. Report total + by-rule breakdown.
+> - **Linter disables:** count `swiftlint:disable`, `eslint-disable`, `rubocop:disable`/`rubocop:todo`, `# type: ignore`, `# noqa`, `@SuppressWarnings`. Group by rule. Report total + by-rule breakdown **as INFORMATIONAL** (a positive signal of awareness). **DO NOT generate a finding for the existence of linter disables or for a permissive linter policy** — that is project policy, not oversight. Escalate to a finding **only** if: (a) the linter config disables rules wholesale (`extends: []` with no overrides, or every rule explicitly set to off, or `--no-*-checks` style flags that turn the linter off entirely); (b) a critical correctness/security rule is silenced **without an inline reason comment** — examples by ecosystem: `no-eval`, `no-implied-eval`, `no-unsafe-*`, `react/no-danger`, `Security/*` (eslint-plugin-security), `Security/*` (rubocop-security / brakeman), `DL3002`/`DL3004` (hadolint root/sudo), SQL-injection equivalents, secret-detection rules; (c) a linter config exists in the repo but **no CI workflow step actually invokes it** (decoration without enforcement).
 > - **Memory observers:** count `addObserver` vs `removeObserver` (Swift/Obj-C/Java). Report delta.
 > - **Pattern duplication count:** total duplicated blocks found, with one example per group.
 >
@@ -179,6 +228,8 @@ Use Phase 1 results to determine which conditional agents apply. Launch all appl
 
 > Assess test coverage AND quality. Focus on **behavioral coverage** (would tests catch real regressions?) over line coverage.
 >
+> **Coverage ceiling:** Determine overall coverage from coverage reports if available, otherwise estimate from `test_files / source_files` ratio. **If overall coverage ≥ 80%, do NOT generate coverage findings.** Report coverage as a POSITIVE and skip all "add tests for X" suggestions. Behavioral gaps on **critical paths** (data loss, auth, payments, regulated data) still qualify regardless of coverage %, but only with a concrete file:line and a 1–10 criticality rating ≥ 7.
+>
 > 1. **Coverage:** For each service/repository/viewmodel/controller, check if a test file exists. Calculate percentage.
 > 2. **Quality anti-patterns:** Tests without assertions, tests with sleep/delays, tests with logic (if/loops).
 > 3. **Test types present:** unit, integration, E2E, contract, security.
@@ -217,11 +268,11 @@ Use Phase 1 results to determine which conditional agents apply. Launch all appl
 >
 > **Git & Repo:**
 >
-> 1. Branch protection on main/master (no direct pushes, required reviews, required status checks). Use `gh api` to inspect actual settings.
-> 2. CODEOWNERS present (case-insensitive — see exclusions). Critical paths covered.
-> 3. Commit hygiene: vague messages ("fix", "update"), missing issue refs, WIP commits on main.
+> 1. Branch protection on main/master (no direct pushes, required reviews, required status checks). Use `gh api` to inspect actual settings. **Respect `team_profile`:** on `solo`/`small` teams, do NOT flag missing multi-reviewer requirements, named bypass lists, `enforce_admins: false`, auto-approve workflows, `pull_request_target` + bot PAT, or CODEOWNERS team self-approval — see the "Governance findings on solo / small teams" rules in the Repository Context section.
+> 2. CODEOWNERS present (case-insensitive — see exclusions). Critical paths covered. On `solo`/`small` teams, `* @org/team` patterns where the PR author is on the team are legitimate — do NOT flag as "allows self-approval".
+> 3. Commit hygiene: vague messages ("fix", "update"), missing issue refs, WIP commits on main. **Only audit commits from the last 30 days** (`git log --since="30 days ago"`). Older commit messages are historical and not actionable — do not flag them.
 > 4. Stale branches >30 days, inconsistent naming.
-> 5. Secrets accidentally committed in git history.
+> 5. Secrets accidentally committed in git history. **Before flagging:** confirm the secret is also present in the current working tree (`git grep -F "<value>"` or check the file at HEAD). If the secret is only in old commits and is NOT in the current working tree, assume it has been rotated — do NOT suggest history rewrites or flag the historical commit. Only flag secrets currently present in the working tree.
 > 6. Large binaries that should use Git LFS.
 >
 > **CI/CD Pipeline:**
@@ -399,8 +450,10 @@ For every Phase 2 finding, launch validation agents (`general-purpose`) tasked w
 > 4. **Check repository settings** (CI/CD, security, branch protection findings) — `gh api`/`gh repo view`. Many settings live in GitHub UI, not config files.
 > 5. **Verify context** — is the code reachable? Test/example/template file? Is severity proportionate to actual risk?
 > 6. **"Would a senior engineer flag this?"** — real issue or pedantic? Would the fix provide meaningful value?
+> 7. **Reasoned intent check** — could a reasonable engineer have made this choice **on purpose** given the repository context (`team_profile`, `active_authors`, `repo_age_days`, `is_private`)? List the deliberateness signals you can see: named entries vs defaults, explicit config rather than absence, inline comments explaining the choice, consistency with team size and project age, presence in merged code (not draft). If "the fix would be unrealistic or absurd for this team in this context" (e.g., requiring 2 reviewers on a 1-author repo, pinning the container's apt-installed runtime to a `.tool-version` file, rewriting 4-year-old git history to scrub a key that's no longer in the working tree, raising 90% coverage to 100%), REJECT — it's a deliberate trade-off, not an oversight. **Do not match against a hardcoded list of "intentional patterns"; reason from the signals.**
+> 8. **Re-read stability test** — would a senior engineer flag this *same* finding on a *second* careful read of the same code, after having already addressed the obvious issues? Eager-eye findings (the kind only noticed during the first skim because everything is novel) are opinion, not load-bearing — they should not surface a second time. If you would *not* re-flag it on the second pass, REJECT. This filter is what keeps re-runs deterministic across stochastic sampling.
 >
-> **REJECT if:** any mitigating factor exists, the issue is handled elsewhere, you cannot quote the problematic code, repo settings address it, a senior engineer would not flag it.
+> **REJECT if:** any mitigating factor exists, the issue is handled elsewhere, you cannot quote the problematic code, repo settings address it, a senior engineer would not flag it, the choice is deliberate given repo context, or it would not be re-flagged on a second read.
 >
 > **CONFIRM only if:** all checks fail to disprove the finding.
 >
@@ -445,6 +498,13 @@ For every Phase 2 finding, launch validation agents (`general-purpose`) tasked w
 | Wrong severity | Flagged HIGH but actually INFO |
 | Deprecated/unreachable code | Never executed, scheduled for removal |
 | CI/CD finding without `gh api` evidence | Repository settings not actually checked |
+| Governance finding on solo/small team | Multi-reviewer/bypass/self-approve unenforceable without more engineers |
+| Linter policy that isn't wholesale-disable / critical-rule-silenced / unenforced | Project policy, not oversight |
+| Coverage finding when overall coverage ≥ 80% | Above the meaningful return curve |
+| Secret found only in git history, not in working tree | Assume rotated; history rewrite not warranted |
+| Vague commit message on a commit older than 30 days | Hygiene only matters going forward |
+| Deliberate trade-off given repo context | Step 7 (reasoned intent check) rejected it |
+| Would not be re-flagged on a second read | Step 8 (re-read stability) rejected it |
 
 ---
 
@@ -452,17 +512,21 @@ For every Phase 2 finding, launch validation agents (`general-purpose`) tasked w
 
 Apply **tiered thresholds by severity**. More important findings survive at lower confidence because the cost of missing a Critical or High issue exceeds the cost of carrying a few mid-confidence ones; conversely, low-severity findings need higher confidence to be worth a reviewer's attention.
 
+**Thresholds are deliberately strict for Medium/Low/Info.** Stochastic sampling means lower-confidence findings drift between runs — raising the bar on those tiers is what keeps a re-run (after fixes are merged) from generating 40 fresh comments. If a finding doesn't survive the threshold, it didn't earn its place in the main report.
+
 After validation:
 
 1. Drop all `decision: REJECT` findings.
 2. Apply per-severity thresholds to CONFIRMED findings:
    - **🔴 Critical:** keep if `confidence_score ≥ 50`
-   - **🟠 High / 🟡 Medium:** keep if `confidence_score ≥ 65`
-   - **🔵 Low / ⚪ Info:** keep if `confidence_score ≥ 80`
+   - **🟠 High:** keep if `confidence_score ≥ 70`
+   - **🟡 Medium:** keep if `confidence_score ≥ 75`
+   - **🔵 Low:** keep if `confidence_score ≥ 85`
+   - **⚪ Info:** keep if `confidence_score ≥ 90`
 
 Adjust per-run only if the user explicitly asks (e.g., "be aggressive — keep everything ≥50" for a deep audit; "release gate — only show ≥90" for a tight pre-release review). Document the override at the top of the report.
 
-Findings filtered here go into the **"Filtered (Low Confidence)"** appendix — not lost, just spot-checkable by a human.
+Findings filtered here go into the **"Filtered (Low Confidence)"** appendix — not lost, just spot-checkable by a human. These are typically opinion/style and unstable between runs; they belong in the appendix, not the main report.
 
 ---
 
@@ -504,6 +568,14 @@ Do NOT include the internal phase tracking in the final report.
 | Dependabot finding without `gh api` evidence | Invalid — must include API output |
 | macOS/Windows runners in public repos | Free; cross-platform testing is a POSITIVE |
 | "Unnecessary" cross-platform testing in open source | Strength, not waste |
+| Multi-reviewer / bypass-list / self-approve / single-vote governance findings on `solo`/`small` teams | Cannot enforce — team is too small; not actionable |
+| Linter disables, permissive linter configs, ignore-only stubs | Project policy unless wholesale-disable / critical-rule silenced without reason / linter never run in CI |
+| Coverage findings when overall coverage ≥ 80% | Above the meaningful return curve; chasing 100% has poor ROI |
+| Secrets found only in git history, not in current working tree | Assume rotated; history rewrite is not warranted years later |
+| Vague commit messages on commits older than 30 days | Audit only the last 30 days; older messages are historical |
+| Container/runtime not pinned to a project `.tool-version` file when installed via OS package manager | Deliberate choice — distro-managed runtimes track distro releases, not project files |
+| Eager-eye stylistic findings (would not be re-flagged on a second read) | Opinion, not load-bearing — appendix at most |
+| Any finding that fails the reasoned intent check (Phase 3 step 7) | Deliberate trade-off given repo context |
 
 ---
 

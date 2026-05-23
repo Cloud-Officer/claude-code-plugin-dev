@@ -8,6 +8,18 @@ allowed-tools: Bash(jira:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(ca
 
 Generate a sprint work summary grouped by repository with items organized into approximately 3-day work blocks.
 
+## Run from the target repo's directory (direnv)
+
+The `jira` CLI authenticates with the `JIRA_URL`/`JIRA_EMAIL`/`JIRA_API_TOKEN` that [direnv](https://direnv.net/) loads from the `.envrc` of the **current working directory**. Run it from a directory whose `.envrc` belongs to a different project/account and it authenticates as the wrong account — the command fails, or summarizes the wrong sprint.
+
+**Before any `jira` command, make the relevant repo/workspace the working directory in its own step:**
+
+```bash
+cd /path/to/target-repo        # or, when already inside it: cd "$(git rev-parse --show-toplevel)"
+```
+
+Run the `cd` as a **separate** Bash call — never chain it as `cd … && jira …`. direnv reloads `.envrc` on the next prompt, so the *following* calls get the right token; a command on the same line as the `cd` still runs with the old environment. MCP tools (`mcp__atlassian__*`) captured their credentials when Claude started and are unaffected.
+
 ## MCP Tools with Fallbacks
 
 This skill uses MCP tools when available and falls back gracefully if they are unavailable or return errors.

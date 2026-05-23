@@ -27,6 +27,18 @@ Parse arguments from the user's invocation:
 
 If `--apply` is set, **confirm with the user once** before the first write, listing the count of close-candidates and reopen-candidates. The cost of mass-mistakes here (mis-assigning, falsely reopening) is high, and a single confirmation is cheap.
 
+## Run from the target repo's directory (direnv)
+
+The CLI / `curl` fallbacks below authenticate with credentials that [direnv](https://direnv.net/) loads from the `.envrc` of the **current working directory**: `GITHUB_TOKEN` for `gh`, and `JIRA_URL`/`JIRA_EMAIL`/`JIRA_API_TOKEN` for `jira`/`curl`. Run one of these from a directory whose `.envrc` belongs to a **different** repo and it authenticates as the wrong account — the command fails, or worse, comments on / closes issues in the wrong repo.
+
+**Before any command that needs per-repo credentials (`gh`, `jira`, `curl` against Jira), make the target repo the working directory in its own step:**
+
+```bash
+cd /path/to/target-repo        # or, when already inside it: cd "$(git rev-parse --show-toplevel)"
+```
+
+Run the `cd` as a **separate** Bash call — never chain it as `cd … && gh …`. direnv reloads `.envrc` on the next prompt, so the *following* calls get the right token; a command on the same line as the `cd` still runs with the old environment. When `--repo` or `--project` targets something other than your current directory, `cd` into that repo's checkout first so the token matches. MCP tools (`mcp__github__*`, `mcp__atlassian__*`) captured their credentials when Claude started and are unaffected.
+
 ## MCP Tools with Fallbacks
 
 Prefer MCP tools when available; fall back to CLIs and `curl` when MCP returns tool-not-found or repeated errors. Both tracker integrations follow the same fallback pattern as `create-issue` and `weekly-dev-report` skills in this repo.
