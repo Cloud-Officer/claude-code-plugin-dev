@@ -6,6 +6,18 @@ allowed-tools: Bash(git:*), Bash(gh:*), Bash(jira:*), Bash(awk:*), Bash(cat:*), 
 
 Work on issue: $ARGUMENTS
 
+## Run from the target repo's directory (direnv)
+
+The CLI fallbacks below authenticate with credentials that [direnv](https://direnv.net/) loads from the `.envrc` of the **current working directory**: `GITHUB_TOKEN` for `gh`/`git`, and the Jira credentials for the `jira` CLI. Run one of these from a directory whose `.envrc` belongs to a **different** repo and it authenticates as the wrong account — the command fails, or the PR is opened against the wrong place.
+
+**Before any command that needs per-repo credentials (`gh`, `git push`, `git fetch`, `jira`), make the target repo the working directory in its own step:**
+
+```bash
+cd /path/to/target-repo        # or, when already inside it: cd "$(git rev-parse --show-toplevel)"
+```
+
+Run the `cd` as a **separate** Bash call — never chain it as `cd … && gh …`. direnv reloads `.envrc` on the next prompt, so the *following* calls get the right token; a command on the same line as the `cd` still runs with the old environment. Step 3 already `cd`s into `$REPO_ROOT` (or the worktree under it) — keep every later `gh`/`jira`/`git push` running from there. MCP tools (`mcp__github__*`, `mcp__atlassian__*`) captured their credentials when Claude started and are unaffected.
+
 ## MCP Tools with Fallbacks
 
 This command uses MCP tools when available and falls back gracefully if they are unavailable or return errors.
@@ -255,6 +267,15 @@ Steps 4–6 and 8 are gated by Issue Type (detected above). The gating column on
    - GitHub: title = `<PREFIX> #$ARGUMENTS: <summary>`
    - Jira: title = `$ARGUMENTS <summary>`
 
+   **GitHub — auto-close the issue on merge (REQUIRED):** the `#$ARGUMENTS:` title prefix is only a *mention* and does NOT close the issue. Ensure the PR **body** (not the title) contains a GitHub closing keyword referencing the issue, so merging the PR closes it automatically. Add a dedicated line to the body using the verb that matches the issue type:
+   - Bug → `Fixes #$ARGUMENTS`
+   - Feature → `Closes #$ARGUMENTS`
+   - Task → `Closes #$ARGUMENTS`
+
+   The closing keyword + issue number must appear as plain text in the body (e.g. on its own line under the summary, or as `Closes #$ARGUMENTS.`). Do not bury it inside a code block or a link, or GitHub won't parse it.
+
+   **Jira:** GitHub closing keywords do NOT close Jira issues — skip the keyword for Jira and rely on the transition step below.
+
    **After the skill finishes:**
    - Jira only: `mcp__atlassian__transitionJiraIssue` (preferred) or `jira issue move $ARGUMENTS "Code Review"`
 
@@ -290,8 +311,10 @@ Steps 4–6 and 8 are gated by Issue Type (detected above). The gating column on
 
 ## Rules
 
+- Run `gh`/`jira`/`git push` from the target repo's directory so direnv loads the right `GITHUB_TOKEN`/Jira token (see "Run from the target repo's directory" above) — step 3 `cd`s into `$REPO_ROOT`/the worktree; stay there
 - Never create PR without user confirmation
 - Commit messages: single line only, NO footers or signatures
 - NEVER add "Generated with Claude Code" or similar signatures to commits or PRs
 - Jira: Branch names must be UPPERCASE (matching Jira key format)
 - Use the correct commit prefix based on detected issue type (Bug → Fix, Feature → Feat, Task → no prefix)
+- GitHub: the PR **body** must include a closing keyword (`Closes`/`Fixes`/`Resolves #<n>`) so the issue auto-closes on merge — the `#<n>:` title prefix alone only links the issue, it does not close it

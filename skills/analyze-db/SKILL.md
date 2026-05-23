@@ -1,12 +1,12 @@
 ---
 name: analyze-db
-description: Analyze, document, map, or scan the database schema. Use when the user wants to analyze the database, document the database, generate schema docs, map the database, create DB documentation, or inspect the database structure. Generates a docs/DB.md file with complete database schema documentation. Auto-detects language/framework. Supports MySQL, PostgreSQL, SQLite, MongoDB, Elasticsearch, Redis, and BigQuery.
+description: Analyze, document, map, or scan the database schema. Use when the user wants to analyze the database, document the database, generate schema docs, map the database, create DB documentation, or inspect the database structure. Generates a docs/db.md file with complete database schema documentation. Auto-detects language/framework. Supports MySQL, PostgreSQL, SQLite, MongoDB, Elasticsearch, Redis, and BigQuery.
 allowed-tools: Bash(php:*), Bash(python:*), Bash(ruby:*), Bash(npm:*), Bash(npx:*), Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Glob, Grep, mcp__postgres__query, mcp__postgres__list_tables, mcp__postgres__describe_table, mcp__postgres__list_schemas, mcp__mysql__mysql_query, mcp__mongodb__find, mcp__mongodb__aggregate, mcp__mongodb__count, mcp__mongodb__list-databases, mcp__mongodb__list-collections, mcp__mongodb__collection-schema, mcp__redis__*, mcp__bigquery__*
 ---
 
 # Analyze Database Schema
 
-Analyze the project and generate `docs/DB.md` with **complete database schema documentation** ready for use by the `query-db` skill.
+Analyze the project and generate `docs/db.md` with **complete database schema documentation** ready for use by the `query-db` skill.
 
 **Document EVERY table/collection/index without exception** — including join tables, migration trackers, session tables, queue tables, cache tables, framework-internal tables. Developers need full schema docs, not just "important" ones.
 
@@ -49,7 +49,7 @@ Prefer MCP tools when available — they handle connection management. Fall back
 
 ## Steps
 
-### Step 0 — Check for existing `docs/DB.md`
+### Step 0 — Check for existing `docs/db.md`
 
 If the file exists, read it but **still execute every step**. Code and schemas drift. After fresh analysis, merge findings:
 
@@ -138,7 +138,7 @@ Look for:
 - Multi-tenancy patterns (`tenant_id`, `organization_id`).
 - **BI dashboards, report generators, analytics endpoints** — capture common business questions and the tables/joins/filters used. These become the "Common Business Questions" section.
 
-### Step 5 — Generate initial `docs/DB.md` draft
+### Step 5 — Generate initial `docs/db.md` draft
 
 ```bash
 mkdir -p docs
@@ -161,7 +161,7 @@ Test connectivity using the simplest CLI ping per DB:
 
 If a test fails, output the missing env var(s) and ask the user to set them. Wait for confirmation.
 
-If the user declines or can't provide credentials, **skip Steps 7-8** and proceed to Step 9 using code-based analysis only. The `Last verified` line in `DB.md` MUST reflect this (see Step 9 timestamp formats).
+If the user declines or can't provide credentials, **skip Steps 7-8** and proceed to Step 9 using code-based analysis only. The `Last verified` line in `db.md` MUST reflect this (see Step 9 timestamp formats).
 
 ### Step 7 — Connect and verify the schema
 
@@ -193,7 +193,7 @@ Use safe sampling depending on table size:
 | Elasticsearch | `terms` aggregation with `size: 0` (always safe — uses approximate counts) | same | same |
 | BigQuery | `SELECT status, COUNT(*) FROM \`$BQ_PROJECT.$DATASET.TABLE\` GROUP BY status ORDER BY count DESC LIMIT 20;` | Use `APPROX_COUNT_DISTINCT(ID)` and always include partition filter | `--dry_run` first to estimate cost |
 
-### Step 9 — Update `docs/DB.md` with verified data
+### Step 9 — Update `docs/db.md` with verified data
 
 **Completeness check before writing:** every table/collection/index returned by Step 7 has a row in the "All Tables / Collections / Indices" section. There must be a 1:1 correspondence — no skipping framework or join tables.
 
@@ -203,14 +203,14 @@ Use safe sampling depending on table size:
 
 **Add row/document counts** to listings, **replace enum guesses with actual values + counts**, **document actual indexes**, **add date ranges**.
 
-**"Last verified" line at top of `docs/DB.md`:**
+**"Last verified" line at top of `docs/db.md`:**
 
 - Live DB verified: `> **Last verified**: YYYY-MM-DD — verified against live database`
 - Code-only (Steps 7-8 skipped): `> **Last verified**: YYYY-MM-DD — derived from code analysis only (not verified against live database)`
 
 ## Document Templates
 
-`docs/DB.md` always starts with H1 `# Database Schema Documentation` and the "Last verified" line. The body sections depend on the DB type. Below are the required sections per DB. Fill them with discovered content; do not paste placeholder rows.
+`docs/db.md` always starts with H1 `# Database Schema Documentation` and the "Last verified" line. The body sections depend on the DB type. Below are the required sections per DB. Fill them with discovered content; do not paste placeholder rows.
 
 ### SQL (MySQL / PostgreSQL / SQLite)
 

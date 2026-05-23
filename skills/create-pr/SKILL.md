@@ -8,6 +8,18 @@ allowed-tools: Bash(git:*), Bash(gh:*), Bash(awk:*), Bash(basename:*), Bash(cat:
 
 Generate the PR content, open the pull request, then leave the repo on its default branch.
 
+## Run from the target repo's directory (direnv)
+
+`gh` and `git push` authenticate with the `GITHUB_TOKEN` that [direnv](https://direnv.net/) loads from the `.envrc` of the **current working directory**. Opening a PR from a directory whose `.envrc` belongs to a **different** repo uses the wrong account's token, and the PR fails (or pushes to the wrong place).
+
+**Before Step 1, make the repo whose changes you are PR-ing the working directory — in its own Bash call:**
+
+```bash
+cd /path/to/that-repo        # or, when already inside it: cd "$(git rev-parse --show-toplevel)"
+```
+
+Run the `cd` as a **separate** call — never chain it as `cd … && gh …`. direnv reloads `.envrc` on the next prompt, so the *following* calls pick up the correct token; a command on the same line as the `cd` still runs with the old environment.
+
 ## Step 1: Gather Information
 
 **YOU MUST EXECUTE THESE COMMANDS IN ORDER. DO NOT SKIP ANY STEP.**
@@ -176,6 +188,7 @@ If the section is required, write a paragraph explaining the breaking changes, c
 
 ## Important Rules
 
+- Run from the repo whose changes you are PR-ing (see "Run from the target repo's directory" above) — `gh`/`git push` use the `GITHUB_TOKEN` direnv loads for the current directory, so the wrong directory means the wrong token
 - NEVER add "Generated with Claude Code" or similar signatures to commit messages or PR body
 - NO emojis unless explicitly requested
 - Before generating PR content, ensure the `run-linters` skill has been executed to verify code quality
