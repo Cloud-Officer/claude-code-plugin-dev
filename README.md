@@ -155,8 +155,8 @@ npx playwright install chromium
 Optional service CLIs: each tool ships its own Linux installer — see official docs for `aws`, `gcloud`, `heroku`,
 `stripe`, `vercel`, `newrelic`, `jira-cli`. App Store Connect is macOS-only.
 
-Language servers (LSPs): the `npm`, `gem`, `go install`, `rustup`, and
-`cpan` install commands listed under the macOS section are cross-platform. Use your distro's package manager for
+Language servers (LSPs): the `npm`, `gem`, `go install`, and `rustup`
+install commands listed under the macOS section are cross-platform. Use your distro's package manager for
 `clangd` (often `clang-tools` or `llvm`) and `pyright` (or
 `pip install pyright`). Swift LSP requires Xcode (macOS only).
 
@@ -182,8 +182,8 @@ npx playwright install chromium
 
 Optional service CLIs: install via `scoop`, `winget`, or each tool's installer. App Store Connect is macOS-only.
 
-Language servers (LSPs): the `npm`, `gem`, `go install`, `rustup`, and
-`cpan` install commands listed under the macOS section work on Windows under their respective toolchains. Use
+Language servers (LSPs): the `npm`, `gem`, `go install`, and `rustup`
+install commands listed under the macOS section work on Windows under their respective toolchains. Use
 `scoop install llvm` for `clangd`. Swift LSP is macOS-only (requires Xcode).
 
 ### Configure Remote MCPs (optional)
