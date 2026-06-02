@@ -631,7 +631,7 @@ const filtered = confirmed.filter(f => !keepFinding(f.severity, f.confidence_sco
 
 log('Confirmed ' + confirmed.length + ' findings; ' + kept.length + ' cleared the confidence threshold, ' + filtered.length + ' went to the appendix.')
 
-export default {
+return {
   phase1: { stack, configs, structure },
   agents_run: selected.map(a => a.key),
   kept,
