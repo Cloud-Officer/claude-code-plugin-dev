@@ -305,6 +305,8 @@ In `--dry-run`, print the planned action per issue and stop.
 
 The comments you post are the load-bearing artifact of this skill. A vague comment ("looks fixed!", "doesn't seem fixed") is worse than no comment, because it pollutes the audit trail. Be concrete: name files, line numbers, commits, and tests.
 
+**Write every comment in the language the issue itself is written in.** Detect that language *only* from the prose the reporter typed in the issue's title and description — the human sentences, not code identifiers or field labels. **Ignore every environmental signal**: the Jira/GitHub UI language, the browser or OS locale, the account's language setting, and project defaults. A French UI around an English issue body still means the comment must be English. Then write the entire comment — headings, prose, and the kick-back ask — in that detected language. The templates below are shown in English for reference only; translate the fixed wording (section headings like "What was changed", "Closing", the reassignment request) to match the issue. Never post a French comment on an English issue or vice versa. Keep code identifiers, file paths, commit SHAs, and quoted acceptance criteria verbatim — only the surrounding prose gets translated.
+
 ### Template: VERIFIED — Closing comment
 
 ```markdown
@@ -355,7 +357,7 @@ This issue was marked resolved on {{resolved_date}} by @{{resolver}}, but the fi
 @{{resolver}} — reassigning to you. Could you either (a) point to the change that addresses this and re-resolve, or (b) re-open the work? If the issue was descoped or is no longer valid, please leave a comment and close as Won't Do.
 ```
 
-Substitute every `{{placeholder}}` with concrete data — never leave a placeholder in a posted comment.
+Substitute every `{{placeholder}}` with concrete data — never leave a placeholder in a posted comment. And write the comment in the issue's own language (see the language note at the top of this section).
 
 ---
 
@@ -406,6 +408,7 @@ When `--apply` runs, replace "would close" / "would reopen" with "closed" / "reo
 - **Verify against the working tree, not just the PR diff.** A PR can land and later be reverted, refactored, or partially undone. The issue is fixed only if the behavior is in the **current code**.
 - **If a fix is not verifiable from code alone, skip it silently.** Visual/UX bugs, third-party integration flows, device-specific rendering, and anything else that needs a human tester to confirm must be marked `SKIP_NEEDS_MANUAL` and left untouched — no comment, no transition, no reassignment. Only the dry-run report mentions them, so a human can take it from there.
 - **Be concrete in comments.** Posted comments must include actual file paths, line numbers, commit SHAs, and quoted acceptance criteria. Vague audit comments degrade trust in future audit runs.
+- **Match the issue's language — from its content, not its environment.** Detect the language from the prose in the issue's title/description, and ignore the UI language, browser/OS locale, account settings, and project defaults. A French Jira UI on an English issue still requires an English comment. Translate the template's fixed headings and prose; keep code, paths, SHAs, and quoted criteria verbatim. A French closing comment on an English issue (or vice versa) is a defect.
 - **Comment before transition.** Especially on Jira where automation may fire on transition, the audit comment must already be on the ticket when the workflow change happens.
 - **Preserve existing labels and fields you didn't touch.** When closing or reopening, only change what the audit decision dictates: state, the assignee on a kick-back, the misleading "fixed/resolved" label on a GitHub kick-back. Don't strip unrelated labels, fix-versions, or sprint assignments.
 - **Skip projects with a single terminal state.** If a project's workflow has only one `done`-category status, there is no "resolved-but-not-closed" gap to audit. Note it once in the report and move on; don't error.
