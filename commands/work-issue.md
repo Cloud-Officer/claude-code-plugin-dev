@@ -242,36 +242,23 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 
    1. **Find the project's test setup first — don't guess.** Detect the runner and conventions from the repo before writing anything:
       - Locate existing tests next to the code you changed (sibling `*_test.*`, `*_spec.*`, or a parallel `test/`, `tests/`, `spec/`, `__tests__/` tree).
-      - Identify the runner from the manifest/config (`package.json` scripts, `Gemfile` + `spec/`, `pytest.ini`/`pyproject.toml`, `go test`, `*.csproj`, etc.).
+      - Identify the runner from the manifest/config (`package.json` scripts, `Gemfile` + `spec/`, `pytest.ini`/`pyproject.toml`, `go test`, `*.csproj`, etc.). **For Swift/iOS:** `Package.swift` → `swift test`; `*.xcworkspace`/`*.xcodeproj` → `xcodebuild test -scheme <Scheme> -destination 'platform=iOS Simulator,name=iPhone 15'` (find schemes with `xcodebuild -list`). On macOS these run locally — do not treat an Xcode project as "untestable".
       - Match the nearest existing tests' style — naming, fixtures/factories, mocking approach, assertion library, file placement.
 
-   2. **Write or update tests that cover the change.** Work from the same three sources as the QA checklist (step 12): the issue's objective, the nature of the change, and the blast radius. At minimum cover:
+   2. **Write or update tests that cover the change.** Work from the same three sources as the QA checklist (step 11): the issue's objective, the nature of the change, and the blast radius. At minimum cover:
       - the success path for each new or changed behavior;
       - the negative/failure paths (invalid input, missing data, permission denied, not-found, boundaries) — not just the happy path;
       - the regression surface — if you changed a shared function/component/query used in N places, add or extend tests so those callers stay covered.
 
       For **Bug** fixes, write a regression test that **fails before the fix and passes after**, and state that you confirmed both.
 
-   3. **Run the tests and make them pass.** Run the narrow suite for the touched area first, then the broader suite if it is fast enough. Paste the final passing result. If the suite genuinely cannot run locally (missing services, etc.), say so explicitly and describe how you mitigated it — do not claim tests pass when you did not run them.
+   3. **Run the tests and make them pass.** Run the narrow suite for the touched area first, then the broader suite if it is fast enough. **Paste the runner's own pass marker** — `** TEST SUCCEEDED **` / `Test Suite '...' passed` (Xcode), `0 failures` (rspec), `N passed` (pytest), `ok` (go) — not a paraphrased "tests pass". The "can't run it locally" excuse is narrow: on macOS, `swift test` and `xcodebuild test` against the iOS Simulator DO run locally — a slow build or a missing `-scheme` is not a reason to skip, find the scheme and run it. Only the genuine absence of infrastructure on this machine (live external services, physical hardware) qualifies; say so explicitly and describe how you mitigated it. Never claim tests pass when you did not run them.
 
    4. **No-test exception — narrow and explicit.** A few change types have no unit-testable logic: pure copy/i18n, static assets, formatting-only changes, config/docs, or generated files. Only then may you skip tests, and you must tell the user **which** category applies and why. "It's hard to test" is not a valid reason — ask the user for guidance instead of skipping.
 
    If the project has no test harness at all, surface that to the user and propose adding a minimal one (or get explicit acknowledgement to proceed without) rather than silently shipping untested code.
 
-9. **Pre-PR review** (opt-in for all types)
-
-   Ask the user: **"Run a pre-PR review before creating the PR? (y/n)"**
-
-   If yes, launch 3 parallel agents over the staged + committed diff:
-   - **Simplicity/DRY:** duplication, dead abstractions, over-engineering, premature generalization
-   - **Bugs:** off-by-one, missing error handling, broken contracts, type confusion, edge cases
-   - **Conventions:** mismatch with codebase patterns, naming, file organization, test placement
-
-   Consolidate findings into a list ordered by severity. Present the highest-severity issues to the user and ask which to fix before the PR.
-
-   For a deeper, whole-codebase audit, point the user at `/code-review-deep` instead — it covers security, dependencies, infrastructure, and more.
-
-10. **Create PR** (all types — only when user explicitly requests)
+9. **Create PR** (all types — only when user explicitly requests)
 
     **Precondition — tests gate (step 8):** Do not create the PR unless step 8 is satisfied: tests covering the change exist and pass, *or* a stated no-test exception applies. If neither holds, go back and write the tests first.
 
@@ -286,7 +273,7 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
     - NO footers, NO co-authors, NO "Generated with Claude Code" signatures
 
     **Open the PR via the `create-pr` skill:**
-    The `create-pr` skill takes care of pushing the branch, opening the PR, and switching the working tree back to the default branch when done. Do NOT run `git push` or `gh pr create` here — the skill does both.
+    The `create-pr` skill takes care of running the test suite locally before pushing, pushing the branch, opening the PR, **watching CI in the background (`gh pr checks --watch`, non-blocking)**, and switching the working tree back to the default branch when done. Do NOT run `git push` or `gh pr create` here — the skill does both. The task is not done until CI is green: if the background watch reports a failing GitHub Actions or Xcode Cloud check, fix it and push again before handing off. Read the checks with `gh pr checks` and act on its output — the token that just opened the PR can read that PR's checks.
 
     When invoking the skill, override its commit-message / PR-title defaults with the issue-tagged form:
 
@@ -307,19 +294,19 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 
     - Jira only: `mcp__atlassian__transitionJiraIssue` (preferred) or `jira issue move $ARGUMENTS "Code Review"`
 
-11. **Update issue if needed** (all types)
+10. **Update issue if needed** (all types)
     If the implementation differs from the original or additional context would be helpful, update the issue.
     Write in a prospective tone (as if before implementation, not after):
     - GitHub: `mcp__github__update_issue` (preferred) or `gh issue edit $ARGUMENTS --title "<updated title>" --body "<updated description>"`
     - Jira: `mcp__atlassian__editJiraIssue` (preferred) or `jira issue edit $ARGUMENTS --summary "<updated title>" --description "<updated description>"`
 
-12. **Post a tester QA checklist on the issue** (all types)
+11. **Post a tester QA checklist on the issue** (all types)
 
     Once the PR is open and the issue is updated, post a comment on the issue aimed at the **testers / QA team**. This is the hand-off gate right before the task moves through code review — it gives a tester an explicit, checkable list to confirm the work is *actually* done, not just merged.
 
     - GitHub: `mcp__github__add_issue_comment` (preferred) or `gh issue comment $ARGUMENTS --body "..."`
     - Jira: `mcp__atlassian__addCommentToJiraIssue` (preferred) or `jira issue comment add $ARGUMENTS "..."`
-    - Jira note: post this comment as part of (or right after) the move to **Code Review** in step 10, so testers picking up the ticket find the checklist waiting.
+    - Jira note: post this comment as part of (or right after) the move to **Code Review** in step 9, so testers picking up the ticket find the checklist waiting.
 
     ### Where the checks come from
 
@@ -359,7 +346,7 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 
     Write the comment in the **same language the issue itself is written in**. Detect that language *only* from the prose the reporter actually typed in the issue's title and description — the human sentences, not code identifiers or field labels. **Ignore every environmental signal**: the Jira/GitHub UI language, the browser or OS locale, the account's language setting, project defaults, and any prior assumption that "issues here are usually French." A French UI around an English issue body still means the comment must be English. If the title and body are in English, comment in English; if they're in French, comment in French. When the body is genuinely mixed or too short to tell, match the language of the title, then the longest prose block. Keep each item short and verifiable by a human who has not seen the diff.
 
-13. **Cleanup** (all types)
+12. **Cleanup** (all types)
 
     The cleanup depends on which path was taken in step 3.
 
@@ -393,4 +380,4 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 - Jira: Branch names must be UPPERCASE (matching Jira key format)
 - Use the correct commit prefix based on detected issue type (Bug → Fix, Feature → Feat, Task → no prefix)
 - GitHub: the PR **body** must include a closing keyword (`Closes`/`Fixes`/`Resolves #<n>`) so the issue auto-closes on merge — the `#<n>:` title prefix alone only links the issue, it does not close it
-- The tester QA checklist (step 12) is sourced from three things, not just one: the issue's objective (never a recap of the diff), the area/nature of the change (when the issue has no acceptance criteria), and the full blast radius (if changed code is reached from N places, all N must be checked). Cover negative paths, security, stress, and bad-network cases — not only the happy path — and help testers turn items into Given/When/Then test cases. Write it in the language the issue body is written in (detect from the reporter's own prose in the title/description — never from the Jira/GitHub UI language, browser/OS locale, or account settings; a French UI on an English issue still requires an English comment)
+- The tester QA checklist (step 11) is sourced from three things, not just one: the issue's objective (never a recap of the diff), the area/nature of the change (when the issue has no acceptance criteria), and the full blast radius (if changed code is reached from N places, all N must be checked). Cover negative paths, security, stress, and bad-network cases — not only the happy path — and help testers turn items into Given/When/Then test cases. Write it in the language the issue body is written in (detect from the reporter's own prose in the title/description — never from the Jira/GitHub UI language, browser/OS locale, or account settings; a French UI on an English issue still requires an English comment)
