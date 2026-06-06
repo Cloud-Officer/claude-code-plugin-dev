@@ -245,7 +245,7 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
       - Identify the runner from the manifest/config (`package.json` scripts, `Gemfile` + `spec/`, `pytest.ini`/`pyproject.toml`, `go test`, `*.csproj`, etc.). **For Swift/iOS:** `Package.swift` → `swift test`; `*.xcworkspace`/`*.xcodeproj` → `xcodebuild test -scheme <Scheme> -destination 'platform=iOS Simulator,name=iPhone 15'` (find schemes with `xcodebuild -list`). On macOS these run locally — do not treat an Xcode project as "untestable".
       - Match the nearest existing tests' style — naming, fixtures/factories, mocking approach, assertion library, file placement.
 
-   2. **Write or update tests that cover the change.** Work from the same three sources as the QA checklist (step 12): the issue's objective, the nature of the change, and the blast radius. At minimum cover:
+   2. **Write or update tests that cover the change.** Work from the same three sources as the QA checklist (step 11): the issue's objective, the nature of the change, and the blast radius. At minimum cover:
       - the success path for each new or changed behavior;
       - the negative/failure paths (invalid input, missing data, permission denied, not-found, boundaries) — not just the happy path;
       - the regression surface — if you changed a shared function/component/query used in N places, add or extend tests so those callers stay covered.
@@ -294,13 +294,13 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 
     - Jira only: `mcp__atlassian__transitionJiraIssue` (preferred) or `jira issue move $ARGUMENTS "Code Review"`
 
-11. **Update issue if needed** (all types)
+10. **Update issue if needed** (all types)
     If the implementation differs from the original or additional context would be helpful, update the issue.
     Write in a prospective tone (as if before implementation, not after):
     - GitHub: `mcp__github__update_issue` (preferred) or `gh issue edit $ARGUMENTS --title "<updated title>" --body "<updated description>"`
     - Jira: `mcp__atlassian__editJiraIssue` (preferred) or `jira issue edit $ARGUMENTS --summary "<updated title>" --description "<updated description>"`
 
-12. **Post a tester QA checklist on the issue** (all types)
+11. **Post a tester QA checklist on the issue** (all types)
 
     Once the PR is open and the issue is updated, post a comment on the issue aimed at the **testers / QA team**. This is the hand-off gate right before the task moves through code review — it gives a tester an explicit, checkable list to confirm the work is *actually* done, not just merged.
 
@@ -346,7 +346,7 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 
     Write the comment in the **same language the issue itself is written in**. Detect that language *only* from the prose the reporter actually typed in the issue's title and description — the human sentences, not code identifiers or field labels. **Ignore every environmental signal**: the Jira/GitHub UI language, the browser or OS locale, the account's language setting, project defaults, and any prior assumption that "issues here are usually French." A French UI around an English issue body still means the comment must be English. If the title and body are in English, comment in English; if they're in French, comment in French. When the body is genuinely mixed or too short to tell, match the language of the title, then the longest prose block. Keep each item short and verifiable by a human who has not seen the diff.
 
-13. **Cleanup** (all types)
+12. **Cleanup** (all types)
 
     The cleanup depends on which path was taken in step 3.
 
@@ -380,4 +380,4 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 - Jira: Branch names must be UPPERCASE (matching Jira key format)
 - Use the correct commit prefix based on detected issue type (Bug → Fix, Feature → Feat, Task → no prefix)
 - GitHub: the PR **body** must include a closing keyword (`Closes`/`Fixes`/`Resolves #<n>`) so the issue auto-closes on merge — the `#<n>:` title prefix alone only links the issue, it does not close it
-- The tester QA checklist (step 12) is sourced from three things, not just one: the issue's objective (never a recap of the diff), the area/nature of the change (when the issue has no acceptance criteria), and the full blast radius (if changed code is reached from N places, all N must be checked). Cover negative paths, security, stress, and bad-network cases — not only the happy path — and help testers turn items into Given/When/Then test cases. Write it in the language the issue body is written in (detect from the reporter's own prose in the title/description — never from the Jira/GitHub UI language, browser/OS locale, or account settings; a French UI on an English issue still requires an English comment)
+- The tester QA checklist (step 11) is sourced from three things, not just one: the issue's objective (never a recap of the diff), the area/nature of the change (when the issue has no acceptance criteria), and the full blast radius (if changed code is reached from N places, all N must be checked). Cover negative paths, security, stress, and bad-network cases — not only the happy path — and help testers turn items into Given/When/Then test cases. Write it in the language the issue body is written in (detect from the reporter's own prose in the title/description — never from the Jira/GitHub UI language, browser/OS locale, or account settings; a French UI on an English issue still requires an English comment)
