@@ -1,7 +1,7 @@
 ---
 name: create-pr
 description: Create, open, submit, or prepare a pull request (PR). Generates the commit message, PR title, and PR body, opens the PR, then returns the repo to its default branch. Use when the user wants to create a PR, open a PR, submit a PR, make a PR, push a PR, send a PR, generate PR content, prepare a pull request, or fill a PR template from code changes.
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(open:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Glob
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(open:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Bash(xcodebuild:*), Bash(swift:*), Bash(xcrun:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(bundle:*), Bash(pytest:*), Bash(go:*), Bash(dotnet:*), Read, Glob
 ---
 
 # Create Pull Request
@@ -93,13 +93,36 @@ git add -A
 git diff --cached --quiet || git commit -m "<commit message from Step 2>"
 ```
 
-## Step 4: Push the Branch
+## Step 4: Run Tests Locally (gate before pushing)
+
+Run the project's existing test suite before pushing. A red CI run that a local test would have caught is exactly what this step exists to prevent. **If a test harness exists and you have not run it, do not push.**
+
+**Step 4.1 — Detect the runner from the repo, including compiled/mobile stacks:**
+
+- JS/TS: `package.json` scripts → `npm test` / `yarn test` / `pnpm test`
+- Ruby: `Gemfile` + `spec/` → `bundle exec rspec`; `test/` → `bin/rails test`
+- Python: `pytest.ini` / `pyproject.toml` / `tox.ini` → `pytest`
+- Go: `go test ./...`
+- .NET: `*.csproj` / `*.sln` → `dotnet test`
+- **Swift / iOS (you are on macOS — these ARE runnable locally):**
+  - `Package.swift` (SwiftPM) → `swift test`
+  - `*.xcworkspace` / `*.xcodeproj` → `xcodebuild test -scheme <Scheme> -destination 'platform=iOS Simulator,name=iPhone 15'`
+    - List schemes with `xcodebuild -list -workspace <name>.xcworkspace` (or `-project <name>.xcodeproj`) and pick the app/test scheme.
+    - Use `-workspace` when a `.xcworkspace` exists (CocoaPods/SPM workspaces), otherwise `-project`.
+
+**Step 4.2 — Run the suite covering your changes and paste the runner's own pass marker as proof:**
+
+`** TEST SUCCEEDED **` / `Test Suite '...' passed` (Xcode), `0 failures` (rspec), `passed`/`N passed` (pytest), `ok` (go). A bare "tests pass" without the runner's output does not count. If anything fails, fix it **before** pushing — never push red.
+
+**Step 4.3 — The "can't run it locally" exception is narrow.** On macOS, `swift test` and `xcodebuild test` against the iOS Simulator run locally; "slow to build" or "needs a scheme" is not an excuse to skip — find the scheme and run it. Only skip when the suite needs infrastructure genuinely absent on this machine (live external services, physical hardware), and say so explicitly. If the repo has no test harness at all, state that and continue.
+
+## Step 5: Push the Branch
 
 ```bash
 git push -u origin "$CURRENT_BRANCH"
 ```
 
-## Step 5: Open the Pull Request
+## Step 6: Open the Pull Request
 
 Prefer `mcp__github__create_pull_request` when the GitHub MCP server is available. Otherwise use the GitHub CLI:
 
@@ -108,9 +131,32 @@ PR_URL=$(gh pr create --base "$DEFAULT_BRANCH" --head "$CURRENT_BRANCH" --title 
 open "$PR_URL"
 ```
 
-If a PR already exists for `$CURRENT_BRANCH` (e.g., the caller already opened it), `gh pr create` will fail — treat that as success and continue to Step 6.
+If a PR already exists for `$CURRENT_BRANCH` (e.g., the caller already opened it), `gh pr create` will fail — treat that as success and continue to Step 7.
 
-## Step 6: Return to Default Branch
+## Step 7: Monitor CI in the Background
+
+A pushed PR is not done until its checks are green — but CI (especially Xcode Cloud) can take several minutes, so **watch it without blocking the session**. Launch the watch as a background task, then continue straight to Step 8. The background watch re-invokes you when CI settles, so a failure is still caught and triaged in this session — just not by sitting idle.
+
+Run this with the Bash tool's **`run_in_background: true`** (do not foreground it):
+
+```bash
+gh pr checks "$CURRENT_BRANCH" --watch --fail-fast
+```
+
+`gh pr checks` reports **every** check registered on the PR — GitHub Actions **and Xcode Cloud**, which posts its build/test result back to GitHub as a check run. So this one command covers both CIs. (`--fail-fast` returns as soon as one check fails; drop it to wait for the full set.) The command exits non-zero if any check fails, zero if all pass.
+
+> **Reading the checks always works here — run `gh pr checks` and report what it returns.** The token that just pushed the branch and opened the PR has everything needed to read that PR's checks, so trust the command and let its output drive your next step. If it ever errors, surface the **verbatim** output and exit code so the real cause is visible. A 404/403 means the wrong working directory loaded the wrong per-repo token — `cd` into the PR's repo and retry.
+
+Do **not** wait on it before Step 8 — proceed immediately. When the background task completes:
+
+- **All checks green (exit 0):** report it; nothing more to do.
+- **A check fails (non-zero):** Step 8 has likely already returned you to the default branch, so re-checkout the PR branch first (`git checkout "$CURRENT_BRANCH"`), then pull the failing logs, fix the cause, and push again (re-run Steps 4–7). Do not leave the PR with a red required check.
+  - GitHub Actions: `gh run view --log-failed` (the failing run URL is also printed by `gh pr checks`).
+  - **Xcode Cloud:** the check tells you only pass/fail. For the failing test names and logs, use the `appstore` skill — `asc-mcp` does not expose the `ci*` endpoints, so the failing `.xcresult` must be fetched via the App Store Connect API and read with `xcrun xcresulttool`.
+
+If the repo has no CI configured, `gh pr checks` exits immediately with no checks — note that and continue.
+
+## Step 8: Return to Default Branch
 
 Leave the repo on the default branch so the user is back at a clean starting point:
 
@@ -192,4 +238,6 @@ If the section is required, write a paragraph explaining the breaking changes, c
 - NEVER add "Generated with Claude Code" or similar signatures to commit messages or PR body
 - NO emojis unless explicitly requested
 - Before generating PR content, ensure the `run-linters` skill has been executed to verify code quality
-- The skill is not done until Step 6 has run (or has been deliberately skipped because of a worktree). Do not stop after printing the Step 2 block.
+- Run the existing test suite locally before pushing (Step 4) — for Swift/iOS that means `swift test` or `xcodebuild test`, which run on this Mac; never push a behavior change without running its tests, and never claim tests pass without the runner's own pass marker
+- After pushing, watch CI **in the background** (Step 7) — run `gh pr checks --watch` with `run_in_background: true` so the session is not blocked, then triage when it reports; one command covers GitHub Actions and Xcode Cloud alike, and the PR is not done while a required check is red. The token that opened the PR can read its checks, so run the command and act on its output.
+- The skill is not done until Step 8 has run (or has been deliberately skipped because of a worktree). Do not stop after printing the Step 2 block.

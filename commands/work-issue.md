@@ -242,7 +242,7 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 
    1. **Find the project's test setup first — don't guess.** Detect the runner and conventions from the repo before writing anything:
       - Locate existing tests next to the code you changed (sibling `*_test.*`, `*_spec.*`, or a parallel `test/`, `tests/`, `spec/`, `__tests__/` tree).
-      - Identify the runner from the manifest/config (`package.json` scripts, `Gemfile` + `spec/`, `pytest.ini`/`pyproject.toml`, `go test`, `*.csproj`, etc.).
+      - Identify the runner from the manifest/config (`package.json` scripts, `Gemfile` + `spec/`, `pytest.ini`/`pyproject.toml`, `go test`, `*.csproj`, etc.). **For Swift/iOS:** `Package.swift` → `swift test`; `*.xcworkspace`/`*.xcodeproj` → `xcodebuild test -scheme <Scheme> -destination 'platform=iOS Simulator,name=iPhone 15'` (find schemes with `xcodebuild -list`). On macOS these run locally — do not treat an Xcode project as "untestable".
       - Match the nearest existing tests' style — naming, fixtures/factories, mocking approach, assertion library, file placement.
 
    2. **Write or update tests that cover the change.** Work from the same three sources as the QA checklist (step 12): the issue's objective, the nature of the change, and the blast radius. At minimum cover:
@@ -252,26 +252,13 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 
       For **Bug** fixes, write a regression test that **fails before the fix and passes after**, and state that you confirmed both.
 
-   3. **Run the tests and make them pass.** Run the narrow suite for the touched area first, then the broader suite if it is fast enough. Paste the final passing result. If the suite genuinely cannot run locally (missing services, etc.), say so explicitly and describe how you mitigated it — do not claim tests pass when you did not run them.
+   3. **Run the tests and make them pass.** Run the narrow suite for the touched area first, then the broader suite if it is fast enough. **Paste the runner's own pass marker** — `** TEST SUCCEEDED **` / `Test Suite '...' passed` (Xcode), `0 failures` (rspec), `N passed` (pytest), `ok` (go) — not a paraphrased "tests pass". The "can't run it locally" excuse is narrow: on macOS, `swift test` and `xcodebuild test` against the iOS Simulator DO run locally — a slow build or a missing `-scheme` is not a reason to skip, find the scheme and run it. Only the genuine absence of infrastructure on this machine (live external services, physical hardware) qualifies; say so explicitly and describe how you mitigated it. Never claim tests pass when you did not run them.
 
    4. **No-test exception — narrow and explicit.** A few change types have no unit-testable logic: pure copy/i18n, static assets, formatting-only changes, config/docs, or generated files. Only then may you skip tests, and you must tell the user **which** category applies and why. "It's hard to test" is not a valid reason — ask the user for guidance instead of skipping.
 
    If the project has no test harness at all, surface that to the user and propose adding a minimal one (or get explicit acknowledgement to proceed without) rather than silently shipping untested code.
 
-9. **Pre-PR review** (opt-in for all types)
-
-   Ask the user: **"Run a pre-PR review before creating the PR? (y/n)"**
-
-   If yes, launch 3 parallel agents over the staged + committed diff:
-   - **Simplicity/DRY:** duplication, dead abstractions, over-engineering, premature generalization
-   - **Bugs:** off-by-one, missing error handling, broken contracts, type confusion, edge cases
-   - **Conventions:** mismatch with codebase patterns, naming, file organization, test placement
-
-   Consolidate findings into a list ordered by severity. Present the highest-severity issues to the user and ask which to fix before the PR.
-
-   For a deeper, whole-codebase audit, point the user at `/code-review-deep` instead — it covers security, dependencies, infrastructure, and more.
-
-10. **Create PR** (all types — only when user explicitly requests)
+9. **Create PR** (all types — only when user explicitly requests)
 
     **Precondition — tests gate (step 8):** Do not create the PR unless step 8 is satisfied: tests covering the change exist and pass, *or* a stated no-test exception applies. If neither holds, go back and write the tests first.
 
@@ -286,7 +273,7 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
     - NO footers, NO co-authors, NO "Generated with Claude Code" signatures
 
     **Open the PR via the `create-pr` skill:**
-    The `create-pr` skill takes care of pushing the branch, opening the PR, and switching the working tree back to the default branch when done. Do NOT run `git push` or `gh pr create` here — the skill does both.
+    The `create-pr` skill takes care of running the test suite locally before pushing, pushing the branch, opening the PR, **watching CI in the background (`gh pr checks --watch`, non-blocking)**, and switching the working tree back to the default branch when done. Do NOT run `git push` or `gh pr create` here — the skill does both. The task is not done until CI is green: if the background watch reports a failing GitHub Actions or Xcode Cloud check, fix it and push again before handing off. Read the checks with `gh pr checks` and act on its output — the token that just opened the PR can read that PR's checks.
 
     When invoking the skill, override its commit-message / PR-title defaults with the issue-tagged form:
 
@@ -319,7 +306,7 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 
     - GitHub: `mcp__github__add_issue_comment` (preferred) or `gh issue comment $ARGUMENTS --body "..."`
     - Jira: `mcp__atlassian__addCommentToJiraIssue` (preferred) or `jira issue comment add $ARGUMENTS "..."`
-    - Jira note: post this comment as part of (or right after) the move to **Code Review** in step 10, so testers picking up the ticket find the checklist waiting.
+    - Jira note: post this comment as part of (or right after) the move to **Code Review** in step 9, so testers picking up the ticket find the checklist waiting.
 
     ### Where the checks come from
 
