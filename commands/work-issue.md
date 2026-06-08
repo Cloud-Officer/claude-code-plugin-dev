@@ -273,7 +273,7 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
     - NO footers, NO co-authors, NO "Generated with Claude Code" signatures
 
     **Open the PR via the `create-pr` skill:**
-    The `create-pr` skill takes care of running the test suite locally before pushing, pushing the branch, opening the PR, **watching CI in the background (`gh pr checks --watch`, non-blocking)**, and switching the working tree back to the default branch when done. Do NOT run `git push` or `gh pr create` here — the skill does both. The task is not done until CI is green: if the background watch reports a failing GitHub Actions or Xcode Cloud check, fix it and push again before handing off. Read the checks with `gh pr checks` and act on its output — the token that just opened the PR can read that PR's checks.
+    The `create-pr` skill takes care of running the test suite locally before pushing, pushing the branch, opening the PR, **watching CI in the background (via the Actions runs REST API, non-blocking)**, and switching the working tree back to the default branch when done. Do NOT run `git push` or `gh pr create` here — the skill does both. The task is not done until CI is green: if the background watch reports a failing GitHub Actions or Xcode Cloud check, fix it and push again before handing off. Read CI status with the Actions runs REST API (`gh api "repos/<owner>/<repo>/actions/runs?head_sha=<SHA>"` → `/actions/runs/<id>/jobs`), not `gh pr checks` — this workflow's fine-grained PAT has no Checks permission and cannot read check runs, so `gh pr checks` always 403s here. See the `create-pr` skill's Step 7.
 
     When invoking the skill, override its commit-message / PR-title defaults with the issue-tagged form:
 
