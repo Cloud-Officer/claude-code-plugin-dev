@@ -6,14 +6,22 @@ allowed-tools: mcp__monday__*, Bash(jq:*), Bash(echo:*)
 
 # monday.com
 
-Manage monday.com boards, items, groups, columns, and updates via the official
-monday MCP server.
+Manage monday.com boards, items, groups, columns, and updates via monday.com's
+official **hosted** MCP endpoint.
 
 ## Authentication
 
 This skill uses the **monday MCP server only** — there is no monday CLI fallback.
-The server (`mcp__monday__*`) reads a **personal access token** from the
-`MONDAY_TOKEN` environment variable.
+The `.mcp.json` entry connects to monday's hosted endpoint
+(`https://mcp.monday.com/mcp`) through the pure-JavaScript `mcp-remote` bridge,
+passing your **personal access token** as a Bearer header. It reads that token
+from the `MONDAY_TOKEN` environment variable.
+
+> **Why hosted, not local?** The local `@mondaydotcomorg/monday-api-mcp` package
+> depends on `isolated-vm`, a native addon with no prebuilt binary for current
+> Node versions — it fails to compile on Node 22+/24+/26. The hosted endpoint
+> needs no native build, so it works regardless of your Node version while using
+> the same token.
 
 To get a token: in monday.com, click your **avatar → Developers → My access
 tokens**, and copy your personal token. Export it before launching Claude Code:

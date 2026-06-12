@@ -61,7 +61,16 @@
     },
     "monday": {
       "command": "npx",
-      "args": ["-y", "@mondaydotcomorg/monday-api-mcp@latest"]
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.monday.com/mcp",
+        "--header",
+        "Authorization:${MONDAY_AUTH_HEADER}"
+      ],
+      "env": {
+        "MONDAY_AUTH_HEADER": "Bearer ${MONDAY_TOKEN}"
+      }
     }
   }
 }
