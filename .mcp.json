@@ -58,6 +58,10 @@
     "gcloud": {
       "command": "npx",
       "args": ["-y", "@google-cloud/gcloud-mcp"]
+    },
+    "monday": {
+      "command": "npx",
+      "args": ["-y", "@mondaydotcomorg/monday-api-mcp@latest"]
     }
   }
 }
