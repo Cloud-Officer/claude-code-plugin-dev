@@ -423,6 +423,7 @@ If you also use remote MCP servers (see [Configure Remote MCPs](#configure-remot
       "mcp__atlassian__*",
       "mcp__bigquery__*",
       "mcp__figma__*",
+      "mcp__monday__*",
       "mcp__newrelic__*",
       "mcp__paypal__*",
       "mcp__stripe__*",
