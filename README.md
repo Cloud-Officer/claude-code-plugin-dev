@@ -189,7 +189,7 @@ install commands listed under the macOS section work on Windows under their resp
 
 ### Configure Remote MCPs (optional)
 
-Some skills use remote MCP servers (OAuth, no local install). Add only the ones you'll use:
+Some skills use remote MCP servers (no local install). Add only the ones you'll use — `claude mcp add` defaults to **local scope**, so each is registered for the current folder only rather than always-loaded for every project:
 
 ```bash
 claude mcp add atlassian --transport http https://mcp.atlassian.com/v1/mcp
@@ -201,7 +201,13 @@ claude mcp add stripe --transport http https://mcp.stripe.com
 claude mcp add vercel --transport http https://mcp.vercel.com
 ```
 
-Each prompts for OAuth on first use. Skills that need a remote MCP fall back to a CLI when one exists — see the **Setup
+Most prompt for OAuth on first use. **monday** is the exception — it authenticates with a personal access token instead of OAuth, so pass it as a Bearer header (the token stays a runtime `${MONDAY_TOKEN}` reference, never written into the stored config):
+
+```bash
+claude mcp add monday --transport http https://mcp.monday.com/mcp --header 'Authorization: Bearer ${MONDAY_TOKEN}'
+```
+
+Skills that need a remote MCP fall back to a CLI when one exists — see the **Setup
 ** column in the [Skills](#skills) table for which skill needs which.
 
 **Naming caveat for multi-tenant setups.** Each server name owns exactly one OAuth grant — Claude Code stores the access token keyed by the name and reuses it for every call. If you work across multiple tenants of the same service (e.g. two Atlassian sites, two Stripe accounts) from different folders on one machine, **give each instance a distinct name** rather than reusing the bare name. Otherwise the OAuth token from whichever folder authorized first leaks into the other folder, even though local-scope registration looks isolated.
@@ -461,7 +467,7 @@ These skills are automatically available to Claude. The **Setup
 | `gcloud`                 | Manage Google Cloud infrastructure and services                 | `gcloud auth login && gcloud config set project <id>`. Optional: `CLOUDSDK_ACTIVE_CONFIG_NAME` for named configs                                                                                                                                   |
 | `heroku`                 | Manage Heroku apps, dynos, logs, and databases                  | `heroku login`                                                                                                                                                                                                                                     |
 | `loco`                   | Manage Loco translation assets (create, delete, scan)           | Env: `LOCO_API_KEY` *(or)* per-project `LOCO_API_KEY_<PROJECT>` (e.g. `LOCO_API_KEY_IOS`)                                                                                                                                                          |
-| `monday`                 | Manage monday.com boards, items, groups, columns, and updates   | Env: `MONDAY_TOKEN` (personal access token from avatar → Developers → My access tokens). Uses monday's hosted MCP endpoint via `mcp-remote` — no local native build. MCP-only, no CLI fallback                                                     |
+| `monday`                 | Manage monday.com boards, items, groups, columns, and updates   | `claude mcp add monday` with a `${MONDAY_TOKEN}` Bearer header — see [Configure Remote MCPs](#configure-remote-mcps-optional). Token from avatar → Developers → My access tokens. MCP-only, no CLI fallback                                        |
 | `newrelic`               | Query New Relic observability data, alerts, and logs            | newrelic remote MCP *(or)* `newrelic profile add --name default --apiKey NRAK-... --accountId ...`                                                                                                                                                 |
 | `paypal`                 | Manage PayPal invoices, payments, and disputes                  | paypal remote MCP **(required — no CLI fallback)**                                                                                                                                                                                                 |
 | `playstore`              | Fetch, analyze, and respond to Google Play reviews              | Env: `GOOGLE_APPLICATION_CREDENTIALS` (path to service-account JSON; needs Google Play Developer API + Play Console access). Requires `uv`/`uvx` on PATH.                                                                                          |

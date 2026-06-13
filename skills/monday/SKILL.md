@@ -12,27 +12,31 @@ official **hosted** MCP endpoint.
 ## Authentication
 
 This skill uses the **monday MCP server only** — there is no monday CLI fallback.
-The `.mcp.json` entry connects to monday's hosted endpoint
-(`https://mcp.monday.com/mcp`) through the pure-JavaScript `mcp-remote` bridge,
-passing your **personal access token** as a Bearer header. It reads that token
-from the `MONDAY_TOKEN` environment variable.
-
-> **Why hosted, not local?** The local `@mondaydotcomorg/monday-api-mcp` package
-> depends on `isolated-vm`, a native addon with no prebuilt binary for current
-> Node versions — it fails to compile on Node 22+/24+/26. The hosted endpoint
-> needs no native build, so it works regardless of your Node version while using
-> the same token.
-
-To get a token: in monday.com, click your **avatar → Developers → My access
-tokens**, and copy your personal token. Export it before launching Claude Code:
+The server is **not bundled** in the plugin's `.mcp.json` (it would always-load
+for every project and require `MONDAY_TOKEN` to be set). Instead, register it
+**per folder** with `claude mcp add`, which defaults to local scope:
 
 ```bash
-export MONDAY_TOKEN="your_monday_api_token"
+export MONDAY_TOKEN="your_monday_api_token"   # avatar → Developers → My access tokens
+claude mcp add monday --transport http https://mcp.monday.com/mcp \
+  --header 'Authorization: Bearer ${MONDAY_TOKEN}'
 ```
+
+This connects to monday's hosted endpoint (`https://mcp.monday.com/mcp`) over
+native HTTP transport and passes your **personal access token** as a Bearer
+header. Single-quote the header so the token stays a runtime `${MONDAY_TOKEN}`
+reference rather than being written into the stored config.
+
+> **Why hosted + token, not the local server?** The local
+> `@mondaydotcomorg/monday-api-mcp` package depends on `isolated-vm`, a native
+> addon with no prebuilt binary for current Node versions — it fails to compile
+> on Node 22+/24+/26. The hosted endpoint needs no native build and no
+> `mcp-remote` bridge, so it works regardless of your Node version.
 
 All tool calls execute as that user and are subject to that user's monday.com
 permissions. If `mcp__monday__*` tools are not available (tool not found errors),
-the token is missing or the MCP server failed to start — inform the user and stop.
+the server has not been added or `MONDAY_TOKEN` is unset — inform the user and
+point them at the `claude mcp add` command above, then stop.
 
 ## MCP Tools
 
