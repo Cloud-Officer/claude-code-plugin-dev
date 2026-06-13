@@ -24,6 +24,18 @@ cd /path/to/repo-under-review        # or, when already inside it: cd "$(git rev
 
 Run the `cd` as a **separate** call — never chain it as `cd … && gh …`. direnv reloads `.envrc` on the next prompt, so the *following* calls get the right token; a command on the same line as the `cd` still runs with the old environment.
 
+## Sync to the default branch and pull latest
+
+Review the up-to-date default branch, not whatever was last checked out. Once the repo is the working directory (and after direnv has reloaded), switch to the default branch if not already on it and fast-forward to the remote:
+
+```bash
+DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@')
+git switch "$DEFAULT_BRANCH"
+git pull --ff-only
+```
+
+If the working tree is dirty or the pull can't fast-forward, **stop and tell the user** rather than discarding or merging their changes — they may want the review to run against the current state. Skip the switch when the user explicitly scoped the review to a feature branch or specific path.
+
 ## MCP Tools with Fallbacks
 
 Prefer MCP tools (`mcp__github__*`, `mcp__context7__*`) when available; fall back to `gh` CLI / `WebSearch` on errors. Don't let MCP failures block the review.
@@ -100,7 +112,7 @@ Workflow({
 | Scan | 3 parallel `Explore` | Tech stack (+ applicability booleans), config inventory, structure |
 | Analyze | 7–11 parallel `general-purpose` | Core agents always run; backend / infra-compliance / i18n-ml / prompt-artifacts run only when Phase 1 flags them |
 | Verify | N parallel (≤10 findings each) | Adversarial validation that tries to **disprove** each finding, with a 0–100 confidence score |
-| Filter | (in-script) | Per-severity confidence thresholds: Critical ≥50, High ≥70, Medium ≥75, Low ≥85, Info ≥90 |
+| Filter | (in-script) | Per-severity confidence thresholds: Critical ≥40, High ≥60, Medium ≥65, Low ≥75, Info ≥80 |
 
 The workflow runs in the background and notifies you on completion. It **returns a structured object**:
 

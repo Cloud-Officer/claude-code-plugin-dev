@@ -29,7 +29,7 @@ const scope = input.scope || 'the whole repository'
 // --- Per-severity confidence thresholds (Phase 3.5) ------------------------
 // Critical/High survive at lower confidence (cost of a miss is high); Medium/
 // Low/Info need higher confidence so stochastic re-runs stay deterministic.
-const SEV_THRESHOLDS = { critical: 50, high: 70, medium: 75, low: 85, info: 90 }
+const SEV_THRESHOLDS = { critical: 40, high: 60, medium: 65, low: 75, info: 80 }
 
 function normSev(s) {
   const t = String(s || '').toLowerCase()
