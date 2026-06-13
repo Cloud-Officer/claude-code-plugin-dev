@@ -18,8 +18,7 @@ for every project and require `MONDAY_TOKEN` to be set). Instead, register it
 
 ```bash
 export MONDAY_TOKEN="your_monday_api_token"   # avatar → Developers → My access tokens
-claude mcp add monday --transport http https://mcp.monday.com/mcp \
-  --header 'Authorization: Bearer ${MONDAY_TOKEN}'
+claude mcp add monday --transport http https://mcp.monday.com/mcp --header 'Authorization: Bearer ${MONDAY_TOKEN}'
 ```
 
 This connects to monday's hosted endpoint (`https://mcp.monday.com/mcp`) over
