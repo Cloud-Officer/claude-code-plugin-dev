@@ -195,19 +195,14 @@ Some skills use remote MCP servers (no local install). Add only the ones you'll 
 claude mcp add atlassian --transport http https://mcp.atlassian.com/v1/mcp
 claude mcp add bigquery --transport http https://bigquery.googleapis.com/mcp
 claude mcp add figma --transport http https://mcp.figma.com/mcp
+claude mcp add monday --transport http https://mcp.monday.com/mcp --header 'Authorization: Bearer ${MONDAY_TOKEN}'
 claude mcp add newrelic --transport http https://mcp.newrelic.com/mcp/
 claude mcp add paypal --transport http https://mcp.paypal.com/http
 claude mcp add stripe --transport http https://mcp.stripe.com
 claude mcp add vercel --transport http https://mcp.vercel.com
 ```
 
-Most prompt for OAuth on first use. **monday** is the exception — it authenticates with a personal access token instead of OAuth, so pass it as a Bearer header (the token stays a runtime `${MONDAY_TOKEN}` reference, never written into the stored config):
-
-```bash
-claude mcp add monday --transport http https://mcp.monday.com/mcp --header 'Authorization: Bearer ${MONDAY_TOKEN}'
-```
-
-Skills that need a remote MCP fall back to a CLI when one exists — see the **Setup
+Most prompt for OAuth on first use. **monday** is the exception — it authenticates with a personal access token instead of OAuth, so it takes a Bearer header (the token stays a runtime `${MONDAY_TOKEN}` reference, never written into the stored config). Skills that need a remote MCP fall back to a CLI when one exists — see the **Setup
 ** column in the [Skills](#skills) table for which skill needs which.
 
 **Naming caveat for multi-tenant setups.** Each server name owns exactly one OAuth grant — Claude Code stores the access token keyed by the name and reuses it for every call. If you work across multiple tenants of the same service (e.g. two Atlassian sites, two Stripe accounts) from different folders on one machine, **give each instance a distinct name** rather than reusing the bare name. Otherwise the OAuth token from whichever folder authorized first leaks into the other folder, even though local-scope registration looks isolated.
