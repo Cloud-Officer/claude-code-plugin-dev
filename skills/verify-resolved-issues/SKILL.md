@@ -1,7 +1,7 @@
 ---
 name: verify-resolved-issues
 description: Audit issues in a "resolved" / "fixed" / "done" state that have not been closed yet, verify the fix actually exists in the current codebase, then either close them with a detailed summary or kick them back to the original resolver with an explanation. Use when the user wants to verify resolved issues, audit resolved tickets, audit closed issues, check fixed bugs, close stale resolved issues, clean up the resolved column, sweep resolved issues, sweep done tickets, verify fixes, confirm resolutions, validate that fixed issues are really fixed, or review the resolved-but-not-closed backlog. Works against GitHub Issues if enabled on the repo, otherwise against Jira. Handles Jira projects with separate "Resolved" → "Closed" workflow as well as projects that use a single terminal state.
-allowed-tools: Bash(gh:*), Bash(jira:*), Bash(git:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(printf:*), Bash(rm:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Grep, Glob, Write, Edit, mcp__github__list_issues, mcp__github__get_issue, mcp__github__search_issues, mcp__github__add_issue_comment, mcp__github__update_issue, mcp__github__get_pull_request, mcp__github__get_pull_request_files, mcp__github__list_commits, mcp__atlassian__searchJiraIssuesUsingJql, mcp__atlassian__getJiraIssue, mcp__atlassian__addCommentToJiraIssue, mcp__atlassian__transitionJiraIssue, mcp__atlassian__getTransitionsForJiraIssue
+allowed-tools: Bash(gh:*), Bash(jira:*), Bash(git:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(printf:*), Bash(rm:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Grep, Glob, Write, Edit, Workflow, Agent, mcp__github__list_issues, mcp__github__get_issue, mcp__github__search_issues, mcp__github__add_issue_comment, mcp__github__update_issue, mcp__github__get_pull_request, mcp__github__get_pull_request_files, mcp__github__list_commits, mcp__atlassian__searchJiraIssuesUsingJql, mcp__atlassian__getJiraIssue, mcp__atlassian__addCommentToJiraIssue, mcp__atlassian__transitionJiraIssue, mcp__atlassian__getTransitionsForJiraIssue
 ---
 
 # Verify Resolved Issues
@@ -84,6 +84,60 @@ If both are passed, that's a contradiction — ask the user which they meant.
 
 ---
 
+## Parallel verification via workflow
+
+The expensive part of this skill — reading each issue's claims, reading its linked PR, cross-checking the current working tree, running narrow tests, and drafting the audit comment — is **independent per issue**, so it runs as a deterministic fan-out workflow (`verify-resolved-issues.workflow.js`): one agent per candidate, all in parallel. This is the same split as `code-review-deep` — the heavy, repeatable judgement lives in the workflow; the parts that need credentials, scope decisions, and a human-in-the-loop confirmation stay here in the skill.
+
+**Division of labour:**
+
+- **The skill (this file) does:** tracker detection (Step 1), candidate discovery (Step 2-G / 2-J + 3-J), resolver identification (Step 3-G / 4-J), and finding the linked merged PRs (Step 5-J). Then it **confirms once** before any write (`--apply`) and performs the actual writes (Step 5-G / 7-J).
+- **The workflow does:** the per-issue verification (Step 4-G / 6-J) and comment drafting, returning a structured verdict per issue. The verification checklist, the three-way outcome rules, the `SKIP_NEEDS_MANUAL` guidance, the comment templates, and the language rule all live in `${CLAUDE_PLUGIN_ROOT}/skills/verify-resolved-issues/verify-resolved-issues.workflow.js`. To tune *how a fix is judged or how a comment reads*, edit that file — not the steps below.
+
+**Before launching**, `cd` into the target repo (its own Bash call) so the workflow's agents inherit the right working directory and direnv token — their `gh`/`git`/test-runner calls depend on it. Then invoke:
+
+```text
+Workflow({
+  scriptPath: "${CLAUDE_PLUGIN_ROOT}/skills/verify-resolved-issues/verify-resolved-issues.workflow.js",
+  args: {
+    tracker: "github" | "jira",
+    scope: "<owner/repo, or project=<KEY>, sprint=<NAME|all>>",
+    ownerRepo: "<owner/repo>",
+    candidates: [
+      {
+        id: "<#NUM or KEY>",
+        title: "<issue title>",
+        url: "<issue url>",
+        body: "<issue description + acceptance criteria, as text>",
+        resolvedDate: "<ISO date the issue entered the resolved state>",
+        resolver: { login: "<gh login>", accountId: "<jira accountId>", displayName: "<name>" },
+        mergedPRs: [ { repo: "owner/repo", number: 123, url: "...", mergeCommit: "<sha>", mergedAt: "<iso>", author: "<login>", mergedBy: "<login>", files: ["path/a", "path/b"] } ],
+        finalClosedStatus: "<Jira final-closed status name, Jira only>",
+        initialStatus: "<Jira workflow start status name, Jira only>"
+      }
+    ]
+  }
+})
+```
+
+Pass **every** discovered candidate in one call — the workflow parallelises across them. It runs in the background and notifies you on completion, returning:
+
+```text
+{
+  tracker, scope,
+  counts:  { total, verified, not_verified, skip_manual, skip_insufficient, errored },
+  results: [ { id, title, url, outcome, one_line, comment_markdown, comment_language,
+               planned_action, resolver, files_reviewed, tests_run, evidence, mergedPRs } ]
+}
+```
+
+`outcome` is one of `VERIFIED` | `NOT_VERIFIED` | `SKIP_NEEDS_MANUAL` | `SKIP_INSUFFICIENT`. `comment_markdown` is the fully-filled, correctly-languaged comment to post verbatim (empty for the two `SKIP_*` outcomes — those are report-only and you must do nothing to the ticket).
+
+**Render the dry-run report** (the "Output (dry-run)" section) from `results` + `counts`. **On `--apply`**, after the single confirmation gate, perform the writes per `outcome` using the steps below: post `comment_markdown` first, then close/transition, then reassign on kick-backs. Do not re-verify — trust the workflow's verdict.
+
+The per-flow steps below remain the source of truth for **discovery and the writes**; treat their "verify in current codebase" steps (4-G / 6-J) as **delegated to the workflow** rather than executed inline.
+
+---
+
 ## GitHub Flow
 
 ### Step 2-G: Find candidate issues
@@ -118,6 +172,8 @@ For each candidate:
 4. Pull the diff: `gh pr diff <PR_NUM> --repo <owner>/<repo>` for review.
 
 ### Step 4-G: Verify in current codebase
+
+> **Delegated to the workflow.** Don't run this per-issue loop inline — pass all candidates discovered in Steps 2-G / 3-G to `verify-resolved-issues.workflow.js` (see "Parallel verification via workflow" above) and use its returned verdicts. The checklist below documents what each workflow agent does, and stays the source of truth for that logic.
 
 For each candidate, decide whether the merged PR's intent matches what the issue described AND whether the changes are still present on the default branch.
 
@@ -260,6 +316,8 @@ Filter to merged PRs. Repeat for `dataType=branch` and `dataType=repository` if 
 If dev-info is empty, fall back to a GitHub search for the issue key in PR titles/bodies/branches: `gh search prs --owner <org> "<KEY>" --merged --json repository,number,title,author,url`.
 
 ### Step 6-J: Verify in current codebase
+
+> **Delegated to the workflow.** Like Step 4-G, pass all candidates (with their resolver and linked-PR data from Steps 4-J / 5-J) to `verify-resolved-issues.workflow.js` and act on its verdicts. The procedure below is what each workflow agent runs.
 
 Same procedure as **Step 4-G**, including the three-way outcome: **VERIFIED**, **NOT_VERIFIED**, or **SKIP_NEEDS_MANUAL**. Read the issue description and acceptance criteria, read the touched files in the current working tree, confirm the described behavior is present, run tests/linters narrowly if useful. If the ticket's correctness cannot be determined from code alone (visual/UX bugs, third-party integrations, device-specific behavior — see Step 4-G), mark **SKIP_NEEDS_MANUAL** and **do nothing on the ticket** — no comment, no transition, no reassignment. Skipped tickets only show up in the report.
 
