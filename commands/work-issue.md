@@ -1,7 +1,7 @@
 ---
-description: Implement a GitHub issue or Jira ticket end-to-end (explore, design, implement, PR)
-argument-hint: <issue-number-or-jira-key>
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(jira:*), Bash(awk:*), Bash(cat:*), Bash(echo:*), Bash(grep:*), Bash(jq:*), Bash(sed:*), Bash(tr:*), Read, Edit, Write, Glob, Grep, TodoWrite, Agent, mcp__github__*, mcp__atlassian__*, mcp__figma__*
+description: Implement one or more GitHub issues or Jira tickets end-to-end (explore, design, implement, PR). Multiple issues run in parallel.
+argument-hint: <issue-number-or-jira-key> [more-issues...]
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(jira:*), Bash(awk:*), Bash(cat:*), Bash(echo:*), Bash(grep:*), Bash(jq:*), Bash(sed:*), Bash(tr:*), Read, Edit, Write, Glob, Grep, TodoWrite, Agent, Workflow, AskUserQuestion, mcp__github__*, mcp__atlassian__*, mcp__figma__*
 ---
 
 Work on issue: $ARGUMENTS
@@ -59,6 +59,73 @@ When the issue description or comments contain Figma URLs (`figma.com/design/...
 | Get screenshot | `mcp__figma__get_screenshot` |
 | Search design system | `mcp__figma__search_design_system` |
 
+## Single issue vs. multiple issues (mode select)
+
+Parse `$ARGUMENTS` into a list of issue refs (split on whitespace and/or commas; e.g. `123 124 DEV-5` or `123, 124`). Count them:
+
+- **One ref → sequential mode (default).** Run the full interactive workflow below (Steps 0–12) exactly as written. The clarifying-questions gate (Step 5) and architecture-choice gate (Step 6) need a human in the loop, so a single issue keeps the rich back-and-forth.
+- **Two or more refs → parallel mode.** Implement them concurrently via the workflow described in the next section, then open PR(s). Use parallel mode when the user passes a batch of issues — it is best for Bugs and well-specified Tasks. If any ref is a **Feature likely to need design discussion**, tell the user it is better done on its own in sequential mode, and offer to either implement it autonomously (the agent records its assumptions for review) or split it out.
+
+---
+
+## Parallel mode (multiple issues)
+
+Each issue is implemented by its own agent in its own **git worktree**, so parallel file edits never collide. The fan-out runs as a deterministic workflow (`work-issue.workflow.js`); your job in the command is the preflight, launching the workflow, and the human-in-the-loop PR decision at the end.
+
+**Why a workflow:** the per-issue explore → implement → test → commit loop is independent across issues, so it parallelises cleanly. What does NOT parallelise — the single "separate vs. combined PR" decision and PR creation itself — stays here in the command.
+
+### P1 — Preflight
+
+`cd` into the target repo in its own Bash call (so direnv loads the right token — see the direnv note above), then gather the base context once:
+
+```bash
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
+REPO_ROOT=$(git rev-parse --show-toplevel)
+git fetch --all --quiet
+```
+
+Detect the tracker once (`gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'`) and reuse it for every ref — a batch is assumed to target one repo/tracker. Refuse to start if the working tree has uncommitted changes (the worktrees branch from `origin/$DEFAULT_BRANCH`, but a dirty main checkout still signals risk) — ask the user to stash/commit first.
+
+### P2 — Launch the workflow
+
+```text
+Workflow({
+  scriptPath: "${CLAUDE_PLUGIN_ROOT}/commands/work-issue.workflow.js",
+  args: {
+    defaultBranch: "<DEFAULT_BRANCH>",
+    repoRoot: "<REPO_ROOT>",
+    issues: [ { ref: "123", tracker: "github" }, { ref: "124", tracker: "github" } ]
+  }
+})
+```
+
+Each agent fetches its issue, creates branch `issue-<n>` (GitHub) or `<KEY>` uppercase (Jira) from `origin/$DEFAULT_BRANCH`, implements the change, **writes and runs tests (hard gate — same rule as Step 8)**, and commits with the correct issue-tagged, signature-free message. Agents are autonomous (no mid-run questions) and record any judgement calls in `assumptions[]`. They do **not** push or open PRs. The workflow returns:
+
+```text
+{
+  defaultBranch, repoRoot,
+  results: [ { ref, tracker, branch, issue_type, title, success, summary,
+               files_changed, test_status, assumptions, pr_title, closing_keyword, block_reason } ]
+}
+```
+
+The implementation rules (branch naming, issue-type → commit prefix, the test hard-gate, no-signature commits) live in `${CLAUDE_PLUGIN_ROOT}/commands/work-issue.workflow.js` — edit that file to tune the parallel path.
+
+### P3 — Review results
+
+Present a compact per-issue summary from `results`: outcome, branch, `test_status`, `files_changed`, and any `assumptions`. For any `success:false`, show `block_reason` and **exclude it from PR creation** — offer to retry it in sequential mode. Let the user eyeball the diffs (`git diff origin/$DEFAULT_BRANCH...<branch>`) before opening anything.
+
+### P4 — Ask: separate PRs or one combined PR?
+
+Once the user is happy, use `AskUserQuestion` to decide how to ship the successful branches:
+
+- **Separate PRs (one per issue)** — for each successful result, open a PR from its branch via the `create-pr` skill, using its `pr_title` and adding its `closing_keyword` to the PR **body** (GitHub). This is the default when the issues are unrelated.
+- **Single combined PR** — create one integration branch from `origin/$DEFAULT_BRANCH`, merge each successful issue branch into it (`git merge --no-ff <branch>` per issue; resolve any conflicts, re-run tests), then open one PR via `create-pr`. Put **every** issue's closing keyword on its own line in the body (`Closes #123`, `Fixes #124`, …) so all of them auto-close on merge. Use this when the issues are tightly related or the user wants a single review.
+
+In both cases the `create-pr` skill handles running tests locally, pushing, opening the PR, and watching CI (via the Actions runs REST API) — do not `git push` / `gh pr create` yourself. After PRs are open, run Steps 10–11 (update issue, post the tester QA checklist) per issue, and for Jira transition each to **Code Review**. Then clean up worktrees (`git worktree remove .worktrees/<branch>` or the workflow's temporary worktrees) once the user confirms, preserving the branches until the PRs merge.
+
+---
+
 ## Detect Issue Tracker
 
 ```bash
@@ -95,7 +162,9 @@ After fetching the issue details, determine the issue type:
 
 For Jira issues, always use `$ARGUMENTS: <description>` (the Jira key is the prefix).
 
-## Workflow
+## Workflow (sequential mode — single issue)
+
+This is the full interactive flow for **one** issue. For two or more issues, use Parallel mode above instead; it reuses these same rules (issue-type detection, the test hard-gate, commit/PR conventions) but runs them per-issue in isolated worktrees.
 
 Steps 4–6 are gated by Issue Type (detected above) — the gating note on each step shows when to run it. **Step 8 (write and run unit tests) is a hard gate for any change that alters behavior**, regardless of issue type; the PR cannot be opened until it is satisfied or an explicit no-test exception applies.
 
