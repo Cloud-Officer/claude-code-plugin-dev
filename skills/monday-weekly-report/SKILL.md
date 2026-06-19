@@ -1,12 +1,12 @@
 ---
 name: monday-weekly-report
-description: Generate a weekly project-status report from one or more monday.com boards — general project tracking, not engineering throughput. Covers per-board health, owner activity (role-aware), items moved this week, overdue and due-soon work, stuck/blocked and stale items, upcoming milestones, and a date-driven delivery-risk assessment with a concrete catch-up plan. Role-aware (owner / contributor / stakeholder / external / other, confirmed once and cached) and runs against a past-full-week or week-to-date window so it can be run any day. Use when the user wants a weekly project report, project status report, monday board status, project health check, delivery-risk assessment, or stakeholder update from monday.com. Writes PROJECT_REPORT.md and prints to stdout; emails on --send.
+description: Generate a weekly project-status report from one or more monday.com boards — general project tracking, not engineering throughput. Covers per-board health, owner activity (role-aware), items moved this week, overdue and due-soon work, stuck/blocked and stale items, upcoming milestones, and a date-driven delivery-risk assessment with a concrete catch-up plan. Role-aware (three roles — owner / external / other, confirmed once and cached) and runs against a past-full-week or week-to-date window so it can be run any day. Use when the user wants a weekly project report, project status report, monday board status, project health check, delivery-risk assessment, or stakeholder update from monday.com. Writes PROJECT_REPORT.md and prints to stdout; emails on --send.
 allowed-tools: mcp__monday__get_board_schema, mcp__monday__get_board_items_by_name, mcp__monday__list_users_and_teams, mcp__monday__all_monday_api, mcp__monday__get_graphql_schema, mcp__monday__get_type_details, AskUserQuestion, Read, Write, Bash(jq:*), Bash(echo:*), Bash(mkdir:*), Bash(date:*), Bash(printf:*), Bash(ls:*), Bash(cat:*)
 ---
 
 # Weekly Project Report (monday.com)
 
-Generate a weekly project-status report for one or more monday.com boards. This is **general project tracking** — owners, statuses, due dates, and milestones — **not** engineering throughput, so keep all language generic ("owner", "contributor", "item") and never assume a board is a software project. The report includes a **date-driven delivery-risk assessment with a concrete catch-up plan**, per-board health rollups, **role-aware** owner activity (each owner's role is confirmed once and cached), items moved this week, overdue / due-soon work, stuck / stale items, and upcoming milestones. Writes `PROJECT_REPORT.md` to the current directory, prints to stdout, and on `--send` delivers via email.
+Generate a weekly project-status report for one or more monday.com boards. This is **general project tracking** — owners, statuses, due dates, and milestones — **not** engineering throughput, so keep all language generic ("owner", "item", "board") and never assume a board is a software project. The report includes a **date-driven delivery-risk assessment with a concrete catch-up plan**, per-board health rollups, **role-aware** owner activity (each owner's role is confirmed once and cached), items moved this week, overdue / due-soon work, stuck / stale items, and upcoming milestones. Writes `PROJECT_REPORT.md` to the current directory, prints to stdout, and on `--send` delivers via email.
 
 This skill is **read-only**. It never creates, edits, moves, or deletes monday boards, items, columns, groups, or updates.
 
@@ -116,8 +116,9 @@ For every selected board, call `get_board_schema` and locate, by **type** (not b
 - **date / timeline column** (`type: date` or `type: timeline`) — the due-date signal that drives delivery risk. Prefer a timeline (start+end) if present; else the date column. A board may legitimately have none.
 - **groups** — top-level groupings (often phases / workstreams / priorities); used for the per-group health rollup.
 - **dependency column** (`type: dependency`, optional) — if present, captures item-to-item dependencies; enables the dependency-aware risk and "re-sequence" recommendations. Skip those clauses entirely when no dependency column exists.
+- **subitems / subtasks column** (`type: subtasks`, optional but common) — links each parent item to its subtasks. **Subtasks always count** (Step 5/6): a parent's real progress lives in its subtasks, so the report must evaluate them, not just the top-level rows. Subtasks live on a **separate subitem board with its own column namespace**, so their status / people / date column IDs **differ from the parent's** (e.g. the parent's `status` is often `status5` on the subitem board, and `dependency_mm…` for the dependency). Discover the subitem board's columns by their `type` — either call `get_board_schema` on the subitem board, or read one subitem's full `column_values { id type text }` once and match by type. Never assume the subitem status id equals the parent's.
 
-Record per board: `board_id`, `board_name`, `status_col_id`, `people_col_id`, `date_col_id` (or null), `dependency_col_id` (or null), and the group list. If a board has **no date column**, note it — its delivery-risk subsection will render "*no date column — risk not assessed*" rather than aborting.
+Record per board: `board_id`, `board_name`, `status_col_id`, `people_col_id`, `date_col_id` (or null), `dependency_col_id` (or null), `subitems_col_id` (or null), the resolved **subitem-board column ids** (`sub_status_col_id`, `sub_people_col_id`, `sub_date_col_id` — or null when a board has no subtasks), and the group list. If a board has **no date column**, note it — its delivery-risk subsection will render "*no date column — risk not assessed*" rather than aborting.
 
 ## Step 3.5: Confirm status mapping per board (cached)
 
@@ -147,13 +148,15 @@ Every owner (person appearing in the people column across the selected boards) h
 
 ### Role catalog
 
-| Role | Key | Tracked on | Behavior |
-| --- | --- | --- | --- |
-| Owner / Lead | `owner` | full activity + on-time delivery of their items | accountable; flagged when their items slip or stall |
-| Contributor | `contributor` | activity + their items' movement | does the work; tracked |
-| Stakeholder / Sponsor | `stakeholder` | not rated on throughput (shows `—`) | manager/exec; only flagged when an item they own is blocking others |
-| External / Vendor | `external` | relaxed expectations; not penalized for low weekly movement | part-time / outside the org |
-| Other (do-not-track) | `other` | not rated (shows `—`); excluded from activity rollups | **but still flagged if their items aren't moving** — stuck/stale/overdue checks still run and surface in the delivery-risk section |
+Exactly **three** roles — each has a genuinely distinct treatment (no two are tracked the same way), set along two axes: *is the owner rated on weekly movement?* and *are their overdue/at-risk items surfaced?*
+
+| Role | Key | Rated on movement? | Overdue surfaced? | Behavior |
+| --- | --- | --- | --- | --- |
+| Owner | `owner` | ✅ yes — full-time expectations | ✅ yes | Accountable, full-time. Rated on weekly movement + on-time delivery; flagged as **stalled** on a quiet week; their overdue items are flagged against them. The default for everyone unless changed. |
+| External | `external` | ✅ yes — **relaxed** (part-time / outside the org) | ✅ yes | Still rated on movement + delivery and their **overdue items are still tracked and flagged**, but on relaxed expectations — **not** flagged as stalled for low weekly cadence (they are not full-time). |
+| Other | `other` | ❌ no — not rated (shows `—`) | ❌ no | **Not tracked.** Excluded from owner-activity ratings and from overdue / at-risk attribution. Their items still count in board totals, but the person is never rated or flagged. |
+
+The one difference between **Owner** and **External** is the cadence flag: both are rated and both have overdue surfaced, but an External is never marked stalled for a slow week. **Other** is the only role excluded from rating and overdue attribution entirely.
 
 ### Load the role cache
 
@@ -165,31 +168,32 @@ Roles persist as JSON keyed by monday `user_id`: `${MONDAY_WEEKLY_REPORT_ROLES:-
 
 ### Decide who to prompt
 
-An owner needs confirmation if they are not in the cache, OR `--reconfirm-roles` was passed. If everyone is cached and the flag was not passed, skip prompting.
+An owner needs confirmation if they are not in the cache, OR their cached entry is `auto: true` (written by a prior `--send` run, never human-confirmed), OR `--reconfirm-roles` was passed. If every owner has a human-confirmed cache entry and the flag was not passed, skip prompting and reuse the cache.
 
-**Auto-detected default (pre-selected):** an owner who owns ≥ 5 active items across the boards → `owner`; an owner whose name/team marks them external (no auto-signal — default `contributor`); everyone else → `contributor`. A cached role always wins as the pre-selection unless `--reconfirm-roles` forces a fresh choice. (These are only defaults; the human picks `stakeholder` / `external` / `other` as needed.)
+**In an interactive preview run, prompting for any owner who needs confirmation is mandatory — do not silently auto-default to avoid asking.** Auto-defaulting only happens on a `--send` / non-interactive run (see the fallback below). The auto-detected role is *proposed* (pre-selected) in the prompt so the human usually just confirms with one tap; it is a proposal, not a substitute for asking. (This mirrors the weekly-dev-report role flow: propose once interactively, then cache and reuse.)
 
-### Prompt (interactive runs only)
+**Auto-detected default (proposed, pre-selected):** default **every** owner to `owner` — there is no reliable API signal for who is external or untracked, so `owner` is the safe proposal and the human downgrades to `external` (part-time / outside the org) or `other` (don't track) where they know it applies. A cached role always wins as the pre-selection unless `--reconfirm-roles` forces a fresh choice.
 
-Only when the run is a preview and the session is interactive. Use **AskUserQuestion**, batching owners ≤ 4 per call:
+### Prompt (interactive preview runs — required)
 
-- One question per owner. `header` = first name (≤ 12 chars). `question` = e.g. `What is Dana Lee's role on this project?`.
-- Options (`multiSelect: false`): **Owner / Lead**, **Contributor**, **Stakeholder / Sponsor**, **External / Vendor**, **Other (don't track, notify if stuck)**. List the auto-detected default first with " (detected)" appended.
-- Map any free-text "Other" answer to the closest role key, defaulting to `other`.
+When the run is a preview and the session is interactive, you **must** present the proposed roles for confirmation — even when there are many owners. Use **AskUserQuestion**, batching owners ≤ 4 per call and **looping** until every owner who needs confirmation has been asked (do not stop after the first batch). Do not skip the prompt because the proposals "look obvious" or to save turns.
+
+- One question per owner. `header` = first name (≤ 12 chars). `question` = e.g. `What is Dana Lee's role on this project?` — include the signal behind the proposal in the question or option description (e.g. "owns 12 active items") so the human can judge.
+- Options (`multiSelect: false`), all three: **Owner**, **External**, **Other (don't track)**. List the proposed default (`owner`) **first** with " (proposed)" appended so it is the obvious pick. Three roles fit the picker's 4-option limit directly — no free-text fallback needed.
 
 ### Persist
 
-Merge answers into the role cache and write it back (`mkdir -p` the parent dir first). Stamp `confirmedAt` with today's date. Never delete entries for owners not in scope this run; only add/update.
+Merge answers into the role cache and write it back (`mkdir -p` the parent dir first). Stamp `confirmedAt` with today's date and **drop any `auto` flag** on the entries the human just confirmed (they are now human-confirmed). Never delete entries for owners not in scope this run; only add/update.
 
 ### Non-interactive fallback (`--send` or no TTY)
 
-Do not prompt. Use the cached role if present, else the auto-detected default. In the report header, disclose how many owners used an auto-default, e.g. `Roles: 7 confirmed, 2 auto-defaulted (run a preview to confirm)`.
+Do not prompt. Use the cached role if present, else the auto-detected default — and when you write an auto-defaulted role to the cache, mark it `auto: true` so the next preview re-proposes it. In the report header, disclose how many owners used an auto-default, e.g. `Roles: 7 confirmed, 2 auto-defaulted (run a preview to confirm)`.
 
 Carry the resolved `owner_role` for every owner into Steps 6–7.
 
 ## Step 5: Pull items and weekly movement
 
-For each board, fetch items with their status, owner, date/timeline values, `updated_at`, and latest update text. Page all items via `all_monday_api` (`items_page`) when the dynamic API is available; otherwise fall back to `get_board_items_by_name` for the items/groups of interest and note the limited coverage in the header. Record per item:
+For each board, fetch items with their status, owner, date/timeline values, `updated_at`, and latest update text. Page all items via `all_monday_api` (`items_page`) when the dynamic API is available; otherwise fall back to `get_board_items_by_name` for the items/groups of interest and note the limited coverage in the header. **Verify the page total against `items_count`** (e.g. `boards { items_count items_page { … } }`): the first page returns up to 500 items plus a `cursor` — keep calling `next_items_page(cursor)` until `cursor` is null, and confirm the collected unique-id count equals `items_count` before computing (a mismatch means a pagination bug — dedupe by id and re-page, do not silently report inflated counts). Record per item:
 
 - `id`, `name`, `group`, `board_id`, `board_name`
 - `status_label` → mapped `status_bucket` (Step 3.5)
@@ -198,23 +202,57 @@ For each board, fetch items with their status, owner, date/timeline values, `upd
 - `updated_at`
 - `last_update` = most recent update/comment `{ author, created_at, text }` if any
 
+### Subtasks (always pulled)
+
+In the **same** `items_page` query, also pull each item's subtasks and their values from the subitem-board columns resolved in Step 3 — never skip them, and never re-use the parent's column ids on a subitem:
+
+```graphql
+items_page(limit: 500) { cursor items {
+  id name updated_at group { title }
+  column_values(ids: ["<status>","<people>","<date|timeline>"]) { id text }
+  subitems {
+    id name updated_at
+    column_values(ids: ["<sub_status>","<sub_people>","<sub_date>"]) { id text }
+  }
+} }
+```
+
+Record per subtask: `id`, `name`, `parent_id`, `sub_status_label` → `sub_status_bucket` (reuse the parent board's Step 3.5 mapping unless the subitem board has distinct labels — confirm/cache separately if so), `owner`(s) → role, `due`, `updated_at`. If `subitems` comes back with empty `column_values`, the subitem column ids were wrong — re-resolve them by type (Step 3) rather than treating the subtask as having no status. Subtasks feed the **subtask rollup** in Step 6; the report evaluates parents *and* subtasks.
+
 ### Weekly movement (hybrid)
 
 - **Activity-log mode:** from `activity_logs(from, to)`, collect per owner the status changes they authored in the window: `→ done` (completed), `→ in_progress` (started), `→ stuck` (flagged blocked), and item creations. Attribute to the `user_id` on the event.
 - **Snapshot mode:** an item is "touched this week" if `updated_at ∈ [week_start, week_end]`. Attribute to the current owner(s). Bucket coarsely: items now in `done` and touched this week → "completed this week"; items now in `stuck` and touched → "flagged stuck this week"; others touched → "advanced this week".
 
+**Subtask movement counts too.** A status change on a subtask is real progress on its parent — include it in the owner's weekly movement and in "items moved this week" (rendered as `<parent> › <subtask>`). In activity-log mode, subtasks live on the subitem board, so their status events come from that board's `activity_logs` (query the subitem board id, or rely on the subtask `updated_at` falling in the window when the subitem activity log isn't reachable, disclosed as snapshot for subtasks). In snapshot mode, a subtask counts as "touched this week" when its own `updated_at` is in the window.
+
 In `current` (week-to-date) mode, exclude changes whose only timestamp is *today* from any per-day rate (today is in progress); they still appear in the "moved this week" counts.
 
 ## Step 6: Compute health, risk, and flags
+
+### Subtask rollup (always applied)
+
+Subtasks are evaluated alongside parents — a parent can look fine while its subtasks slip, so fold subtask state into the parent before computing health and risk:
+
+- **Effective done.** A parent counts as *truly* done only when its own bucket is `done` **and** every subtask is `done`/`cancelled`. A parent in `done` with ≥ 1 non-done subtask is **not** counted as done in `completion_pct`; instead it is flagged `parent done but N/M subtasks open` and surfaced in the at-risk list.
+- **Subtask completion ratio.** Per parent with subtasks, compute `done_subtasks / total_subtasks` (excluding cancelled). Render it next to the parent (e.g. `(3/5 subtasks done)`).
+- **Subtask overdue / stuck.** An overdue subtask (`sub.due < today`, bucket ∉ {done, cancelled}) or a `stuck` subtask makes its parent **at risk** even if the parent's own status/date look clean — list it as `<parent> › <subtask>` in the overdue/at-risk and 🚩 stuck sections with the parent as context.
+- **Status-mismatch flag.** When a parent's bucket is *ahead* of its subtasks (e.g. parent `In Review/Approval` while a recording subtask is still `not_started`), flag `parent ahead of subtasks` — it usually means the parent status was advanced prematurely.
+- **Parent movement roll-up (judge a container by its subtasks, not the wrapper).** A parent **with subtasks** is a container/ownership wrapper — it is *expected* to sit parked on its owner (often a product owner) and **cannot** be effective-done until its subtasks finish, so the parent's own `updated_at` going quiet is **not** a stall signal. For each such parent compute:
+  - **`parent_is_moving`** = any subtask had a status change in the trailing 14 days (activity-log mode) or any subtask's `updated_at` is within 14 days (snapshot mode), OR any subtask is in an active (`in_progress`) status. → The parent is healthy ("parked, subtasks in flight") and **must not** be flagged stuck or stale, and its owner must not be flagged stalled on its account.
+  - **`parent_is_blocked`** = the parent can't complete **and every** subtask is itself stalled (no subtask change in 14 days and none `in_progress`) — usually one or more subtasks are `stuck` or `not_started`. → The real problem is those subtasks. Surface the **blocking subtask(s)** with **their own owner(s)** as the stuck/at-risk entry (rendered `<parent> › <subtask>`), noted `blocks parent — parked on <owner> (product owner)`. Attribute the action to the subtask owner, never to the parent's product owner.
+  A parent with **no subtasks** is a leaf — its own `updated_at` remains the signal, unchanged.
+- **Counting model.** Primary board/group counts stay **item-level** (one row per top-level item) so totals match the board; subtask state is layered on via the rollups above. Add a per-board **subtask coverage line** (`X parents have subtasks; Y subtasks total, Z% done`) so the reader sees the depth behind the headline counts. Do **not** silently merge subtasks into the top-level bucket totals (that double-counts) — keep them as a rollup and an explicit coverage line.
 
 ### Per-board / per-group health
 
 For each board (and each group within it):
 
-- counts by bucket: `done`, `in_progress`, `stuck`, `not_started`, `cancelled`
-- `completion_pct = done / (total − cancelled)`
-- `overdue_count`, `due_soon_count` (see below)
-- board health: 🔴 if `stuck_count > 0` and `overdue_count > 0` (or completion far behind, see risk); 🟡 if any overdue **or** any stuck; 🟢 otherwise.
+- counts by bucket: `done`, `in_progress`, `stuck`, `not_started`, `cancelled` (item-level; a parent with open subtasks is not counted `done` per the rollup above)
+- `completion_pct = effective_done / (total − cancelled)` (effective-done applies the subtask rollup)
+- `overdue_count`, `due_soon_count` (see below; include parents made at-risk by an overdue subtask)
+- subtask coverage line (parents-with-subtasks, total subtasks, % subtasks done)
+- board health: 🔴 if `stuck_count > 0` and `overdue_count > 0` (or completion far behind, see risk); 🟡 if any overdue **or** any stuck (parent- or subtask-level); 🟢 otherwise.
 
 ### Delivery risk (date-driven — the project-goal analog)
 
@@ -229,19 +267,23 @@ Risk is measured against **due dates / timelines** (the decision for this skill)
    - 🟢 **On track** — no overdue and no at-risk due-soon items.
    - Board with **no date column**: status = "n/a — no date column"; still report health and stuck/stale.
 5. **At-risk items** list — each with item, board, owner (+role), due, status, the reason, and a **recommended action**.
-6. **Catch-up plan** — a short, **prioritized** list; every step names specific items and people. Levers: re-balance ownership (overloaded/stuck owner → owner with capacity), escalate stuck items to a `stakeholder`, pull in an `external`/vendor, re-sequence dependencies (only when a dependency column exists), or **recommend** moving a low-priority item's due date / descope. **Recommend only — never modify monday** (read-only skill). If 🟢 with no at-risk items, the plan is a single "On track" line.
+6. **Catch-up plan** — a short, **prioritized** list; every step names specific items and people. Levers: re-balance ownership (overloaded/stuck `owner` → `owner` with capacity), chase an `external` on a relaxed cadence for an overdue item, re-sequence dependencies (only when a dependency column exists), or **recommend** moving a low-priority item's due date / descope. **Recommend only — never modify monday** (read-only skill). If 🟢 with no at-risk items, the plan is a single "On track" line.
+
+Items owned by an `other`-role owner are **excluded** from the at-risk list and the catch-up plan (that role is not tracked) — they still count in board totals but are not attributed or chased.
 
 ### 🚩 Stuck / blocked items
 
-Items with `status_bucket == stuck`, OR items in `in_progress`/`not_started` with **no `updated_at` change and no update/comment in the last 14 days** (calendar days from today, independent of the window). For `other`-role owners, additionally flag **any** of their items with no movement in 14 days (the "do-not-track but notify if not moving" rule).
+Items with `status_bucket == stuck`, OR items in `in_progress`/`not_started` with **no `updated_at` change and no update/comment in the last 14 days** (calendar days from today, independent of the window). Items owned **only** by an `other`-role owner are excluded from this section (that role is not tracked); `owner`- and `external`-owned items are both included.
+
+**Apply the parent movement roll-up first.** A parent with subtasks that is `parent_is_moving` is **not** stuck no matter how quiet its own row is — skip it. A `parent_is_blocked` parent is represented by its **blocking subtask(s)** here (`<parent> › <subtask>`, with the subtask's owner), not the parked parent. A parent is listed in its own right only when it has no subtasks (a leaf) or is genuinely `stuck` at the parent level.
 
 ### 🐢 Stale items
 
-Top items (across boards) with the oldest `updated_at` among non-`done`/`cancelled` items — the "nothing is happening here" list. **Exclude items already shown in the 🚩 Stuck / blocked section** so the same item isn't double-listed. Cap at the 10 oldest and say so.
+Top items (across boards) with the oldest `updated_at` among non-`done`/`cancelled` items — the "nothing is happening here" list. **Exclude items already shown in the 🚩 Stuck / blocked section** so the same item isn't double-listed. **Also exclude any `parent_is_moving` container** — a Story-style parent parked on its owner while its subtasks advance is not stale, even though its own `updated_at` is old; rank it by its newest subtask activity, not the wrapper's timestamp. Cap at the 10 oldest and say so.
 
 ### Stalled owners
 
-Flag an owner (excluding `stakeholder` and `external`) who owns ≥ 1 non-done item and authored **zero** weekly movement (activity-log mode) or had **zero** touched items this week (snapshot mode) across both the week and the trailing 14 days. `other`-role owners are surfaced via their non-moving items, not as a "stalled owner" rating.
+Flag only an **`owner`** (full-time) who owns ≥ 1 non-done item and authored **zero** weekly movement (activity-log mode) or had **zero** touched items this week (snapshot mode) across both the week and the trailing 14 days. **Exclude owners whose only non-done items are `parent_is_moving` containers** — a product owner parked on Stories whose subtasks (often owned by others) are advancing is doing ownership, not stalling. They must own ≥ 1 non-moving **leaf** (or a `parent_is_blocked` container with no other owner to attribute to) before the stalled flag fires; a blocked parent's stall is attributed to the blocking subtask's owner, not the product owner. `external` owners are **not** flagged as stalled (relaxed cadence — they are part-time/outside), though their overdue items still surface in the delivery-risk section. `other` owners are not tracked at all.
 
 ## Step 7: Render the report
 
@@ -269,8 +311,8 @@ Write `PROJECT_REPORT.md` to the current directory and print the same content. U
 
 | Item | Board | Owner (role) | Due | Status | Why at risk | Recommended action |
 | --- | --- | --- | --- | --- | --- | --- |
-| **Vendor contract sign-off** (id 998877, Ops) | Ops | Dana (stakeholder) | 2026-06-15 | Stuck | 4 days overdue, blocks launch | Escalate to <sponsor>; set a decision deadline this week |
-| **Landing page copy** (id 112233, Marketing) | Marketing | Priya (external) | 2026-06-22 | Not started | Due in 3 days, not begun | Re-balance to Sam, or confirm vendor start date today |
+| **Vendor contract sign-off** (id 998877, Ops) | Ops | Sam (owner) | 2026-06-15 | Stuck | 4 days overdue, blocks launch | Escalate; set a decision deadline this week |
+| **Landing page copy** (id 112233, Marketing) | Marketing | Priya (external) | 2026-06-22 | Not started | Due in 3 days, not begun | Chase the vendor for a start date today |
 
 ### Catch-up plan (prioritized)
 
@@ -278,6 +320,18 @@ Write `PROJECT_REPORT.md` to the current directory and print the same content. U
 2. <…>
 
 If 🟢 on track with no at-risk items, replace both subsections with: "🟢 **On track** — no delivery risks flagged. All dated items are on schedule." Do not omit the section.
+
+## Roles
+
+The full roster of owners and the role each is tracked under (from Step 4). Always render this list so the reader can see — and challenge — how every owner is being evaluated. `Source` is `confirmed` (human-confirmed in a preview) or `auto-proposed` (auto-defaulted on a headless run, not yet confirmed — re-proposed next preview).
+
+| Owner | Role | Source | Open items | Note |
+| --- | --- | --- | ---:| --- |
+| Sam | Owner | confirmed | 9 | full-time, accountable |
+| Priya | External | confirmed | 3 | part-time vendor — relaxed cadence, overdue still tracked |
+| Jordan | Other | auto-proposed | 1 | not tracked — confirm in a preview |
+
+If every owner is `auto-proposed`, add a one-line note: "_All roles auto-proposed — run a preview (or `--reconfirm-roles`) to confirm._"
 
 ## Project health at a glance
 
@@ -291,13 +345,13 @@ Per board (and a roll-up row). `Completion` excludes cancelled items.
 
 ## Owner activity this week (role-aware)
 
-Owners with role `stakeholder`, `external`, or `other` are not rated on weekly movement (their cell shows `—` with a note); they appear if they have activity or non-moving items.
+`owner` and `external` are both rated on weekly movement (External on a relaxed cadence — never flagged stalled for a quiet week). `other` is not rated — its cell shows `—` and the row appears only if it has activity. `other`-owned items are not surfaced as risk.
 
 | Owner | Role | Items completed | Items advanced | Flagged stuck | Items owned (open) | Note |
 | --- | --- | ---:| ---:| ---:| ---:| --- |
-| Sam | Owner / Lead | 3 | 4 | 0 | 9 | On track |
-| Dana | Stakeholder | — | — | — | 2 | Sponsor — not rated; owns 1 blocking item |
-| Priya | External / Vendor | 1 | 1 | 0 | 3 | Vendor — relaxed cadence |
+| Sam | Owner | 3 | 4 | 0 | 9 | On track |
+| Priya | External | 1 | 1 | 0 | 3 | External — relaxed cadence; overdue still tracked |
+| Jordan | Other | — | — | — | 1 | Not tracked |
 
 (In snapshot attribution mode, "completed / advanced / flagged stuck" are derived from `updated_at` + current status and are approximate — the header states this.)
 
@@ -312,16 +366,16 @@ Grouped by board. New items, completions, and status changes inside the window.
 
 | Item | Board | Owner (role) | Due | Status | Days |
 | --- | --- | --- | --- | --- | ---:|
-| **Vendor contract sign-off** (id …) | Ops | Dana (stakeholder) | 2026-06-15 | Stuck | +4 overdue |
+| **Vendor contract sign-off** (id …) | Ops | Sam (owner) | 2026-06-15 | Stuck | +4 overdue |
 | **Landing page copy** (id …) | Marketing | Priya (external) | 2026-06-22 | Not started | −3 (due soon) |
 
 ## 🚩 Stuck / blocked items
 
 | Item | Board | Owner (role) | Status | Last movement |
 | --- | --- | --- | --- | --- |
-| **Vendor contract sign-off** (id …) | Ops | Dana (stakeholder) | Stuck | 2026-05-30 |
+| **Vendor contract sign-off** (id …) | Ops | Sam (owner) | Stuck | 2026-05-30 |
 
-Include `other`-owner items with no movement in 14 days, noted `untracked owner — item not moving`. Omit the section if empty.
+Include `other`-owner items with no movement in 14 days, noted `untracked owner — item not moving` — but only **leaf** items or `parent_is_blocked` containers (rendered as the blocking `<parent> › <subtask>` with the subtask's owner); a `parent_is_moving` container parked on an `other` owner is not listed. Omit the section if empty.
 
 ## 🐢 Stale items (no movement)
 
@@ -339,9 +393,9 @@ Items flagged as milestones (a milestone column/label if the board has one, else
 
 ## Per-owner detail
 
-Each heading: `### <Name> — <Role>`. For `stakeholder` / `external` / `other`, note the role so low movement is not misread.
+Each heading: `### <Name> — <Role>`. For `external` (relaxed cadence) and `other` (not tracked), note the role so low movement is not misread.
 
-### Sam — Owner / Lead
+### Sam — Owner
 
 _On track. Completed 3 items, advanced 4._
 
@@ -350,12 +404,13 @@ _On track. Completed 3 items, advanced 4._
 
 ---
 
-<Repeat per owner: 🔴/at-risk owners first, then on-track, then non-rated roles last>
+<Repeat per owner: 🔴/at-risk owners first, then on-track owners/externals, then `other` (not rated) last>
 ````
 
 Rendering rules:
 
 - Every item is shown with its **name and ID**; add the board when the same name could appear on multiple boards.
+- **Subtasks:** parents with subtasks show their completion ratio inline (e.g. `(3/5 subtasks done)`). Subtask-level risks render as `**<parent>** (id …) › **<subtask>** (id …)` so the parent is always the anchor. Add the per-board **subtask coverage line** under the health-at-a-glance table, and in the per-owner detail list a parent's open/overdue/stuck subtasks beneath it. Surface `parent done but N subtasks open` and `parent ahead of subtasks` mismatches in the 🎯 at-risk list.
 - Dates in local timezone, `YYYY-MM-DD`. Overdue shown as `+N overdue`, due-soon as `−N (due soon)`.
 - Never include raw JSON, GraphQL, tokens, or debug output in the rendered report.
 - Escape pipes (`|`) in table cells.
@@ -381,7 +436,7 @@ If run **with** `--send`:
 
 All caches live under `~/.config/monday-weekly-report/` (override paths via the env vars below). Create the directory with `mkdir -p` before writing. Read with the Read tool, treating a missing file as empty.
 
-- `roles.json` — `user_id → { name, role, confirmedAt }` (Step 4)
+- `roles.json` — `user_id → { name, role, confirmedAt, auto? }` (Step 4). Set `auto: true` on entries written from an auto-default (a `--send` run) so a later preview knows they were never human-confirmed and re-proposes them; drop the flag once the human confirms.
 - `statuses.json` — `board_id → { <label>: <bucket> }` (Step 3.5)
 - `boards.json` — last interactively-selected board set (Step 2), so reruns don't re-prompt
 
@@ -391,10 +446,12 @@ All caches live under `~/.config/monday-weekly-report/` (override paths via the 
 - **No email unless `--send`.** A run without that flag is a pure preview.
 - **Secrets.** Never print `MONDAY_TOKEN` or the `MONDAY_WEEKLY_REPORT_CC` addresses into the report or stdout. The recipient list may be echoed on a successful send.
 - **Boards are the lens.** Someone with no items on the selected boards is not in the report — the boards define scope.
-- **Generic, non-engineering language.** This is project tracking, not dev throughput. Use "owner", "contributor", "item", "board" — never "developer", "PR", "commit", or "sprint".
+- **Generic, non-engineering language.** This is project tracking, not dev throughput. Use "owner", "item", "board" — never "developer", "PR", "commit", or "sprint".
 - **Weekly window: `past` (default) or `current`.** Default to the previous completed Mon→Sun (stable for scheduled emails). `current` (week-to-date) is an explicit opt-in via `--window current` or the Step 1 prompt, with today excluded from per-day figures and early-week results marked provisional.
-- **Roles & status mappings: confirmed once, then cached.** Re-prompt only for new entries, or for everyone with `--reconfirm-roles` / `--reconfirm-statuses`. Never prompt on a `--send` / non-interactive run — fall back to cache + auto-defaults and disclose the gap in the header.
-- **Role-aware tracking.** `owner`/`contributor` are tracked on activity and on-time delivery; `stakeholder` and `external` are not rated on weekly movement; `other` is not rated **but** its non-moving items are still surfaced ("untracked owner — item not moving").
+- **Roles & status mappings: proposed and confirmed once interactively, then cached.** In a preview run you **must** prompt (via AskUserQuestion, proposing the detected role pre-selected) for every owner not already in the role cache — never silently auto-default in a preview to skip the ask. Re-prompt only for new entries, or for everyone with `--reconfirm-roles` / `--reconfirm-statuses`. Only a `--send` / non-interactive run skips prompting — it falls back to cache + auto-defaults and discloses the gap in the header (`Roles: K confirmed, X auto-defaulted`).
+- **Subtasks always count.** Pull each item's subtasks (from the subitem board's own column namespace — their status/people/date column ids differ from the parent's) and fold them into the parent via the Step 6 subtask rollup: effective-done, subtask completion ratio, overdue/stuck subtasks, and `parent ahead of subtasks` / `parent done but N subtasks open` mismatches. A parent is never reported done while it has open subtasks.
+- **Containers are judged by their subtasks, never by the wrapper.** A parent with subtasks is an ownership wrapper that is *expected* to sit parked on its owner (often a product owner) and cannot be effective-done until its subtasks finish — so its own quiet `updated_at` is **not** a stall. The stuck, stale, and stalled-owner checks apply the Step 6 parent movement roll-up: skip a `parent_is_moving` container, and for a `parent_is_blocked` container surface the **blocking subtask and its owner** (`<parent> › <subtask>`), never the parked parent or its product owner. Only a leaf item (or a parent with no movable subtask) is flagged in its own right. This prevents false "no movement in 14 days" stalls on correctly-parked parent items.
+- **Role-aware tracking — exactly three roles.** `owner` (full-time) is rated on weekly movement + on-time delivery, flagged stalled on a quiet week, overdue surfaced. `external` (part-time/outside) is also rated and has overdue surfaced, but is **never** flagged stalled for low cadence. `other` is **not tracked** — not rated and excluded from overdue/at-risk attribution (its items still count in board totals). Default proposal is `owner`; the human picks `external`/`other`.
 - **Delivery risk is date-driven, actionable, and read-only.** The 🎯 section states project-goal status (🟢/🟡/🔴) from overdue / due-soon items, lists the specific at-risk items, and gives a prioritized catch-up plan whose every step names concrete items and people. Re-balancing, escalation, and descope are **recommendations only** — never write to monday.
 - **Attribution mode is disclosed.** State whether weekly movement came from the precise activity log or the coarser `updated_at` snapshot, so the reader knows the precision.
 - **Graceful degradation.** A board missing a date or status column does not abort the run — skip the part that needs it with an explicit note and report everything else.
