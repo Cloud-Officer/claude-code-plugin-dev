@@ -1,12 +1,12 @@
 ---
 name: weekly-dev-report
-description: Generate a weekly team activity report from the active Jira sprint and linked GitHub repos, with per-member achievability ratings, stuck-ticket flags, stalled-member flags, and worklog audit. The roster mixes engineers, QA, content, and consultants; titles and language stay generic so non-engineering members aren't mislabelled. Use when the user wants a weekly activity report, sprint progress audit, contributor status report, time-logged audit, or team check-in. Pulls roster from the active sprint, auto-discovers repos from Jira ticket dev-info, emails the report on --send, otherwise writes WEEKLY_REPORT.md and prints to stdout.
-allowed-tools: Bash(jira:*), Bash(gh:*), Bash(git:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(echo:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(printenv:*), Bash(printf:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(xargs:*), Read, Write, mcp__atlassian__searchJiraIssuesUsingJql, mcp__atlassian__getJiraIssue, mcp__github__list_pull_requests, mcp__github__list_commits, mcp__github__get_pull_request_reviews, mcp__github__search_issues, mcp__github__get_pull_request
+description: Generate a weekly team activity report from the active Jira sprint and linked GitHub repos, with per-member achievability ratings, stuck-ticket flags, stalled-member flags, and worklog audit. The roster mixes engineers, QA, content, and consultants; titles and language stay generic so non-engineering members aren't mislabelled. Flags sprint-goal delivery risk with a concrete, prioritized catch-up plan, and confirms each member's role (developer full-time / consultant part-time / manager-cto-ciso / tester / other) once interactively then caches it so later runs reuse it. Use when the user wants a weekly activity report, sprint progress audit, delivery-risk assessment, contributor status report, time-logged audit, or team check-in. Pulls roster from the active sprint, auto-discovers repos from Jira ticket dev-info, emails the report on --send, otherwise writes WEEKLY_REPORT.md and prints to stdout.
+allowed-tools: Bash(jira:*), Bash(gh:*), Bash(git:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(echo:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(printenv:*), Bash(printf:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(xargs:*), Read, Write, AskUserQuestion, mcp__atlassian__searchJiraIssuesUsingJql, mcp__atlassian__getJiraIssue, mcp__github__list_pull_requests, mcp__github__list_commits, mcp__github__get_pull_request_reviews, mcp__github__search_issues, mcp__github__get_pull_request
 ---
 
 # Weekly Activity Report
 
-Generate a weekly activity report for every team member with tickets in the active Jira sprint. The roster typically mixes engineers, QA, content/media folks, and consultants — keep all member-facing language generic ("team member", "member", "contributor") so the report does not mislabel anyone as an engineer. The report includes per-member sprint achievability (🟢🟡🔴), ticket and PR activity, time-logged audit, and flags for stuck tickets and stalled members. Writes `WEEKLY_REPORT.md` to the current directory, prints to stdout, and on `--send` delivers via Gmail.
+Generate a weekly activity report for every team member with tickets in the active Jira sprint. The roster typically mixes engineers, QA, content/media folks, and consultants — keep all member-facing language generic ("team member", "member", "contributor") so the report does not mislabel anyone as an engineer. The report includes a **sprint-goal delivery-risk assessment with a concrete catch-up plan**, per-member sprint achievability (🟢🟡🔴) that is **role-aware** (each member's role is confirmed once and cached), ticket and PR activity, time-logged audit, and flags for stuck tickets and stalled members. Writes `WEEKLY_REPORT.md` to the current directory, prints to stdout, and on `--send` delivers via Gmail.
 
 ## Arguments
 
@@ -15,9 +15,11 @@ Parse arguments from the user's invocation:
 - `--dry-run` (default) — write `WEEKLY_REPORT.md` and print to stdout. Do not send email.
 - `--send` — after generating, email the report. Primary recipient comes from env var `WEEKLY_DEV_REPORT_TO` (required when `--send` is used); additional recipients from env var `WEEKLY_DEV_REPORT_CC` (comma-separated, may be empty/unset). If `WEEKLY_DEV_REPORT_TO` is unset, abort with a message asking the user to set it.
 - `--week-offset N` — run the report for N weeks ago (0 = this week, 1 = last week, default 0).
+- `--window <past|current>` — choose the weekly window. `past` (default) = the **previous completed** Mon→Sun (a fixed 7-day week; stable for scheduled emails). `current` = **week-to-date**: this week's Monday through today (a partial week, fewer than 7 days unless run on Sunday) so the report can be run any day. When omitted in an interactive preview, the skill asks (Step 1). A `--send` / non-interactive run defaults to `past`.
 - `--sprint <ID|name>` — override sprint detection (rare; usually the active sprint is correct).
+- `--reconfirm-roles` — force the interactive role prompt for **every** roster member, ignoring the cache (Step 2.5). Use after team changes. Without it, only members missing from the role cache are prompted.
 
-If the user did not pass `--send`, treat the run as a preview. Never send email unless `--send` is present.
+If the user did not pass `--send`, treat the run as a preview. Never send email unless `--send` is present. Role prompting (Step 2.5) only happens in a preview/interactive run — a `--send` run never prompts and instead falls back to the cached roles plus auto-detected defaults.
 
 ## Run from the target repo's directory (direnv)
 
@@ -63,17 +65,38 @@ Run the `cd` as a **separate** Bash call — never chain it as `cd … && gh …
    curl -s -u "$JIRA_EMAIL:$JIRA_API_TOKEN" "$JIRA_URL/rest/agile/1.0/sprint/<SPRINT_ID>" | jq '{name, startDate, endDate, state}'
    ```
 
-3. Compute the raw week window (**previous completed week**, never the current running week):
-   - `week_end = most recent past Sunday 23:59 local` (if today is Sunday, use today − 7 days)
-   - `week_start = week_end − 6 days at 00:00 local` (the Monday of that same week)
-   - Apply `--week-offset N` by subtracting `7*N` days from both (0 = previous completed week, 1 = the week before that)
+3. **Determine the weekly-window mode, then compute the raw window.**
+
+   First decide the mode (`past` or `current`):
+   - If `--window` was passed, honor it.
+   - Else if this is a non-interactive / `--send` run, use `past` (keeps scheduled weekly emails stable).
+   - Else (interactive preview) **and** today is mid-week (not already the end of a completed week), **ask the user** with AskUserQuestion — one question, `multiSelect: false`, header `Window`:
+     - Question: "This week is still in progress — which weekly window do you want?"
+     - Option A (listed first, the default): **Past full week (Mon–Sun)** — the last completed 7-day week.
+     - Option B: **Week-to-date (this Mon → today)** — partial current week; lets you run this report any day.
+   - If today is Sunday end-of-day the two windows coincide; skip the prompt and use `past`.
+
+   Then compute the raw window for the chosen mode:
+   - **`past` (previous completed week):**
+     - `week_end = most recent past Sunday 23:59 local` (if today is Sunday, use today − 7 days)
+     - `week_start = week_end − 6 days at 00:00 local` (the Monday of that same week)
+   - **`current` (week-to-date):**
+     - `week_start = this week's Monday 00:00 local`
+     - `week_end = today 23:59 local` (now). Partial window — fewer than 7 calendar days and possibly only 1–4 working days.
+   - Apply `--week-offset N` to **either** mode by subtracting `7*N` days from both bounds (0 = the window above, 1 = the week before, …).
+   - Record `window_mode` and a human label for the report header.
+
+   **Partial-week handling (`current` mode only):**
+   - `today` is still in progress, so don't penalize it: exclude today from the worklog "< 7h" short-day flag (Step 3) and from the `working_days_in_week` denominator used for PRs/day and Tickets/day (Step 6). The denominator is **completed** working days = Mon–Fri strictly before today within the window.
+   - If completed working days < 2 (e.g. a Monday or Tuesday run), mark all per-day rates **provisional** in the header and why-lines, and do not assign 🔴 on rate alone — cap rate-only misses at 🟡. Stalled/stuck flags still stand.
+   - Stuck-ticket and stalled-member detection use trailing-N-days / sprint-to-date windows and are unaffected by the weekly-window mode.
 
 4. **Pick the weekly-anchor sprint** — the sprint whose tickets, transitions, PRs, and worklogs are the basis for every weekly-window metric in the report:
    - If `[week_start, week_end]` overlaps with the active sprint (any day in the window falls within `[sprint.startDate, sprint.endDate]`), the weekly-anchor sprint is the **active sprint**.
    - Otherwise (the whole weekly window falls before the active sprint — typically because the active sprint started after the previous Sunday), the weekly-anchor sprint is the **previous closed sprint** (the most recent sprint on the same board with `state=closed`). When this fallback fires, every weekly table is computed against that previous sprint's tickets and bounds, and the report header explicitly states `weekly-anchor sprint = <previous sprint name>`. Sprint-to-date metrics still target the active sprint.
    - **Clamp** the window to the chosen anchor sprint's bounds: `week_start = max(week_start, anchor.startDate)`, `week_end = min(week_end, anchor.endDate)`. Report dates in local time.
    - Never produce an empty weekly window. If clamping would invert the range under both choices, abort with an explanatory message and ask the user how to proceed.
-   - Rationale: a report covering the still-running week is meaningless because the team is mid-task. But silently dropping the weekly section when the active sprint is fresh hides a full week of contribution — the previous-sprint fallback keeps the weekly view honest.
+   - Rationale: defaulting to the still-running week would be misleading because the team is mid-task — so `past` is the default and `current` (week-to-date) is an explicit opt-in (Step 1 item 3). But silently dropping the weekly section when the active sprint is fresh hides a full week of contribution — the previous-sprint fallback keeps the weekly view honest.
 
 5. Compute the **sprint-to-date** window separately: `[active_sprint.startDate, today 23:59 local]`. This is used for sprint-achievability calculations and the "sprint-to-date" throughput table. Keep it distinct from the weekly window.
 
@@ -132,6 +155,74 @@ curl -s -u "$JIRA_EMAIL:$JIRA_API_TOKEN" "$JIRA_URL/rest/agile/1.0/board/<BOARD_
 ```
 
 If the board ID isn't obvious, get it from the active sprint's `originBoardId`.
+
+## Step 2.5: Confirm member roles (interactive, cached)
+
+Every roster member has a **role** that determines how they are rated and tracked. The role is confirmed by the human **once** and cached, so subsequent runs — including headless `--send` runs — reuse it without prompting. This makes the ratings honest: a part-time consultant or a CISO is not measured against a full-time developer's PR baseline, and an "other" member is not rated at all but is still watched for stalled work.
+
+### Role catalog
+
+| Role | Key | Rated on | Worklog hours expected | Behavior |
+| --- | --- | --- | --- | --- |
+| Developer (full-time) | `developer` | PR/day on the 🟢🟡🔴 scale | yes (≥ 7h / working day) | the existing full rating; default for engineers |
+| Consultant (part-time) | `consultant` | PRs only, **relaxed** (half) thresholds | no — exempt from worklog flags and from the time-logged table | don't penalize for part-time hours |
+| Manager / CTO / CISO | `manager` | not rated on the PR scale (shows `—`) | no | leadership / escalation target; only flagged when an item escalated to them stalls |
+| Tester | `tester` | QA validations & regressions logged | optional | this is the `qa_user`; never rated on PRs |
+| Other (do not track) | `other` | not rated (shows `—`); excluded from throughput tables | no | **but still flagged if their issues aren't moving** — stuck/stalled checks still run and surface in the delivery-risk section |
+
+### Load the role cache
+
+Roles persist as JSON at `${WEEKLY_DEV_REPORT_ROLES:-$HOME/.config/weekly-dev-report/roles.json}`, keyed by Jira `accountId`:
+
+```bash
+ROLES_FILE="${WEEKLY_DEV_REPORT_ROLES:-$HOME/.config/weekly-dev-report/roles.json}"
+```
+
+Read it with the Read tool (it may not exist yet — that's fine, treat as `{}`). Each entry looks like:
+
+```json
+{
+  "5f8a…": { "displayName": "Alice Ng", "email": "alice@…", "role": "developer", "confirmedAt": "2026-06-19" }
+}
+```
+
+### Decide who to prompt
+
+For each roster member, look up the cache by `accountId` (fall back to email). A member needs confirmation if **any** of:
+
+- they are not in the cache, OR
+- `--reconfirm-roles` was passed.
+
+If every member is already cached and `--reconfirm-roles` was not passed, skip prompting entirely.
+
+### Auto-detected default (pre-selected in the prompt)
+
+Compute a sensible default so the human usually just accepts it:
+
+- `member == qa_user` (Step 2 majority-holder) → default `tester`.
+- member with **zero worklog entries in the trailing 28 days** (the same cheap JQL used in Step 3's time-table filter, `worklogAuthor = "<accountId>" AND worklogDate >= -28d`) → default `consultant`.
+- a secondary "in QA" holder who is clearly a leader/escalation target (Step 2 item 3) → default `manager`.
+- everyone else → default `developer`.
+
+A cached role always takes precedence as the pre-selection over the auto-default (the human's last answer wins) unless `--reconfirm-roles` forces a fresh choice.
+
+### Prompt (interactive runs only)
+
+Only prompt when the run is a preview (no `--send`) and the session is interactive. Use the **AskUserQuestion** tool. AskUserQuestion takes up to 4 questions per call — batch members in groups of 4 and loop until all who-need-confirmation members are covered:
+
+- One question per member. `header` = the member's first name (≤ 12 chars). `question` = e.g. `What is Alice Ng's role this sprint?`.
+- Options (always these five, `multiSelect: false`): **Developer (full-time)**, **Consultant (part-time)**, **Manager / CTO / CISO**, **Tester**, **Other (don't track, notify if stuck)**. List the auto-detected default **first** and append " (detected)" to its label so it is the obvious pick.
+- The user can always pick "Other" free-text via the built-in escape hatch; map any unrecognized answer to the closest role key, defaulting to `other`.
+
+### Persist
+
+After collecting answers, merge them into the role cache and write it back with the Write tool (create the parent dir first: `mkdir -p "$(dirname "$ROLES_FILE")"`). Stamp `confirmedAt` with today's date (already known from the run window — do not call `date` just for this if today is in scope). Never delete cache entries for members not in this sprint; only add/update.
+
+### Non-interactive fallback (`--send` or no TTY)
+
+Do **not** prompt. For each member use the cached role if present, else the auto-detected default. In the report header, list any members whose role came from an auto-default rather than a confirmed cache entry, e.g. `Roles: 9 confirmed, 2 auto-defaulted (run a preview to confirm)`. This keeps automated runs unblocked while making the gap visible.
+
+Carry the resolved `member_role` for every member into Steps 6 (rating + delivery risk) and 7 (rendering).
 
 ## Step 3: Count transitions and fetch worklogs
 
@@ -218,7 +309,7 @@ For each remaining member, compute over `[week_start, week_end]`:
 
 - `daily_hours[date]` = sum `timeSpentSeconds / 3600` for all entries whose local-day equals `date` (one bucket per Mon, Tue, … Sun in the window — pre-fill missing days with 0)
 - `total_hours` = sum across the window
-- `working_days_below_7h` = count of working days (Mon–Fri inside the window) where `daily_hours[date] < 7.0`. A working day with zero entries counts as 0h and triggers the flag.
+- `working_days_below_7h` = count of working days (Mon–Fri inside the window) where `daily_hours[date] < 7.0`. A working day with zero entries counts as 0h and triggers the flag. **In `current` (week-to-date) mode, exclude today** — it is still in progress and would otherwise flag everyone (see Step 1 partial-week handling).
 - `pattern_flag` = true if the member has **≥ 3 entries in the window** AND every entry shares the same `started` time-of-day (HH:MM, local) AND the same `timeSpentSeconds`. Below 3 entries the signal is too noisy and the flag stays false.
 - `logged_tickets` = distinct list of `{ key, summary }` for every issue that received a worklog entry from this member in the window. Resolve `summary` once per key (cache it — it's the same string for every entry on that ticket). This list renders into the new `Jira logged` column on the time-logged table (Step 7).
 
@@ -354,14 +445,28 @@ For each member (excluding `qa_user`), flag if **all** of:
 
 The last condition checks **author of the transition**, not current assignee — a member who moved their last ticket to `in QA` and then got reassigned to QA should NOT be flagged as stalled.
 
+**Role-specific movement checks (Step 2.5 roles):**
+
+- `other` (do-not-track): these members are not rated, but the explicit point of the role is "notify if issues aren't moving." So in addition to the strict stalled rule, flag **any** sprint ticket they own that had **zero status transitions in the sprint-to-date window** — regardless of how many issues they hold. Surface each such ticket in the ⚠️ Stalled-members section and the 🎯 Delivery-risk at-risk list with the note `untracked member — issue not moving`.
+- `manager`: don't apply the stalled rule (low ticket counts are expected). But if an item that was **escalated to them** (e.g. moved to them out of QA) has had zero movement for ≥ 7 days, flag it as an escalation stall in the delivery-risk section.
+- `tester` (`qa_user`): excluded from the stalled rule as today.
+
 ### Per-member rating (🟢🟡🔴)
 
 The rating is anchored on **PR throughput per working day in the weekly window**, with hardness floors from the worklog data. PRs are the primary signal because, with AI assistance, "at least one PR per working day" is the team's working baseline. Note: not every roster member is expected to ship PRs (QA, content, consultants); the rating is meaningful for engineering contributors and is suppressed for the QA row. For non-engineering members the report should call out the role mismatch in the why-line so the rating isn't misread.
 
+**Role gating (apply first, using `member_role` from Step 2.5):**
+
+- `tester` (the `qa_user`): not rated on this scale — show QA metrics only (validations done, regressions logged). Rating cell = `—`.
+- `manager`: not rated on the PR scale. Rating cell = `—`, why-line = `Leadership/escalation role — not rated on PR throughput.` Only raise a flag if an item escalated to them has stalled (feeds the delivery-risk and stuck-ticket sections).
+- `other`: not rated. Rating cell = `—`, why-line = `Not tracked (role: other).` Excluded from the throughput tables. **Still run the stalled/stuck checks on their tickets** — if any of their sprint tickets haven't moved, surface them in the Stalled-members, Stuck-tickets, and Delivery-risk sections with the note `untracked member — issue not moving`.
+- `consultant`: rated on PRs only, with **relaxed (half) thresholds**, and worklog flags forced false (they are exempt from the time table). Use the part-time bands below.
+- `developer`: full rating exactly as specified below.
+
 Inputs (all over `[week_start, week_end]` against the **weekly-anchor sprint** chosen in Step 1):
 
 - `prs_merged_week` = number of PRs merged within the window where this member is the **author** (the opener), resolved via the GH→Jira map from Step 5; a PR counts iff `pr.author.login` maps to their Jira identity. The user who clicked merge does **not** get credit — that belongs to a separate `Reviews` / `merged-for-others` metric. Count merges only (not opens or closes-without-merge), and exclude bot/automation accounts.
-- `working_days_in_week` = count of Mon–Fri inside `[week_start, week_end]` (typically 5; will be smaller if the window was clamped at a sprint boundary).
+- `working_days_in_week` = count of Mon–Fri inside `[week_start, week_end]` (typically 5; smaller if the window was clamped at a sprint boundary). **In `current` (week-to-date) mode, exclude today** (in progress) and count only completed working days; use `max(working_days_in_week, 1)` to avoid divide-by-zero on early-week runs, and treat per-day rates as **provisional** (cap rate-only misses at 🟡) when completed working days < 2.
 - `pr_per_day` = `prs_merged_week / working_days_in_week`.
 - `worklog_short_day` = true if any working day in the window has `daily_hours < 7.0` (from the worklog section). False (and irrelevant) if the member was dropped from the time table for the 28-day-no-entries rule.
 - `worklog_pattern_flag` = the `pattern_flag` from the worklog section.
@@ -381,6 +486,14 @@ The PR threshold is **per working day**. For a normal 5-working-day week:
 
 For a clamped 4-working-day week, the corresponding bands are ≥ 4 / 2–3 / ≤ 1, and so on.
 
+**Consultant (part-time) bands** — halve the per-working-day thresholds, since a part-timer is not expected to ship daily, and never apply worklog flags:
+
+- 🟢 **Green** if `pr_per_day ≥ 0.5` (about one PR every other working day).
+- 🟡 **Yellow** if `0.25 ≤ pr_per_day < 0.5`.
+- 🔴 **Red** if `pr_per_day < 0.25`, OR `is_stalled`.
+
+The why-line must say "consultant (part-time)" so a 🟡 isn't read as underperformance, e.g. `"Yellow — consultant (part-time): 2 PRs / 5 working days = 0.4/day"`.
+
 One-line "why" per rating: state the worst driver. Examples:
 
 - `"Red — 1 PR / 5 working days = 0.2/day"`
@@ -392,9 +505,49 @@ One-line "why" per rating: state the worst driver. Examples:
 
 **Carve-outs.**
 
-- `qa_user` is not rated on this scale — their row shows QA-specific metrics (validations done, regressions logged).
-- A member who was excluded from the time table for the 28-day rule (consultant) is rated on PRs alone — both worklog flags evaluate to false for them.
+- `qa_user` (role `tester`) is not rated on this scale — their row shows QA-specific metrics (validations done, regressions logged).
+- A member with role `consultant` (or excluded from the time table for the 28-day rule) is rated on PRs alone, on the relaxed part-time bands above — both worklog flags evaluate to false for them.
+- Members with role `manager` or `other` are not rated (cell `—`) per the role gating above.
 - Members flagged as **content team** or any other non-engineering role in the report's per-member caveats (e.g. via project memory) should still be rated, but the why-line must call out the role mismatch so the reader does not interpret a 🔴 as poor performance.
+
+### Delivery risk assessment (sprint-goal tracking)
+
+The point of this section is to tell the reader, in one glance, whether the sprint goal will be met — and if not, **exactly what to do to catch up**. Compute against the **active sprint** over the sprint-to-date window.
+
+1. **Scope & progress.**
+   - `total_work` = sum of story points across active-sprint issues **if ≥ 80% of issues carry points**; otherwise fall back to plain issue count.
+   - `done_work` = same measure restricted to issues in a terminal status (Done / Closed / equivalent).
+   - `completion_pct = done_work / total_work`.
+2. **Time (working days only — exclude Sat/Sun, don't detect holidays).**
+   - `sprint_working_days` = Mon–Fri in `[sprint.startDate, sprint.endDate]`.
+   - `elapsed_working_days` = Mon–Fri in `[sprint.startDate, min(today, sprint.endDate)]`.
+   - `working_days_left = sprint_working_days − elapsed_working_days`.
+   - `expected_pct = elapsed_working_days / sprint_working_days` (the linear-burn baseline).
+3. **Run rate.**
+   - `current_rate = done_work / max(elapsed_working_days, 0.5)` (work units per working day so far).
+   - `remaining_work = total_work − done_work`.
+   - `required_rate = remaining_work / max(working_days_left, 0.5)` (rate needed to finish on time).
+   - `rate_gap = required_rate − current_rate`.
+4. **Sprint-goal status** (first match wins):
+   - 🔴 **Off track** — `completion_pct < expected_pct − 0.25`, OR `required_rate > current_rate × 1.75`, OR `working_days_left ≤ 0` with `remaining_work > 0`.
+   - 🟡 **At risk** — behind by 10–25 points (`expected_pct − completion_pct` in `[0.10, 0.25]`), OR `required_rate` is `1.25×–1.75×` the current rate.
+   - 🟢 **On track** — otherwise (`completion_pct ≥ expected_pct − 0.10` and `required_rate ≤ current_rate × 1.25`).
+5. **At-risk items.** Build the concrete list of what jeopardizes the goal — each with owner (+role), the reason, and a recommended action. Draw from:
+   - Not-started or blocked tickets with the largest remaining estimate, and any P1/blocker priority.
+   - Stuck tickets (the 🚩 flag above).
+   - Tickets owned by **stalled** members, by 🔴-rated members holding goal-critical work, or by `other`-role members that haven't moved.
+   - Review bottlenecks (the 🐢 section) that are blocking merges the goal depends on.
+6. **Recommended course of action (the catch-up plan).** Produce a short, **prioritized** list. Every recommendation must name specific tickets and specific people — no generic advice. Choose and tailor from these levers:
+   - **Re-balance** — move named tickets from overloaded / stalled / 🔴 owners to members with capacity (write it as `move DEV-1300 from Bob → Alice`).
+   - **Unblock** — name the blocker and who can clear it (often the `manager` role).
+   - **Expedite reviews** — assign a specific reviewer to the oldest blocking PRs to drain the 🐢 queue.
+   - **Parallelize / pair** — pair two members on the highest-remaining-estimate item.
+   - **Descope** — when `required_rate` is infeasible (`> ~2×` current rate with few days left), recommend the lowest-priority tickets to pull from the sprint to protect the goal, naming them. **Recommend only — never transition or edit Jira** (this skill is read-only).
+   - **Escalate stuck items** — route each stuck ticket to the `manager` role with a named owner and a deadline.
+
+   If the goal is 🟢 on track and there are no at-risk items, the plan is a single line: "On track — current run-rate sustains the sprint goal."
+
+This feeds the "🎯 Delivery risk & recommended actions" render section in Step 7.
 
 ## Step 7: Render the report
 
@@ -405,14 +558,39 @@ Write to `WEEKLY_REPORT.md` in the current working directory, and print the same
 
 **Active sprint:** <active sprint name> (sprint-to-date metrics) <br>
 **Weekly-anchor sprint:** <same as active, OR "previous closed sprint <name>" if the fallback fired> <br>
-**Weekly window:** <week_start> → <week_end> (<N> working days; previous completed Mon → Sun, clamped to weekly-anchor sprint bounds) <br>
+**Weekly window:** <week_start> → <week_end> (<window_mode>: <"previous completed Mon → Sun" | "week-to-date, this Mon → today — partial, today in progress">; <N> working days<, provisional if early-week>; clamped to weekly-anchor sprint bounds) <br>
 **Sprint-to-date window:** <active_sprint.startDate> → <today> <br>
 **Sprint ends:** <active_sprint.endDate> <br>
 **Team rating:** <🟢|🟡|🔴> <br>
+**Sprint goal:** <🟢 On track | 🟡 At risk | 🔴 Off track> — <completion_pct>% done vs ~<expected_pct>% expected; <working_days_left> working days left <br>
 **QA:** <qa_user displayName, or "not detected"> <br>
+**Roles:** <K confirmed, X auto-defaulted (run a preview to confirm)> <br>
 **Time table:** <K of M members in scope; X dropped under the 28-day no-entries rule (consultants / non-loggers)>
 
-<Two-sentence overall summary: sprint % complete, notable flags, roster-level hours coverage if low.>
+<Two-sentence overall summary: sprint % complete, sprint-goal verdict, notable flags, roster-level hours coverage if low.>
+
+## 🎯 Delivery risk & recommended actions
+
+**Sprint goal status:** <🟢 On track | 🟡 At risk | 🔴 Off track> <br>
+**Progress:** <done_work>/<total_work> <points|tickets> done = <completion_pct>% (≈<expected_pct>% expected by today) <br>
+**Burn:** <current_rate>/day actual vs <required_rate>/day required to finish — <working_days_left> working days left <br>
+**Verdict:** <one sentence: on pace, or "N units behind, needs X/day (Y× current) to catch up">
+
+### At-risk items
+
+| Item | Owner (role) | Why at risk | Recommended action |
+| --- | --- | --- | --- |
+| [DEV-1300](url) — Payment retry queue | Bob (developer, 🔴) | Not started, 8 pts, 3 working days left | Move DEV-1300 from Bob → Alice (has capacity); pair on the spec Mon AM |
+| [DEV-1188](url) — CSV export crash | Dana (other) | Untracked member, no movement in 9 days | Escalate to <manager>; confirm still owned or reassign |
+| [#231](url) — Auth refactor | Alice (developer) | PR open 6 days, blocking 2 goal tickets | Assign <reviewer> today to clear the review |
+
+### Catch-up plan (prioritized)
+
+1. <concrete action naming tickets + people>
+2. <…>
+3. <…>
+
+If 🟢 on track with no at-risk items, replace both subsections with a single line: "🟢 **On track** — no delivery risks flagged. Current run-rate sustains the sprint goal." Do not omit the section — its presence (and the explicit all-clear) is itself information.
 
 ## Team at a glance (weekly throughput)
 
@@ -427,13 +605,17 @@ The header should state how many roster members were dropped under this filter s
 
 `qa_user` is exempt from this filter and always shown if they had any activity.
 
-| Team member | Rating | → Code Review | → in QA | → Done | → REJECTED | PRs authored & merged | PRs/day | Tickets/day | Avg cycle (IP→CR) | Why |
-| --- | --- | ---:| ---:| ---:| ---:| ---:| ---:| ---:| ---:| --- |
-| Alice | 🟢 | 4 | 3 | 0 | 0 | 6 | 1.2 | 1.4 | 18h | Green — 6 PRs / 5 working days = 1.2/day |
-| Bob | 🔴 | 0 | 0 | 0 | 0 | 1 | 0.2 | 0.2 | — | Red — 1 PR / 5 working days = 0.2/day |
-| Jamie (QA) | — | — | 2 | 20 | — | — | — | 4.4 | n/a | QA validations |
+**Role handling in this table:** the `Role` column shows the confirmed/auto-defaulted role from Step 2.5 (Developer / Consultant / Manager / Tester / Other), with the QA tester suffixed `(QA)`. Members with role `other` are **not** listed here (they are not tracked for throughput) — but if they hold a sprint ticket that hasn't moved, they appear in the ⚠️ Stalled-members section and the 🎯 Delivery-risk section instead. `manager` rows are shown when they have activity but always carry a `—` rating.
 
-Rows sorted: 🔴 first, 🟡 next, 🟢 last, `qa_user` last. Break ties by `PRs authored & merged` descending, then `→ in QA` descending.
+| Team member | Role | Rating | → Code Review | → in QA | → Done | → REJECTED | PRs authored & merged | PRs/day | Tickets/day | Avg cycle (IP→CR) | Why |
+| --- | --- | --- | ---:| ---:| ---:| ---:| ---:| ---:| ---:| ---:| --- |
+| Alice | Developer | 🟢 | 4 | 3 | 0 | 0 | 6 | 1.2 | 1.4 | 18h | Green — 6 PRs / 5 working days = 1.2/day |
+| Bob | Developer | 🔴 | 0 | 0 | 0 | 0 | 1 | 0.2 | 0.2 | — | Red — 1 PR / 5 working days = 0.2/day |
+| Priya | Consultant | 🟡 | 1 | 1 | 0 | 0 | 2 | 0.4 | 0.6 | 30h | Yellow — consultant (part-time): 2 PRs = 0.4/day |
+| Sam | Manager | — | — | 1 | 3 | — | — | — | 0.8 | n/a | Leadership/escalation role — not rated on PR throughput |
+| Jamie | Tester (QA) | — | — | 2 | 20 | — | — | — | 4.4 | n/a | QA validations |
+
+Rows sorted: 🔴 first, 🟡 next, 🟢 next, then the non-rated `—` rows (`manager`, then `tester`/`qa_user`) last. Break ties by `PRs authored & merged` descending, then `→ in QA` descending.
 
 Column rules:
 
@@ -526,7 +708,9 @@ Top 10 oldest open non-draft PRs across in-scope repos, awaiting review or with 
 
 ## Per-member detail
 
-### Alice — 🟢
+Each member's heading carries their role: `### <Name> — <Role> — <rating>`. For `manager`, `tester`, and `other` roles the rating is `—` (see role gating in Step 6).
+
+### Alice — Developer — 🟢
 
 _On track. 4 of 6 tickets moved to Done this week._
 
@@ -544,7 +728,7 @@ _On track. 4 of 6 tickets moved to Done this week._
 
 ---
 
-### Bob — 🔴  ⚠️ Stalled
+### Bob — Developer — 🔴  ⚠️ Stalled
 
 _Only 2 sprint tickets, both carried over from previous sprint with no status change this week. 12h logged against 40h expected._
 
@@ -594,7 +778,7 @@ If run with `--send`:
 - **Generic role language.** The roster mixes engineers, QA, content/media folks, and consultants. Never call the report or its rows "developers" or assume engineering as a default — use "team member", "member", "contributor", or the explicitly detected role (`QA`, content team, consultant). The rendered title is "Weekly Activity Report", not "Weekly Developer Report".
 - **Throughput via transitions, never assignee.** Current `fields.assignee` is a holdings signal, not a throughput signal, because the workflow auto-reassigns tickets at `in QA`. The Team-at-a-glance and per-member sections must derive throughput from `status CHANGED TO <X> BY <user> DURING (...)`.
 - **QA role auto-detected, not hardcoded.** Never hardcode a tester's name or email in the skill. Always detect via the majority-holder rule in Step 2 and label their row `(QA)`. Secondary "in QA" holders (e.g. a CTO receiving escalations) are contributors / leaders, not QA.
-- **Weekly = previous completed Mon → Sun.** Never report on the currently running week; it is meaningless because work is mid-flight. When that window falls entirely outside the active sprint (the active sprint is brand-new), use the previous closed sprint as the **weekly-anchor sprint** instead of producing an empty report — see Step 1 item 4.
+- **Weekly window: `past` (default) or `current`.** By default the weekly window is the previous completed Mon → Sun (a fixed 7-day week) — stable for scheduled emails and never mid-flight. The user may opt into `current` (week-to-date: this Mon → today) via `--window current` or the Step 1 prompt, so the report can be run any day. In `current` mode the window is partial: exclude **today** from worklog short-day flags and from per-day rate denominators, and mark early-week results provisional (cap rate-only misses at 🟡) — see Step 1 partial-week handling. When the chosen window falls entirely outside the active sprint (the active sprint is brand-new), use the previous closed sprint as the **weekly-anchor sprint** instead of producing an empty report — see Step 1 item 4.
 - **Per-day PR threshold drives the rating.** 🟢 ≥ 1 PR per working day, 🟡 ≥ 0.5/day, 🔴 < 0.5/day or ⚠️ Stalled. Worklog flags (any working day < 7h, or every entry sharing the same start-time + duration) cap a member at 🟡. See Step 6.
 - **Time table omits no-clock consultants.** Drop a member from the time-logged table if they have zero worklog entries in the trailing 28 days. They stay in the throughput tables and are still rated on PRs.
 - **Throughput table omits non-contributors.** Drop a roster member from the team-at-a-glance and per-member sections if they had zero Jira transitions AND zero authored-merged PRs in the weekly window. Those rows are not contribution activity. They may still show up in the Time-logged table (if they clocked) or the Stalled section (if they hold a sprint ticket that hasn't moved). The report header should state the count of dropped rows.
@@ -603,8 +787,13 @@ If run with `--send`:
 - **Releases reconciled across Jira and GitHub.** The Releases-this-week section must compare Jira `released==true` versions in the window with GitHub tags / releases in the same window and surface mismatches. If neither system has releases in the window, render an explicit "*No releases this week.*" line — do not silently omit the section.
 - **No skill / process meta-commentary in the rendered report.** The output is a status report for the team — never include sections like "Skill changes shipped this run", "Implementation notes", "TODOs for the script", or any other description of how the report was produced. Those belong in commit messages and the skill source itself, not in `WEEKLY_REPORT.md`. The report ends after the per-member detail and the trailing "Preview written to WEEKLY_REPORT.md. Re-run with --send to email." line.
 - **Working days.** When computing `days_left` and `expected_hours`, exclude Saturdays and Sundays. Do not attempt to detect holidays.
+- **Roles confirmed once, then cached.** Per-member roles (Step 2.5) are confirmed by the human via AskUserQuestion and persisted to the role cache. Re-prompt only for members missing from the cache, or for everyone when `--reconfirm-roles` is passed. Never prompt during a `--send` / non-interactive run — fall back to cache + auto-defaults and report how many were auto-defaulted.
+- **Role-aware rating.** Each member is rated according to their role: `developer` on the full PR/day scale, `consultant` on relaxed (half) part-time bands with no worklog flags, `tester` on QA metrics, and `manager`/`other` not rated (cell `—`). Never measure a part-timer, leader, or untracked member against the full-time developer baseline.
+- **Untracked ('other') members still surface non-moving work.** Role `other` means "do not track" for rating/throughput — but their sprint tickets are still checked for movement, and any ticket with zero transitions sprint-to-date must appear in the Stalled-members and Delivery-risk sections noted `untracked member — issue not moving`.
+- **Delivery risk is actionable and read-only.** The 🎯 Delivery-risk section must state the sprint-goal status (🟢/🟡/🔴), the burn-vs-required rate, the specific at-risk items, and a prioritized catch-up plan whose every step names concrete tickets and people. Descope and reassignment are **recommendations only** — never transition, reassign, comment on, or otherwise modify Jira or GitHub.
 - **Env vars referenced** (document at the top of output if any are unset and affect the run):
   - `WEEKLY_DEV_REPORT_TO` — required when `--send` is used; primary email recipient
   - `WEEKLY_DEV_REPORT_CC` — optional additional email recipients (comma-separated)
   - `GITHUB_USERNAME_MAP` — optional `email=ghuser` manual override on top of auto-mapping (Step 5)
+  - `WEEKLY_DEV_REPORT_ROLES` — optional path to the role cache JSON (Step 2.5); defaults to `~/.config/weekly-dev-report/roles.json`
   - `JIRA_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` — required for curl-based Jira calls (dev-info, changelog, worklog); if unset, try `jira` CLI equivalents
