@@ -132,10 +132,20 @@ done
 
 Extract per issue:
 
-- `key`, `id`, `fields.summary`, `fields.status.name`, `fields.issuetype.name`
+- `key`, `id`, `fields.summary`, `fields.status.name`, `fields.issuetype.name`, `fields.issuetype.subtask` (boolean)
 - `fields.assignee.accountId`, `fields.assignee.displayName`, `fields.assignee.emailAddress`
 - `fields.timeoriginalestimate`, `fields.timeestimate`, `fields.customfield_*` for story points (try `fields.customfield_10016` and `fields.customfield_10002` — pick whichever is numeric)
 - `fields.customfield_*` for Sprint (array of sprint objects including historical sprints)
+- **Hierarchy / links** (needed for the container roll-up in Step 6): `fields.parent.key`, `fields.subtasks[].{key,fields.status.name}`, and `fields.issuelinks[]` — for each link capture the link type name (`type.name`, e.g. `Blocks`, `Relates`, `Parent/Child`), the direction, and the linked issue's `{key, fields.status.name}` from whichever of `inwardIssue` / `outwardIssue` is present.
+
+### Classify each issue: container vs leaf
+
+Movement expectations differ by whether an issue does work itself or rolls up other work:
+
+- **Container** = a Story, or any issue that has `fields.subtasks` **or** has "blocking"/"parent" style links to other issues (`Blocks`, `is blocked by`, `Parent/Child`, `Epic-Story`, or a project-specific equivalent). A container is a tracking/ownership wrapper: it is *expected* to sit parked on its owner (often a product owner — a `manager` or `other` role) and **cannot** transition to Done until its children/blockers do. The parent not moving is therefore **not** a stall signal on its own.
+- **Leaf** = a Task, Bug, or any issue with no children and no blocking dependents — the actual unit of work whose movement (or lack of it) is the real signal.
+
+Record `is_container` per issue, plus its `child_keys` = the set of sub-task keys ∪ blocked/child linked-issue keys. Leaf issues have `child_keys = ∅`. This classification feeds every movement check in Step 6 (stuck-ticket, stalled-member, and the `other`-role non-moving rule) so a parked container is never flagged in place of its real blocker.
 
 Build the **roster** = unique assignees across all active-sprint issues. Skip unassigned issues for per-member sections (but include their totals in the team rollup). Do not assume roster members are engineers — many will be QA, content, or consultants. Use generic terms ("team member", "contributor") in all human-facing output.
 
@@ -405,6 +415,19 @@ Compute per member:
 
 ## Step 6: Compute flags
 
+### Container movement roll-up (apply before every "is it moving?" check)
+
+A container issue (Story / parent / blocker — see Step 2 classification) is judged by its **children's** movement, never by its own status transitions. This stops the report from flagging a Story that is correctly parked on a product owner just because the wrapper hasn't moved, when the real situation is "child task X isn't done yet."
+
+For each container, resolve the movement of its `child_keys` (sub-tasks + blocked/child linked issues) over the relevant window using the same `status CHANGED ... DURING (...)` JQL already used for throughput:
+
+- **`container_is_moving`** = at least one child had a status transition in the window, OR at least one child is in an active (non-terminal, non–To-Do) status. → The container is healthy and **must not** be flagged as stalled/stuck. If you mention it at all, describe it as "parked, children in flight."
+- **`container_is_blocked`** = the container cannot close **and every** child is itself stalled (no child transition in the trailing 14 days and none in progress) — typically because one or more **leaf** children are blocked or unstarted. → The real problem is those children, not the parent.
+
+When a container is blocked, surface **the blocking child leaf issue(s)** — each with its **own** assignee and role — as the at-risk/stuck item, with a note like `blocks [PARENT] — parent parked on <owner> (product owner), waiting on this task`. Never attribute the stall to the parent's owner when they are just the product owner holding the wrapper; attribute it to whoever owns the unfinished child. If a blocked container genuinely has no child owner to point at (orphaned children, or no children at all), then and only then flag the container itself, owner included.
+
+Leaf issues are unaffected by this subsection — their own movement is the signal, as before.
+
 ### Stuck ticket flag 🚩
 
 Find candidate stuck tickets via JQL, paginating past the 100-result API cap using key cursor:
@@ -428,6 +451,7 @@ For each candidate, confirm the stricter rule — all of:
 - Appeared in ≥ 3 distinct sprints (current + ≥ 2 prior) — derived from changelog Sprint field history
 - No status transition in the last 7 days (from now, not the week window)
 - No worklog entry AND no comment in the last 7 days
+- **Container check:** if the candidate `is_container`, apply the roll-up above — skip it when `container_is_moving` (its children are active; the parent is just parked), and when `container_is_blocked` report the **blocking child leaf** in its place rather than the parent. A container is only listed as stuck in its own right when it has no movable child to attribute the stall to.
 
 Fetch comments if needed:
 
@@ -442,13 +466,14 @@ For each member (excluding `qa_user`), flag if **all** of:
 - Assigned ≤ 2 issues in the active sprint
 - ≥ 50% of their active-sprint issue keys were also in the previous sprint
 - Zero status transitions **authored by them** (via JQL `BY <user>`) on any sprint issue during both the week window and the full sprint-to-date window
+- **At least one of their assigned issues is a leaf** (Task/Bug) — i.e. don't flag a member whose only sprint issues are containers they're parked on. If every one of their sprint issues `is_container` and each `container_is_moving`, they are product-owning live work, not stalled. (When a container they hold `is_blocked`, the entry goes to the blocking child's owner, per the roll-up — not to this member.)
 
-The last condition checks **author of the transition**, not current assignee — a member who moved their last ticket to `in QA` and then got reassigned to QA should NOT be flagged as stalled.
+The third condition checks **author of the transition**, not current assignee — a member who moved their last ticket to `in QA` and then got reassigned to QA should NOT be flagged as stalled. The fourth keeps a product owner who holds only Stories from being mislabelled stalled when their own work is the children's.
 
 **Role-specific movement checks (Step 2.5 roles):**
 
-- `other` (do-not-track): these members are not rated, but the explicit point of the role is "notify if issues aren't moving." So in addition to the strict stalled rule, flag **any** sprint ticket they own that had **zero status transitions in the sprint-to-date window** — regardless of how many issues they hold. Surface each such ticket in the ⚠️ Stalled-members section and the 🎯 Delivery-risk at-risk list with the note `untracked member — issue not moving`.
-- `manager`: don't apply the stalled rule (low ticket counts are expected). But if an item that was **escalated to them** (e.g. moved to them out of QA) has had zero movement for ≥ 7 days, flag it as an escalation stall in the delivery-risk section.
+- `other` (do-not-track): these members are not rated, but the explicit point of the role is "notify if issues aren't moving." So in addition to the strict stalled rule, flag **any sprint ticket they own that had zero status transitions in the sprint-to-date window** — regardless of how many issues they hold — **but apply the container roll-up first**. If the non-moving ticket `is_container` and `container_is_moving` (a Story parked on them as product owner while its children are in flight), it is **not** a stall — do not flag it. If it `is_container` and `container_is_blocked`, flag the **blocking child leaf and its owner** instead of the parent. Only a non-moving **leaf** they own (or a container with no movable child) becomes a stalled-member entry, surfaced in the ⚠️ Stalled-members section and the 🎯 Delivery-risk at-risk list with the note `untracked member — issue not moving`.
+- `manager`: don't apply the stalled rule (low ticket counts are expected). But if an item that was **escalated to them** (e.g. moved to them out of QA) has had zero movement for ≥ 7 days, flag it as an escalation stall in the delivery-risk section. **Exclude containers they merely own as product owner** — a Story parked on a manager whose children are moving is normal ownership, not an escalation stall; apply the container roll-up and only flag a blocked leaf (attributed to the child's owner) or a genuinely escalated leaf.
 - `tester` (`qa_user`): excluded from the stalled rule as today.
 
 ### Per-member rating (🟢🟡🔴)
@@ -537,6 +562,7 @@ The point of this section is to tell the reader, in one glance, whether the spri
    - Stuck tickets (the 🚩 flag above).
    - Tickets owned by **stalled** members, by 🔴-rated members holding goal-critical work, or by `other`-role members that haven't moved.
    - Review bottlenecks (the 🐢 section) that are blocking merges the goal depends on.
+   - **For a blocked container** (a Story that can't close, per the roll-up): list the **blocking child leaf task** with **its own owner**, not the parent or the product owner. The reason reads `blocks [PARENT] — parent parked on <owner> (product owner)` and the action targets the child's owner (unblock / reassign / expedite the child). Never put a parked container's product owner on the at-risk list for the parent's lack of movement.
 6. **Recommended course of action (the catch-up plan).** Produce a short, **prioritized** list. Every recommendation must name specific tickets and specific people — no generic advice. Choose and tailor from these levers:
    - **Re-balance** — move named tickets from overloaded / stalled / 🔴 owners to members with capacity (write it as `move DEV-1300 from Bob → Alice`).
    - **Unblock** — name the blocker and who can clear it (often the `manager` role).
@@ -581,7 +607,7 @@ Write to `WEEKLY_REPORT.md` in the current working directory, and print the same
 | Item | Owner (role) | Why at risk | Recommended action |
 | --- | --- | --- | --- |
 | [DEV-1300](url) — Payment retry queue | Bob (developer, 🔴) | Not started, 8 pts, 3 working days left | Move DEV-1300 from Bob → Alice (has capacity); pair on the spec Mon AM |
-| [DEV-1188](url) — CSV export crash | Dana (other) | Untracked member, no movement in 9 days | Escalate to <manager>; confirm still owned or reassign |
+| [DEV-1189](url) — Wire export endpoint | Dana (developer) | Leaf blocks [DEV-1188] — parent Story parked on Yves (product owner); this child unstarted 9 days | Unblock/expedite DEV-1189 with Dana; the Story closes once it lands |
 | [#231](url) — Auth refactor | Alice (developer) | PR open 6 days, blocking 2 goal tickets | Assign <reviewer> today to clear the review |
 
 ### Catch-up plan (prioritized)
@@ -789,7 +815,8 @@ If run with `--send`:
 - **Working days.** When computing `days_left` and `expected_hours`, exclude Saturdays and Sundays. Do not attempt to detect holidays.
 - **Roles confirmed once, then cached.** Per-member roles (Step 2.5) are confirmed by the human via AskUserQuestion and persisted to the role cache. Re-prompt only for members missing from the cache, or for everyone when `--reconfirm-roles` is passed. Never prompt during a `--send` / non-interactive run — fall back to cache + auto-defaults and report how many were auto-defaulted.
 - **Role-aware rating.** Each member is rated according to their role: `developer` on the full PR/day scale, `consultant` on relaxed (half) part-time bands with no worklog flags, `tester` on QA metrics, and `manager`/`other` not rated (cell `—`). Never measure a part-timer, leader, or untracked member against the full-time developer baseline.
-- **Untracked ('other') members still surface non-moving work.** Role `other` means "do not track" for rating/throughput — but their sprint tickets are still checked for movement, and any ticket with zero transitions sprint-to-date must appear in the Stalled-members and Delivery-risk sections noted `untracked member — issue not moving`.
+- **Untracked ('other') members still surface non-moving work.** Role `other` means "do not track" for rating/throughput — but their sprint tickets are still checked for movement, and any **leaf** ticket with zero transitions sprint-to-date must appear in the Stalled-members and Delivery-risk sections noted `untracked member — issue not moving`. Apply the container roll-up first: a parked container (Story) whose children are moving is never flagged.
+- **Containers are judged by their children, never by the wrapper.** A Story / parent / blocker is a roll-up that is *expected* to sit parked on its owner (often a product owner — `manager` or `other`) and **cannot** transition to Done until its children/blockers do. Stuck-ticket, stalled-member, and `other`/`manager`-role movement checks must apply the Step 6 container roll-up: skip a container whose children are active, and when a container is blocked, attribute the at-risk/stuck entry to the **blocking child leaf and its owner**, not to the parent or its product owner. Only flag the container itself when it has no movable child to point at. This prevents false "zero movement in N days" stalls on correctly-parked Stories (the real signal is the unfinished child task).
 - **Delivery risk is actionable and read-only.** The 🎯 Delivery-risk section must state the sprint-goal status (🟢/🟡/🔴), the burn-vs-required rate, the specific at-risk items, and a prioritized catch-up plan whose every step names concrete tickets and people. Descope and reassignment are **recommendations only** — never transition, reassign, comment on, or otherwise modify Jira or GitHub.
 - **Env vars referenced** (document at the top of output if any are unset and affect the run):
   - `WEEKLY_DEV_REPORT_TO` — required when `--send` is used; primary email recipient
