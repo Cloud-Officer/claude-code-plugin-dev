@@ -1,6 +1,6 @@
 ---
-description: Exhaustive multi-phase code audit using parallel agents (security, deps, quality, infra, etc.)
-argument-hint: "[scope]"
+name: code-review-deep
+description: "Exhaustive multi-phase code audit using parallel agents (security, dependencies, code quality, infrastructure, tests, and more). Use when the user wants a deep or thorough code review, a comprehensive audit, a security-and-quality sweep of a repo or subsystem, or a multi-agent review that goes beyond the current diff. Optionally scoped to a path or subsystem."
 allowed-tools: Bash(git:*), Bash(gh:*), Bash(jq:*), Bash(awk:*), Bash(cat:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(ls:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, Workflow, Agent, AskUserQuestion, WebSearch, WebFetch, mcp__github__*, mcp__context7__*
 ---
 
@@ -86,13 +86,13 @@ The governance rules (solo/small teams cannot enforce multi-reviewer governance,
 
 ## STEP 3 — RUN THE ANALYSIS WORKFLOW
 
-Invoke the workflow with the gathered context. Pass `$ARGUMENTS` as the scope when the user narrowed the review (e.g. a path or subsystem); otherwise omit it to review the whole repository.
+Invoke the workflow with the gathered context. Pass the scope the user provided when they narrowed the review (e.g. a path or subsystem); otherwise omit it to review the whole repository.
 
 ```text
 Workflow({
   scriptPath: "${CLAUDE_PLUGIN_ROOT}/commands/code-review-deep.workflow.js",
   args: {
-    scope: "<$ARGUMENTS or 'the whole repository'>",
+    scope: "<the user-provided scope, or 'the whole repository'>",
     repoContext: {
       team_profile: "<solo|small|medium|large>",
       active_authors: <ACTIVE_AUTHORS>,
