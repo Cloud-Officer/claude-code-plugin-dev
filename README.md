@@ -14,7 +14,6 @@ Claude Code plugin for development workflow automation.
   * [Multi-Account Setups (direnv)](#multi-account-setups-direnv)
   * [Recommended Permissions](#recommended-permissions)
 * [Usage](#usage)
-  * [Commands](#commands)
   * [Skills](#skills)
   * [Language Servers (LSPs)](#language-servers-lsps)
   * [Local Development](#local-development)
@@ -440,13 +439,6 @@ If you also use remote MCP servers (see [Configure Remote MCPs](#configure-remot
 
 ## Usage
 
-### Commands
-
-| Command                         | Description                                            |
-|---------------------------------|--------------------------------------------------------|
-| `/co-dev:work-issue <issue-id>` | Work on a GitHub or Jira issue (bug, feature, or task) |
-| `/co-dev:code-review-deep`      | Deep code review using parallel agent strategy         |
-
 ### Skills
 
 These skills are automatically available to Claude. The **Setup
@@ -457,6 +449,7 @@ These skills are automatically available to Claude. The **Setup
 | `analyze-db`             | Generate docs/db.md with database schema docs                   | DB-specific env vars — see `query-db` row                                                                                                                                                                                                          |
 | `appstore`               | Manage App Store Connect (builds, TestFlight, reviews, IAPs)    | macOS-only. `mint install zelentsov-dev/asc-mcp`. Env: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY_PATH` (path to `.p8`). [Create API key](https://appstoreconnect.apple.com/access/integrations/api)                                          |
 | `aws`                    | Manage AWS infrastructure and services                          | `aws configure`, or env: `AWS_PROFILE` *(or)* `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` + `AWS_REGION`                                                                                                                                         |
+| `code-review-deep`       | Exhaustive multi-phase code audit using parallel agents         | None — uses bundled `github` + `context7` MCPs                                                                                                                                                                                                     |
 | `create-issue`           | Create GitHub or Jira issues with proper templates              | GitHub: `GITHUB_PERSONAL_ACCESS_TOKEN` *(or)* `gh auth login`. Jira: atlassian remote MCP *(or)* `jira init`                                                                                                                                       |
 | `create-pr`              | Generate PR content, open the PR, return to default branch      | GitHub: `gh auth login` *(or)* `GITHUB_PERSONAL_ACCESS_TOKEN`                                                                                                                                                                                      |
 | `crashlytics`            | Query Firebase Crashlytics crash data from BigQuery             | bigquery remote MCP *(or)* `gcloud auth application-default login`. Env: `BQ_PROJECT`, `BQ_CRASHLYTICS_DATASET`                                                                                                                                    |
@@ -480,6 +473,7 @@ These skills are automatically available to Claude. The **Setup
 | `vercel`                 | Manage Vercel deployments and projects                          | vercel remote MCP *(or)* `vercel login`                                                                                                                                                                                                            |
 | `verify-resolved-issues` | Audit resolved/fixed/done issues, verify fixes, close or reopen | GitHub: `gh auth login` *(or)* `GITHUB_PERSONAL_ACCESS_TOKEN`. Jira: atlassian remote MCP *(or)* `jira init`                                                                                                                                       |
 | `weekly-dev-report`      | Weekly dev activity report from Jira sprint + GitHub            | atlassian remote MCP *(or)* `jira init`. GitHub: `gh auth login`. Optional env: `WEEKLY_DEV_REPORT_TO` (required for `--send`), `WEEKLY_DEV_REPORT_CC`, `GITHUB_USERNAME_MAP`                                                                      |
+| `work-issue`             | Implement GitHub/Jira issue(s) end-to-end and open a PR         | GitHub: `gh auth login` *(or)* `GITHUB_PERSONAL_ACCESS_TOKEN`. Jira: atlassian remote MCP *(or)* `jira init`                                                                                                                                       |
 
 ### Language Servers (LSPs)
 

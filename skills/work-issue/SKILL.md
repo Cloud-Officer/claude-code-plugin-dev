@@ -1,10 +1,12 @@
 ---
-description: Implement one or more GitHub issues or Jira tickets end-to-end (explore, design, implement, PR). Multiple issues run in parallel.
-argument-hint: <issue-number-or-jira-key> [more-issues...]
+name: work-issue
+description: "Implement one or more GitHub issues or Jira tickets end-to-end — explore, design, implement, and open a PR. Multiple issues run in parallel. Use when the user wants to work on an issue, implement a ticket, fix a bug from a tracker, or take a GitHub issue or Jira key from description to pull request."
 allowed-tools: Bash(git:*), Bash(gh:*), Bash(jira:*), Bash(awk:*), Bash(cat:*), Bash(echo:*), Bash(grep:*), Bash(jq:*), Bash(sed:*), Bash(tr:*), Read, Edit, Write, Glob, Grep, TodoWrite, Agent, Workflow, AskUserQuestion, mcp__github__*, mcp__atlassian__*, mcp__figma__*
 ---
 
-Work on issue: $ARGUMENTS
+## Arguments
+
+The user names one or more issues to work on — GitHub issue numbers or Jira keys (e.g. `123` or `PROJ-456`). Parse them from the request. In the steps below, `<issue>` stands for the issue reference currently being worked; when several are given, run them in parallel as described.
 
 ## Run from the target repo's directory (direnv)
 
@@ -29,10 +31,10 @@ This command uses MCP tools when available and falls back gracefully if they are
 | Operation | MCP Tool | CLI Fallback |
 | --- | --- | --- |
 | Check issues enabled | `mcp__github__list_issues` (if it succeeds, issues are enabled) | `gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'` |
-| Get issue details | `mcp__github__get_issue` | `gh issue view $ARGUMENTS --comments` |
+| Get issue details | `mcp__github__get_issue` | `gh issue view <issue> --comments` |
 | Create PR | `mcp__github__create_pull_request` | `gh pr create --base ... --head ... --title "..." --body "..."` |
-| Update issue | `mcp__github__update_issue` | `gh issue edit $ARGUMENTS --title "..." --body "..."` |
-| Add comment | `mcp__github__add_issue_comment` | `gh issue comment $ARGUMENTS --body "..."` |
+| Update issue | `mcp__github__update_issue` | `gh issue edit <issue> --title "..." --body "..."` |
+| Add comment | `mcp__github__add_issue_comment` | `gh issue comment <issue> --body "..."` |
 | Get repo owner/name | Parse from `git remote get-url origin` | `gh repo view --json owner,name` |
 
 **Note:** MCP tools require `owner` and `repo` parameters. Extract these from `git remote get-url origin` (parse the owner/repo from the URL).
@@ -43,10 +45,10 @@ This command uses MCP tools when available and falls back gracefully if they are
 
 | Operation | MCP Tool | CLI Fallback |
 | --- | --- | --- |
-| Get issue details | `mcp__atlassian__getJiraIssue` | `jira issue view $ARGUMENTS --comments 16` |
-| Transition issue | `mcp__atlassian__transitionJiraIssue` | `jira issue move $ARGUMENTS "Code Review"` |
-| Update issue | `mcp__atlassian__editJiraIssue` | `jira issue edit $ARGUMENTS --summary "..." --description "..."` |
-| Add comment | `mcp__atlassian__addCommentToJiraIssue` | `jira issue comment add $ARGUMENTS "..."` |
+| Get issue details | `mcp__atlassian__getJiraIssue` | `jira issue view <issue> --comments 16` |
+| Transition issue | `mcp__atlassian__transitionJiraIssue` | `jira issue move <issue> "Code Review"` |
+| Update issue | `mcp__atlassian__editJiraIssue` | `jira issue edit <issue> --summary "..." --description "..."` |
+| Add comment | `mcp__atlassian__addCommentToJiraIssue` | `jira issue comment add <issue> "..."` |
 | Get transitions | `mcp__atlassian__getTransitionsForJiraIssue` | N/A (not needed with CLI) |
 
 ### Figma Design Context
@@ -61,7 +63,7 @@ When the issue description or comments contain Figma URLs (`figma.com/design/...
 
 ## Single issue vs. multiple issues (mode select)
 
-Parse `$ARGUMENTS` into a list of issue refs (split on whitespace and/or commas; e.g. `123 124 DEV-5` or `123, 124`). Count them:
+Parse `<issue>` into a list of issue refs (split on whitespace and/or commas; e.g. `123 124 DEV-5` or `123, 124`). Count them:
 
 - **One ref → sequential mode (default).** Run the full interactive workflow below (Steps 0–12) exactly as written. The clarifying-questions gate (Step 5) and architecture-choice gate (Step 6) need a human in the loop, so a single issue keeps the rich back-and-forth.
 - **Two or more refs → parallel mode.** Implement them concurrently via the workflow described in the next section, then open PR(s). Use parallel mode when the user passes a batch of issues — it is best for Bugs and well-specified Tasks. If any ref is a **Feature likely to need design discussion**, tell the user it is better done on its own in sequential mode, and offer to either implement it autonomously (the agent records its assumptions for review) or split it out.
@@ -133,8 +135,8 @@ In both cases the `create-pr` skill handles running tests locally, pushing, open
 gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'
 ```
 
-- **GitHub** (if `true`): Use `mcp__github__*` tools (preferred) or `gh issue` commands, branch name `issue-$ARGUMENTS`
-- **Jira** (if `false`): Use `jira` commands, branch name `$ARGUMENTS` (uppercase)
+- **GitHub** (if `true`): Use `mcp__github__*` tools (preferred) or `gh issue` commands, branch name `issue-<issue>`
+- **Jira** (if `false`): Use `jira` commands, branch name `<issue>` (uppercase)
 
 ## Detect Issue Type
 
@@ -156,11 +158,11 @@ After fetching the issue details, determine the issue type:
 
 | Issue Type | GitHub Commit Format | GitHub PR Title Format |
 | --- | --- | --- |
-| Bug | `Fix #$ARGUMENTS: <description>` | `Fix #$ARGUMENTS: <summary>` |
-| Feature | `Feat #$ARGUMENTS: <description>` | `Feat #$ARGUMENTS: <summary>` |
-| Task | `#$ARGUMENTS: <description>` | `#$ARGUMENTS: <summary>` |
+| Bug | `Fix #<issue>: <description>` | `Fix #<issue>: <summary>` |
+| Feature | `Feat #<issue>: <description>` | `Feat #<issue>: <summary>` |
+| Task | `#<issue>: <description>` | `#<issue>: <summary>` |
 
-For Jira issues, always use `$ARGUMENTS: <description>` (the Jira key is the prefix).
+For Jira issues, always use `<issue>: <description>` (the Jira key is the prefix).
 
 ## Workflow (sequential mode — single issue)
 
@@ -173,8 +175,8 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
    Use `TodoWrite` to create a todo list of the workflow steps for this issue. Mark each item completed as you finish it. This survives context compaction and gives the user a stable progress view across long sessions.
 
 1. **Get issue details** (all types) — Present to user before proceeding
-   - GitHub: `mcp__github__get_issue` (preferred) or `gh issue view $ARGUMENTS --comments`
-   - Jira: `mcp__atlassian__getJiraIssue` (preferred) or `jira issue view $ARGUMENTS --comments 16`
+   - GitHub: `mcp__github__get_issue` (preferred) or `gh issue view <issue> --comments`
+   - Jira: `mcp__atlassian__getJiraIssue` (preferred) or `jira issue view <issue> --comments 16`
 
 2. **Extract Figma design context** (all types — only if Figma links are present)
 
@@ -199,8 +201,8 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 
    Decide the branch name from the issue tracker:
 
-   - GitHub: `BRANCH=issue-$ARGUMENTS`
-   - Jira: `BRANCH=$ARGUMENTS` (uppercase — matches the Jira key)
+   - GitHub: `BRANCH=issue-<issue>`
+   - Jira: `BRANCH=<issue>` (uppercase — matches the Jira key)
 
    **Worktree usage is opt-in based on what the repo already does.** Worktrees are great for keeping the user's main checkout untouched and running multiple issues in parallel, but introducing them into a repo that doesn't use them adds a `.worktrees/` directory, a `.gitignore` change, and a workflow expectation the rest of the team may not share. So default to plain branching, and only use a worktree if the repo is already set up for it.
 
@@ -337,8 +339,8 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
     git add .
     ```
 
-    - GitHub: `git commit -m "<PREFIX> #$ARGUMENTS: <brief description>"` (use the commit prefix from the issue type table above)
-    - Jira: `git commit -m "$ARGUMENTS: <brief description>"`
+    - GitHub: `git commit -m "<PREFIX> #<issue>: <brief description>"` (use the commit prefix from the issue type table above)
+    - Jira: `git commit -m "<issue>: <brief description>"`
     - NO footers, NO co-authors, NO "Generated with Claude Code" signatures
 
     **Open the PR via the `create-pr` skill:**
@@ -346,35 +348,35 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 
     When invoking the skill, override its commit-message / PR-title defaults with the issue-tagged form:
 
-    - GitHub: title = `<PREFIX> #$ARGUMENTS: <summary>`
-    - Jira: title = `$ARGUMENTS <summary>`
+    - GitHub: title = `<PREFIX> #<issue>: <summary>`
+    - Jira: title = `<issue> <summary>`
 
-    **GitHub — auto-close the issue on merge (REQUIRED):** the `#$ARGUMENTS:` title prefix is only a *mention* and does NOT close the issue. Ensure the PR **body** (not the title) contains a GitHub closing keyword referencing the issue, so merging the PR closes it automatically. Add a dedicated line to the body using the verb that matches the issue type:
+    **GitHub — auto-close the issue on merge (REQUIRED):** the `#<issue>:` title prefix is only a *mention* and does NOT close the issue. Ensure the PR **body** (not the title) contains a GitHub closing keyword referencing the issue, so merging the PR closes it automatically. Add a dedicated line to the body using the verb that matches the issue type:
 
-    - Bug → `Fixes #$ARGUMENTS`
-    - Feature → `Closes #$ARGUMENTS`
-    - Task → `Closes #$ARGUMENTS`
+    - Bug → `Fixes #<issue>`
+    - Feature → `Closes #<issue>`
+    - Task → `Closes #<issue>`
 
-    The closing keyword + issue number must appear as plain text in the body (e.g. on its own line under the summary, or as `Closes #$ARGUMENTS.`). Do not bury it inside a code block or a link, or GitHub won't parse it.
+    The closing keyword + issue number must appear as plain text in the body (e.g. on its own line under the summary, or as `Closes #<issue>.`). Do not bury it inside a code block or a link, or GitHub won't parse it.
 
     **Jira:** GitHub closing keywords do NOT close Jira issues — skip the keyword for Jira and rely on the transition step below.
 
     **After the skill finishes:**
 
-    - Jira only: `mcp__atlassian__transitionJiraIssue` (preferred) or `jira issue move $ARGUMENTS "Code Review"`
+    - Jira only: `mcp__atlassian__transitionJiraIssue` (preferred) or `jira issue move <issue> "Code Review"`
 
 10. **Update issue if needed** (all types)
     If the implementation differs from the original or additional context would be helpful, update the issue.
     Write in a prospective tone (as if before implementation, not after):
-    - GitHub: `mcp__github__update_issue` (preferred) or `gh issue edit $ARGUMENTS --title "<updated title>" --body "<updated description>"`
-    - Jira: `mcp__atlassian__editJiraIssue` (preferred) or `jira issue edit $ARGUMENTS --summary "<updated title>" --description "<updated description>"`
+    - GitHub: `mcp__github__update_issue` (preferred) or `gh issue edit <issue> --title "<updated title>" --body "<updated description>"`
+    - Jira: `mcp__atlassian__editJiraIssue` (preferred) or `jira issue edit <issue> --summary "<updated title>" --description "<updated description>"`
 
 11. **Post a tester QA checklist on the issue** (all types)
 
     Once the PR is open and the issue is updated, post a comment on the issue aimed at the **testers / QA team**. This is the hand-off gate right before the task moves through code review — it gives a tester an explicit, checkable list to confirm the work is *actually* done, not just merged.
 
-    - GitHub: `mcp__github__add_issue_comment` (preferred) or `gh issue comment $ARGUMENTS --body "..."`
-    - Jira: `mcp__atlassian__addCommentToJiraIssue` (preferred) or `jira issue comment add $ARGUMENTS "..."`
+    - GitHub: `mcp__github__add_issue_comment` (preferred) or `gh issue comment <issue> --body "..."`
+    - Jira: `mcp__atlassian__addCommentToJiraIssue` (preferred) or `jira issue comment add <issue> "..."`
     - Jira note: post this comment as part of (or right after) the move to **Code Review** in step 9, so testers picking up the ticket find the checklist waiting.
 
     ### Where the checks come from
