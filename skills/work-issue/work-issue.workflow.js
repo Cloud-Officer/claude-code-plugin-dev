@@ -9,7 +9,7 @@ export const meta = {
 // ---------------------------------------------------------------------------
 // Parallel path for the work-issue command. Used ONLY when the user passes
 // more than one issue. A single issue still runs the normal interactive flow
-// in work-issue.md (clarifying-questions gate, architecture choice, per-step
+// in SKILL.md (clarifying-questions gate, architecture choice, per-step
 // approval) — those gates need a human and don't fit a background workflow.
 //
 // Each issue is implemented by its OWN agent in its OWN git worktree
@@ -22,8 +22,8 @@ export const meta = {
 // does NOT open PRs — the command asks the user "separate PRs or one combined
 // PR?" once, after this returns, and drives create-pr accordingly.
 //
-// Invoked by commands/work-issue.md via:
-//   Workflow({ scriptPath: "${CLAUDE_PLUGIN_ROOT}/commands/work-issue.workflow.js",
+// Invoked by skills/work-issue/SKILL.md via:
+//   Workflow({ scriptPath: "${CLAUDE_PLUGIN_ROOT}/skills/work-issue/work-issue.workflow.js",
 //              args: { issues: [{ ref, tracker }], defaultBranch, repoRoot } })
 // ---------------------------------------------------------------------------
 

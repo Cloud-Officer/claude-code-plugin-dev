@@ -1,16 +1,16 @@
 ---
 name: code-review-deep
 description: "Exhaustive multi-phase code audit using parallel agents (security, dependencies, code quality, infrastructure, tests, and more). Use when the user wants a deep or thorough code review, a comprehensive audit, a security-and-quality sweep of a repo or subsystem, or a multi-agent review that goes beyond the current diff. Optionally scoped to a path or subsystem."
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(jq:*), Bash(awk:*), Bash(cat:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(ls:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, Workflow, Agent, AskUserQuestion, WebSearch, WebFetch, mcp__github__*, mcp__context7__*
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(jq:*), Bash(awk:*), Bash(cat:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(ls:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, Workflow, Agent, Skill, AskUserQuestion, WebSearch, WebFetch, mcp__github__*, mcp__context7__*
 ---
 
 # Deep Code Review (Workflow-Orchestrated)
 
-You are a senior staff engineer running an exhaustive code audit. The heavy fan-out — Phase 1 scans, Phase 2 deep analysis, Phase 3 adversarial validation, and the Phase 3.5 confidence filter — runs as a **deterministic workflow** (`code-review-deep.workflow.js`). Your job in this command is the work that needs judgment and a human in the loop: the pre-flight check, gathering repository context, invoking the workflow, and rendering the final report from the structured data it returns.
+You are a senior staff engineer running an exhaustive code audit. The heavy fan-out — Phase 1 scans, Phase 2 deep analysis, Phase 3 adversarial validation, and the Phase 3.5 confidence filter — runs as a **deterministic workflow** (`code-review-deep.workflow.js`). Your job in this command is the work that needs judgment and a human in the loop: the pre-flight check, gathering repository context, invoking the workflow, optionally running the dedicated documentation skills in review-only mode when the user opts in (Step 3.5), and rendering the final report from the structured data it returns.
 
 **Balance criticism with recognition.** A good review acknowledges what the team does well. The workflow returns `positives` from every agent — surface them in the report. It should feel constructive, not purely negative.
 
-**Where the analysis rules live.** The agent prompts, governance rules, exclusions, the adversarial-validation checklist, and the per-severity confidence thresholds are all defined in `${CLAUDE_PLUGIN_ROOT}/commands/code-review-deep.workflow.js`. To tune *what the review looks for*, edit that file — not this command.
+**Where the analysis rules live.** The agent prompts, governance rules, exclusions, the adversarial-validation checklist, and the per-severity confidence thresholds are all defined in `${CLAUDE_PLUGIN_ROOT}/skills/code-review-deep/code-review-deep.workflow.js`. To tune *what the review looks for*, edit that file — not this skill.
 
 ## Run from the target repo's directory (direnv)
 
@@ -90,7 +90,7 @@ Invoke the workflow with the gathered context. Pass the scope the user provided 
 
 ```text
 Workflow({
-  scriptPath: "${CLAUDE_PLUGIN_ROOT}/commands/code-review-deep.workflow.js",
+  scriptPath: "${CLAUDE_PLUGIN_ROOT}/skills/code-review-deep/code-review-deep.workflow.js",
   args: {
     scope: "<the user-provided scope, or 'the whole repository'>",
     repoContext: {
@@ -110,9 +110,9 @@ Workflow({
 | Phase | Agents | Purpose |
 | ----- | ------ | ------- |
 | Scan | 3 parallel `Explore` | Tech stack (+ applicability booleans), config inventory, structure |
-| Analyze | 7–11 parallel `general-purpose` | Core agents always run; backend / infra-compliance / i18n-ml / prompt-artifacts run only when Phase 1 flags them |
-| Verify | N parallel (≤10 findings each) | Adversarial validation that tries to **disprove** each finding, with a 0–100 confidence score |
-| Filter | (in-script) | Per-severity confidence thresholds: Critical ≥40, High ≥60, Medium ≥65, Low ≥75, Info ≥80 |
+| Analyze | 8–12 parallel `general-purpose` | Core agents always run (security, quality, bugs, testing, deps, repo-ci, docs, consistency); backend / infra-compliance / i18n-ml (i18n + accessibility) / prompt-artifacts run only when Phase 1 flags them |
+| Verify | N parallel (≤5 findings each) | Adversarial validation that tries to **disprove** each finding, with a 0–100 confidence score |
+| Filter | (in-script) | Per-severity confidence thresholds (aligned to the validator's 0/25/50/75/100 anchor grid): Critical ≥25, High ≥50, Medium ≥50, Low ≥50, Info ≥75 |
 
 The workflow runs in the background and notifies you on completion. It **returns a structured object**:
 
@@ -132,6 +132,28 @@ If the user explicitly asks to change strictness (e.g. "be aggressive — keep e
 
 ---
 
+## STEP 3.5 — DEEP DOCUMENTATION REVIEW (opt-in, review-only)
+
+**This step is gated OFF by default.** The workflow's `docs` agent already covers documentation presence, stubs, and configuration on every run — that is the default. Skip this entire step **unless the user explicitly opts in** to a deep documentation-content review, e.g. by passing a `--docs` / `--deep-docs` flag or asking in words to "also review the README / architecture doc / user guide content", "include a documentation review", or similar. If the user did not ask for it, go straight to Step 4 and treat the three doc skills as **not run** in the Review Coverage checklist.
+
+When opted in, deep-review the documentation with the three dedicated skills, then fold their findings into this report. These skills verify doc **content against the code**, which the workflow does not.
+
+Invoke each via the **Skill** tool in **review-only** mode — they must NOT create or modify any files during a deep review; we only want their findings:
+
+- `co-dev:review-readme`
+- `co-dev:review-architecture`
+- `co-dev:review-user-guide`
+
+For each, pass an explicit review-only instruction as the skill's args, e.g.:
+
+> Review-only mode for a larger code audit: analyze and report findings, but DO NOT create, write, or edit README.md / docs/architecture.md / docs/user-guide.md or any other file. Return your findings only — the deep code review will fold them into `docs/code-review.md`.
+
+Each skill self-exempts when its document doesn't apply (e.g. no end-user product → the user-guide skill skips). Treat a skip as **N/A**, not a failure.
+
+**Fold the results in:** translate each skill's reported issues into the standard finding format under the report's Documentation area, using `DOC-*` IDs, with severity per the skill's own assessment and the file references it cites. Deduplicate against the workflow's `docs` findings (same file + root cause). In the report, note that deep documentation review was performed by the review-readme / review-architecture / review-user-guide skills. Do not let these skills write their own doc files or a separate report.
+
+---
+
 ## STEP 4 — REPORT GENERATION
 
 Operate on the workflow's return value. **Pre-report verification:** confirm the workflow completed and every `kept` finding has a `code_quoted` and `confidence_score`. If the workflow returned nothing (e.g. it was cancelled), stop and report that rather than inventing findings.
@@ -139,11 +161,12 @@ Operate on the workflow's return value. **Pre-report verification:** confirm the
 Then:
 
 1. Take `kept` as the main findings; `filtered` becomes the "Filtered (Low Confidence)" appendix.
-2. Deduplicate overlapping findings (same file + same root cause across agents).
-3. Sort by severity (Critical → High → Medium → Low → Info).
-4. Write `docs/code-review.md` (create the directory if needed).
-5. Include `positives` (grouped by area) and the quantitative `counts` in the report.
-6. Build the **Review Coverage** checklist from `agents_run` (mark agents that did not run as N/A, not as failures).
+2. If Step 3.5 ran, merge in its `DOC-*` findings as regular findings; if it was skipped (the default), there are none to merge.
+3. Deduplicate overlapping findings (same file + same root cause across agents, and vs. any Step 3.5 doc findings).
+4. Sort by severity (Critical → High → Medium → Low → Info).
+5. Write `docs/code-review.md` (create the directory if needed).
+6. Include `positives` (grouped by area) and the quantitative `counts` in the report.
+7. Build the **Review Coverage** checklist from `agents_run`; add the three doc skills only when Step 3.5 ran (mark agents/skills that did not run, were not opted into, or self-exempted as N/A, not as failures).
 
 Do NOT include internal workflow/phase tracking in the final report.
 
@@ -242,7 +265,7 @@ How to address it.
 
 ## ✅ Positive Observations & Strengths
 
-Highlight what the team is doing well, organized by area (Architecture, Code Quality, Security, Testing, DevOps/CI/CD, Documentation, Dependencies, IaC, Performance, Observability, API Design, Compliance, Configuration, Error Handling). Be specific about which files/patterns demonstrate this. Skip sections that don't apply.
+Highlight what the team is doing well, organized by area (Architecture, Code Quality, Consistency, Security, Testing, DevOps/CI/CD, Documentation, Dependencies, IaC, Performance, Observability, API Design, Compliance, Configuration, Error Handling, Internationalization, Accessibility). Be specific about which files/patterns demonstrate this. Skip sections that don't apply.
 
 ---
 
@@ -314,6 +337,8 @@ Highlight what the team is doing well, organized by area (Architecture, Code Qua
 | I18N | Internationalization |
 | BUG | Bug Patterns |
 | COMPAT | Backwards Compatibility |
+| CONS | Consistency / Convention Drift |
+| A11Y | Accessibility |
 | PLUGIN | Claude Code Plugin Artifacts (commands/skills/agents/hooks/MCP) |
 | PROMPT | LLM Prompt Engineering (embedded prompts) |
 
@@ -369,6 +394,8 @@ Always include `code-review` plus one category label:
 | BUG-* | bug-patterns |
 | COMPAT-* | backwards-compat |
 | CFG-* | configuration |
+| CONS-* | consistency |
+| A11Y-* | accessibility |
 | PLUGIN-* | plugin-artifacts |
 | PROMPT-* | llm-prompts |
 

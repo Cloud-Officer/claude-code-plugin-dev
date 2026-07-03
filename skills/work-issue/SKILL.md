@@ -92,7 +92,7 @@ Detect the tracker once (`gh repo view --json hasIssuesEnabled --jq '.hasIssuesE
 
 ```text
 Workflow({
-  scriptPath: "${CLAUDE_PLUGIN_ROOT}/commands/work-issue.workflow.js",
+  scriptPath: "${CLAUDE_PLUGIN_ROOT}/skills/work-issue/work-issue.workflow.js",
   args: {
     defaultBranch: "<DEFAULT_BRANCH>",
     repoRoot: "<REPO_ROOT>",
@@ -111,7 +111,7 @@ Each agent fetches its issue, creates branch `issue-<n>` (GitHub) or `<KEY>` upp
 }
 ```
 
-The implementation rules (branch naming, issue-type → commit prefix, the test hard-gate, no-signature commits) live in `${CLAUDE_PLUGIN_ROOT}/commands/work-issue.workflow.js` — edit that file to tune the parallel path.
+The implementation rules (branch naming, issue-type → commit prefix, the test hard-gate, no-signature commits) live in `${CLAUDE_PLUGIN_ROOT}/skills/work-issue/work-issue.workflow.js` — edit that file to tune the parallel path.
 
 ### P3 — Review results
 

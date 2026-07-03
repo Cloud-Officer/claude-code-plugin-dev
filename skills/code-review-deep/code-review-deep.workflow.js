@@ -13,12 +13,12 @@ export const meta = {
 // analysis behaviour: the Phase 1 scout prompts, the Phase 2 analysis prompts,
 // the Phase 3 adversarial-validation checklist, the governance rules, the
 // exclusions, and the per-severity confidence thresholds all live here. Edit
-// THIS FILE to tune what the review looks for. The command markdown only
+// THIS FILE to tune what the review looks for. The skill markdown only
 // handles preflight (existing-report check, repo-context gathering) and the
 // final report rendering from the structured data this workflow returns.
 //
-// Invoked by commands/code-review-deep.md via:
-//   Workflow({ scriptPath: "${CLAUDE_PLUGIN_ROOT}/commands/code-review-deep.workflow.js",
+// Invoked by skills/code-review-deep/SKILL.md via:
+//   Workflow({ scriptPath: "${CLAUDE_PLUGIN_ROOT}/skills/code-review-deep/code-review-deep.workflow.js",
 //              args: { repoContext: {...}, scope: "..." } })
 // ---------------------------------------------------------------------------
 
@@ -27,9 +27,14 @@ const repoContext = input.repoContext || {}
 const scope = input.scope || 'the whole repository'
 
 // --- Per-severity confidence thresholds (Phase 3.5) ------------------------
-// Critical/High survive at lower confidence (cost of a miss is high); Medium/
-// Low/Info need higher confidence so stochastic re-runs stay deterministic.
-const SEV_THRESHOLDS = { critical: 40, high: 60, medium: 65, low: 75, info: 80 }
+// IMPORTANT: the validator scores on the anchor grid 0/25/50/75/100 (see
+// buildVerifyPrompt). Thresholds MUST land ON those anchors — a threshold of
+// 65 silently rounds a "50 = verified real but minor" finding up into the
+// reject bucket, which is why the main report used to come back empty while
+// the appendix filled up. Keep every value in {25, 50, 75}.
+// Critical/High survive at lower confidence (cost of a miss is high); Low/Info
+// need a higher bar so stochastic re-runs stay deterministic.
+const SEV_THRESHOLDS = { critical: 25, high: 50, medium: 50, low: 50, info: 75 }
 
 function normSev(s) {
   const t = String(s || '').toLowerCase()
@@ -302,6 +307,9 @@ const A_DOCS = {
   key: 'docs', idPrefix: 'DOC',
   prompt: [
     'Project documentation AND configuration management.',
+    'SCOPE NOTE: deep content-accuracy review of README.md, docs/architecture.md, and docs/user-guide.md is an OPTIONAL, opt-in pass',
+    'handled by dedicated skills after this workflow (off by default). Regardless of whether it runs, this agent limits documentation',
+    'work to: presence, empty/stub detection, required-files below, and configuration management. Do the configuration checks in full.',
     'Documentation - required files:',
     '- README.md sections: project name with build badge, table of contents, overview, installation, usage, contributing.',
     '- docs/architecture.md (standard): TOC, architecture diagram, software units, SOUP, critical algorithms, risk controls.',
@@ -322,6 +330,37 @@ const A_DOCS = {
     '4. Feature flags: inconsistent naming, no cleanup of old flags, undocumented dependencies.',
     '5. Platform-specific: iOS xcconfig per environment; Android buildConfigField per flavor; Web client-side env exposure',
     '   (NEXT_PUBLIC_, VITE_), build-time vs runtime.',
+  ].join('\n'),
+}
+
+const A_CONSISTENCY = {
+  key: 'consistency', idPrefix: 'CONS',
+  prompt: [
+    'Review CONSISTENCY WITH THE REST OF THE CODEBASE — does the code look like it was written by the same team, following',
+    'the conventions already established here? Establish the repo\'s dominant patterns FIRST (read a representative sample of',
+    'existing code), then flag code that diverges from them without a reason. This is about uniformity, not absolute rules:',
+    'the yardstick is "what does the rest of this repo already do?"',
+    'Do NOT duplicate other agents: pure duplication metrics + method/class size are Agent B (quality); silent-failure counts',
+    'are Agent C (bugs); dependency duplicates are the deps agent; hardcoded user-facing strings / i18n routing are the i18n',
+    'agent. Here, focus on CONVENTION DRIFT:',
+    '1. Reinventing existing building blocks: a new helper/util/service that re-implements something the repo already provides',
+    '   (an existing formatter, validator, HTTP wrapper, date util, form/section helper, base class). Grep for the existing',
+    '   one and cite it. Reusing the established helper is the fix.',
+    '2. Naming drift: identifiers, files, DB columns, routes, event/constant names that break the repo\'s prevailing casing or',
+    '   naming scheme (camelCase vs snake_case, handler vs controller, get_x vs fetch_x). Cite the majority convention.',
+    '3. Structural drift: a file/module placed outside the established folder layout, or a layer boundary crossed the way the',
+    '   rest of the repo does not (e.g. a view hitting the DB directly when every other view goes through a repository).',
+    '4. Divergent approach for a solved problem: a second way of doing something the codebase already standardizes — a',
+    '   different HTTP client, state-management approach, error-wrapping style, logging call, config-access pattern, or test',
+    '   scaffolding than the prevailing one. Report the two variants and which is dominant.',
+    '5. UI/component drift (if applicable): bespoke markup/components where the repo has a shared component / design-system /',
+    '   form helper for that exact thing; inconsistent spacing/props/variants versus the established components.',
+    '6. Idiom drift: manual code where the repo elsewhere uses a cleaner idiom already (framework helper, language feature),',
+    '   or formatting/ordering that the rest of the repo does not use.',
+    'For every finding, cite BOTH the divergent code AND at least one existing example of the established convention',
+    '(file:line). A finding with no established-convention citation is just opinion — do not raise it. Severity is usually',
+    'Low/Medium (maintainability); escalate only when the drift causes real bugs or bypasses a safety pattern. Acknowledge',
+    'strong consistency in positives[].',
   ].join('\n'),
 }
 
@@ -381,12 +420,24 @@ const A_INFRA = {
 const A_LOCALE_ML = {
   key: 'i18n-ml', idPrefix: 'I18N',
   prompt: [
-    'Localization AND AI/ML practices (only because user-facing UI or ML was detected). Run only the relevant sub-section.',
-    'i18n (if user-facing UI): hardcoded user-facing strings, concatenation that breaks translation, missing translation keys;',
-    'missing plural forms, incorrect rules for non-English; date/time/currency not locale-aware, hardcoded number/date formats;',
-    'RTL: hardcoded left/right vs leading/trailing (iOS), missing supportsRtl (Android), margin-left vs margin-inline-start (CSS);',
-    'platform: iOS strings in Localizable.strings/.xcstrings, NSLocalizedString usage; Android @string/ not hardcoded, translations in',
-    'values-XX/; Web i18n library usage, no template literals with embedded text; workflow: string extraction in CI, missing translations flagged.',
+    'Localization, ACCESSIBILITY, AND AI/ML practices (only because user-facing UI or ML was detected). Run only the relevant sub-sections.',
+    'i18n uniformity (if user-facing UI) - the guiding question is "does EVERY user-facing string go through the project\'s',
+    'translation mechanism, the way the rest of the app does?" First identify the project\'s i18n mechanism (e.g. I18n.t / t(),',
+    'NSLocalizedString, @string/, an i18n library) and its locale files, then:',
+    '- Hardcoded user-facing strings that bypass it - flag each with file:line and the key it SHOULD use. Report an exact count',
+    '  ("X hardcoded user-facing strings across Y files") and the percentage routed through i18n if estimable.',
+    '- Keys referenced in code but MISSING from the locale/translation files, and (INFO) keys defined but never referenced.',
+    '- Partial-locale coverage: a key present in one locale but missing in others.',
+    '- Concatenation / interpolation that breaks translation word order; missing plural forms or wrong plural rules for non-English;',
+    '  date/time/currency/number not locale-aware (hardcoded formats).',
+    '- RTL: hardcoded left/right vs leading/trailing (iOS), missing supportsRtl (Android), margin-left vs margin-inline-start (CSS).',
+    '- Platform specifics: iOS Localizable.strings/.xcstrings + NSLocalizedString; Android @string/ + values-XX/; Web i18n library,',
+    '  no template literals with embedded text; workflow: string extraction in CI, missing translations flagged.',
+    'Accessibility (if user-facing UI) - prefix A11Y: images/icons without alt/contentDescription/accessibilityLabel; form inputs',
+    'without associated labels; buttons/links with no accessible name (icon-only controls); non-semantic clickable elements (div',
+    'onClick) without role/keyboard handlers; missing focus management / keyboard navigation; color-only signaling of state;',
+    'insufficient contrast where declared; missing lang attribute / dynamic-type or font-scaling support; decorative media not',
+    'hidden from assistive tech. Cite file:line; be consistent with the platform\'s a11y API. Use prefix A11Y for these findings.',
     'AI/ML (if ML frameworks detected): reproducibility (random seeds set, model versioning, experiment tracking, no hardcoded',
     'hyperparameters); data (schema/validation, train/test split verification, data leakage, feature versioning); model management',
     '(registry, metadata, A/B testing, rollback); security (models from untrusted sources can execute arbitrary code on load - flag any',
@@ -426,7 +477,7 @@ const A_PROMPTS = {
   ].join('\n'),
 }
 
-const CORE_AGENTS = [A_SECURITY, A_QUALITY, A_BUGS, A_TESTING, A_DEPS, A_REPO_CI, A_DOCS]
+const CORE_AGENTS = [A_SECURITY, A_QUALITY, A_BUGS, A_TESTING, A_DEPS, A_REPO_CI, A_DOCS, A_CONSISTENCY]
 
 // --- Phase 3 adversarial validation prompt ---------------------------------
 function buildVerifyPrompt(findings) {
@@ -447,8 +498,13 @@ function buildVerifyPrompt(findings) {
     'Findings to validate (JSON):',
     JSON.stringify(list, null, 2),
     '',
-    'For EACH finding, complete ALL of these checks. If you cannot complete a check, REJECT.',
-    '1. Quote the actual code - read the file at the location and quote 5-10 lines of context. No quote = REJECT.',
+    'For EACH finding, work through ALL of these checks. A finding survives only if NONE of the checks disprove it.',
+    'Do NOT auto-reject merely because a check was inconclusive — reject on a positive disproof (a mitigating factor',
+    'you actually found), and otherwise let the confidence score carry the uncertainty.',
+    '1. Quote the actual code - read the file at the location and quote 5-10 lines of context. If you genuinely cannot',
+    '   open the file in this pass (batched review, path moved), do NOT auto-reject: proceed with the remaining checks and',
+    '   cap confidence_score at 50, noting in confidence_rationale that the quote is missing. Only an EMPTY/nonexistent file',
+    '   or a quote that contradicts the finding is a REJECT.',
     '2. Check for mitigating factors - wrappers, middleware, base classes, config files (.env, config/, settings), related files',
     '   providing the missing functionality, handling at a different layer (infra, framework, platform).',
     '3. Check for existing handling elsewhere - grep for related patterns; check imports for libraries that handle this automatically.',
@@ -466,11 +522,13 @@ function buildVerifyPrompt(findings) {
     '   addressed? Eager-eye findings (only noticed on the first skim) are opinion, not load-bearing. If you would not re-flag it on a',
     '   second pass, REJECT. This is what keeps re-runs deterministic across stochastic sampling.',
     '',
-    'REJECT if: any mitigating factor exists, the issue is handled elsewhere, you cannot quote the code, repo settings address it, a',
-    'senior engineer would not flag it, the choice is deliberate given repo context, or it would not be re-flagged on a second read.',
-    'CONFIRM only if all checks fail to disprove the finding.',
+    'REJECT if: any mitigating factor exists, the issue is handled elsewhere, the file is empty/nonexistent or the quoted code',
+    'contradicts the finding, repo settings address it, a senior engineer would not flag it, the choice is deliberate given repo',
+    'context, or it would not be re-flagged on a second read. Being unable to open the file in a batched pass is NOT grounds to',
+    'reject — cap the confidence at 50 instead. CONFIRM if the checks fail to disprove the finding.',
     '',
-    'Confidence score (CONFIRMs only): 0 = false positive / pre-existing; 25 = might be real but unverified or purely stylistic;',
+    'Confidence score (CONFIRMs only): output ANY integer 0-100 and interpolate between these anchors — do NOT snap only to',
+    'the round numbers. 0 = false positive / pre-existing; 25 = might be real but unverified or purely stylistic;',
     '50 = verified real but minor/rare; 75 = double-checked, real, likely to be hit, OR explicitly violates a project convention;',
     '100 = certain, evidence directly confirms it, will happen frequently. REJECTED = 0. CONFIRMED must score >= 25.',
     '',
@@ -581,7 +639,9 @@ log('Phase 1 done. Running ' + selected.length + ' analysis agents: ' + selected
 // ===========================================================================
 // PHASE 2 -> PHASE 3 as a pipeline: each agent's findings are adversarially
 // verified as soon as that agent returns (no global barrier). Verification is
-// batched up to 10 findings per validator to preserve cache reuse / cost.
+// batched up to 5 findings per validator: small enough that the validator can
+// actually open and quote every file in the batch (larger batches starved the
+// per-finding code-read budget and caused false rejections).
 // ===========================================================================
 phase('Analyze')
 const reviewed = await pipeline(
@@ -592,7 +652,7 @@ const reviewed = await pipeline(
     const issues = (review && Array.isArray(review.issues)) ? review.issues : []
     if (!issues.length) return { agentDef, review, verdicts: [] }
     const batches = await parallel(
-      chunk(issues, 10).map((group, i) => () =>
+      chunk(issues, 5).map((group, i) => () =>
         agent(buildVerifyPrompt(group), { label: 'verify:' + agentDef.key + '#' + i, phase: 'Verify', schema: VERDICT_SCHEMA, agentType: 'general-purpose' })
       )
     )
