@@ -29,6 +29,7 @@ This plugin provides development workflow automation for Claude Code.
 * Automated deep code reviews using parallel agents
 * PR generation with commit messages
 * Linting and code quality checks
+* Automated test generation with coverage enforcement across 10 languages (RSpec, PHPUnit/Pest, pytest, Jest/Vitest, xUnit, Swift Testing/XCUITest, Kotest, Go, GoogleTest, Rust)
 * Database schema documentation and natural language querying
 * Project documentation review (README, architecture, user guide)
 * Sprint work summaries grouped by repository
@@ -526,6 +527,7 @@ These skills are automatically available to Claude. The **Setup
 | `verify-resolved-issues` | Audit resolved/fixed/done issues, verify fixes, close or reopen                                                         | GitHub: `gh auth login` *(or)* `GITHUB_PERSONAL_ACCESS_TOKEN`. Jira: atlassian remote MCP *(or)* `jira init`                                                                                                                                        |
 | `weekly-dev-report`      | Weekly dev activity report from Jira sprint + GitHub                                                                    | atlassian remote MCP *(or)* `jira init`. GitHub: `gh auth login`. Optional env: `WEEKLY_DEV_REPORT_TO` (required for `--send`), `WEEKLY_DEV_REPORT_CC`, `GITHUB_USERNAME_MAP`                                                                       |
 | `work-issue`             | Implement GitHub/Jira issue(s) end-to-end and open a PR                                                                 | GitHub: `gh auth login` *(or)* `GITHUB_PERSONAL_ACCESS_TOKEN`. Jira: atlassian remote MCP *(or)* `jira init`                                                                                                                                        |
+| `write-tests`            | Generate and run tests in the repo's own framework (unit/integration/e2e); enforces 80/80 line/branch coverage          | None — uses the test runner already in the repo (RSpec, pytest, Jest/Vitest, go test, dotnet, xcodebuild, gradle, PHPUnit/Pest, cargo, ctest, …)                                                                                                    |
 
 ### Language Servers (LSPs)
 
@@ -535,7 +537,7 @@ The plugin declares LSPs for 13 languages. Each is **idle until you open a match
 
 **Why they matter:** an active LSP gives Claude **real type information
 ** from your installed dependencies — function signatures, references, type definitions, completions — instead of inferring from source code. This is what stops Claude from hallucinating method names on third-party libraries or guessing the shape of a return type. Any skill that touches code (
-`code-review-deep`, `run-linters`, `work-issue`,
+`code-review-deep`, `run-linters`, `work-issue`, `write-tests`,
 `create-pr`, the deep-analysis agents) becomes meaningfully more accurate.
 
 **Activation rules:**

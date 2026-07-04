@@ -311,6 +311,8 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 
    Do not advance to the PR unless the change is covered by tests that pass, or it falls into the narrow no-test exception below. This step belongs in the TodoWrite list (step 0) so it cannot be skipped silently.
 
+   **Use the `write-tests` skill to author them.** This step owns the *gate* (no behavior change ships untested); `write-tests` is *how* you satisfy it — it handles framework detection (including repos with more than one framework for a language), the success/negative/edge/regression case matrix, running to green, and the coverage floor (line ≥ 80% / branch ≥ 80% by default, or the repo's configured threshold if higher). The detection and case guidance below mirrors that skill; keep them in sync.
+
    1. **Find the project's test setup first — don't guess.** Detect the runner and conventions from the repo before writing anything:
       - Locate existing tests next to the code you changed (sibling `*_test.*`, `*_spec.*`, or a parallel `test/`, `tests/`, `spec/`, `__tests__/` tree).
       - Identify the runner from the manifest/config (`package.json` scripts, `Gemfile` + `spec/`, `pytest.ini`/`pyproject.toml`, `go test`, `*.csproj`, etc.). **For Swift/iOS:** `Package.swift` → `swift test`; `*.xcworkspace`/`*.xcodeproj` → `xcodebuild test -scheme <Scheme> -destination 'platform=iOS Simulator,name=iPhone 15'` (find schemes with `xcodebuild -list`). On macOS these run locally — do not treat an Xcode project as "untestable".
