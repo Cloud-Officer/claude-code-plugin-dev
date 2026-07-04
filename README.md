@@ -64,8 +64,8 @@ brew install node uv gh jq
 In Claude Code:
 
 ```text
-/plugin marketplace add cloud-officer/claude-code-plugin-dev
-/plugin install co-dev@cloud-officer
+claude plugin marketplace add cloud-officer/claude-code-plugin-dev
+claude plugin install co-dev@cloud-officer
 ```
 
 After install:
@@ -142,8 +142,8 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 In Claude Code:
 
 ```text
-/plugin marketplace add cloud-officer/claude-code-plugin-dev
-/plugin install co-dev@cloud-officer
+claude plugin marketplace add cloud-officer/claude-code-plugin-dev
+claude plugin install co-dev@cloud-officer
 ```
 
 After install:
@@ -170,8 +170,8 @@ scoop install nodejs uv gh jq
 In Claude Code:
 
 ```text
-/plugin marketplace add cloud-officer/claude-code-plugin-dev
-/plugin install co-dev@cloud-officer
+claude plugin marketplace add cloud-officer/claude-code-plugin-dev
+claude plugin install co-dev@cloud-officer
 ```
 
 After install:
@@ -350,16 +350,23 @@ These official plugins from the `claude-plugins-official` marketplace pair well 
 
 | Plugin                 | What it adds                                                                                                                        | Install                                                        |
 |------------------------|-------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------|
-| `plugin-dev`           | Toolkit for developing Claude Code plugins — 7 skills (hooks, MCP, structure, settings, commands, agents, skills) + validators      | `/plugin install plugin-dev@claude-plugins-official`           |
-| `claude-md-management` | Audit and revise CLAUDE.md files based on session learnings                                                                         | `/plugin install claude-md-management@claude-plugins-official` |
-| `claude-code-setup`    | Analyze a codebase and recommend Claude Code automations to add                                                                     | `/plugin install claude-code-setup@claude-plugins-official`    |
-| `skill-creator`        | Guided skill creation workflow (overlaps with `plugin-dev`'s skill-development skill — pick one)                                    | `/plugin install skill-creator@claude-plugins-official`        |
-| `code-simplifier`      | Refactor recently-modified code for clarity, DRY, and consistency                                                                   | `/plugin install code-simplifier@claude-plugins-official`      |
-| `code-review`          | Lean automated PR review with confidence scoring (alternative to `co-dev`'s `/code-review-deep`, which is broader and not PR-bound) | `/plugin install code-review@claude-plugins-official`          |
-| `security-guidance`    | Proactive security hints via PreToolUse hooks (complements `code-review-deep`'s reactive audit)                                     | `/plugin install security-guidance@claude-plugins-official`    |
-| `frontend-design`      | Opinionated patterns for production-grade frontend interfaces                                                                       | `/plugin install frontend-design@claude-plugins-official`      |
-| `superpowers`          | Brainstorming and subagent-driven workflows                                                                                         | `/plugin install superpowers@claude-plugins-official`          |
-| `agent-sdk-dev`        | Toolkit for building apps on the Anthropic **Agent SDK** (a different stack from Claude Code plugins)                               | `/plugin install agent-sdk-dev@claude-plugins-official`        |
+| `plugin-dev`           | Toolkit for developing Claude Code plugins — 7 skills (hooks, MCP, structure, settings, commands, agents, skills) + validators      | `claude plugin install plugin-dev@claude-plugins-official`           |
+| `claude-md-management` | Audit and revise CLAUDE.md files based on session learnings                                                                         | `claude plugin install claude-md-management@claude-plugins-official` |
+| `claude-code-setup`    | Analyze a codebase and recommend Claude Code automations to add                                                                     | `claude plugin install claude-code-setup@claude-plugins-official`    |
+| `skill-creator`        | Guided skill creation workflow (overlaps with `plugin-dev`'s skill-development skill — pick one)                                    | `claude plugin install skill-creator@claude-plugins-official`        |
+| `code-simplifier`      | Refactor recently-modified code for clarity, DRY, and consistency                                                                   | `claude plugin install code-simplifier@claude-plugins-official`      |
+| `code-review`          | Lean automated PR review with confidence scoring (alternative to `co-dev`'s `/code-review-deep`, which is broader and not PR-bound) | `claude plugin install code-review@claude-plugins-official`          |
+| `security-guidance`    | Proactive security hints via PreToolUse hooks (complements `code-review-deep`'s reactive audit)                                     | `claude plugin install security-guidance@claude-plugins-official`    |
+| `frontend-design`      | Opinionated patterns for production-grade frontend interfaces                                                                       | `claude plugin install frontend-design@claude-plugins-official`      |
+| `superpowers`          | Brainstorming and subagent-driven workflows                                                                                         | `claude plugin install superpowers@claude-plugins-official`          |
+| `agent-sdk-dev`        | Toolkit for building apps on the Anthropic **Agent SDK** (a different stack from Claude Code plugins)                               | `claude plugin install agent-sdk-dev@claude-plugins-official`        |
+| `document-skills`      | Anthropic's `xlsx`/`docx`/`pptx`/`pdf` skills — deliver `co-dev` reports (`weekly-dev-report`, `sprint-summary`, `query-db`, …) as Office/PDF files. Separate marketplace (see note). | `claude plugin marketplace add anthropics/skills` then `claude plugin install document-skills@anthropic-agent-skills` |
+
+> `document-skills` lives on Anthropic's own `anthropic-agent-skills` marketplace (not
+> `claude-plugins-official`), so it needs the one-time `claude plugin marketplace add` step above. It is
+> **not** open source — review each skill's `LICENSE.txt`. Optional: Claude Code can already generate
+> these formats on demand via open-source libraries (`openpyxl`, `python-docx`, `python-pptx`,
+> `reportlab`); the skills mainly add standardized, repeatable formatting.
 
 ### Configure Environment Variables
 
@@ -464,8 +471,10 @@ These skills are automatically available to Claude. The **Setup
 | `playstore`              | Fetch, analyze, and respond to Google Play reviews              | Env: `GOOGLE_APPLICATION_CREDENTIALS` (path to service-account JSON; needs Google Play Developer API + Play Console access). Requires `uv`/`uvx` on PATH.                                                                                          |
 | `query-db`               | Query databases using natural language via CLI                  | Per DB: PG (`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`) · MySQL (`MYSQL_*`) · Mongo (`MDB_MCP_CONNECTION_STRING`) · Redis (`REDIS_URL`) · SQLite (`SQLITE_DB`) · BigQuery (`BQ_PROJECT`, `BQ_DATASETS`) · ES (`ES_URL`, `ES_API_KEY`)|
 | `review-architecture`    | Review or create docs/architecture.md                           | None — uses bundled `fetch` + `context7` MCPs                                                                                                                                                                                                      |
+| `review-copy`            | Audit user-facing copy — microcopy, form/help text, voice & tone, i18n readiness, marketing; writes docs/copy-review.md | None — uses `git` + optional `loco` handoff for i18n keys |
 | `review-design`          | Compare UI code against Figma designs (Android, iOS, web)       | figma remote MCP **(required — no CLI fallback)**                                                                                                                                                                                                  |
 | `review-readme`          | Review or create README.md to match standards                   | None — uses bundled `fetch` + `context7` MCPs                                                                                                                                                                                                      |
+| `review-seo`             | Audit SEO + GEO (AI answer-engine) for a codebase and/or live URL; writes docs/seo-audit.md | None — uses `curl` + bundled `fetch` MCP; optional `chrome-devtools-mcp` for Core Web Vitals |
 | `review-user-guide`      | Review or create docs/user-guide.md with user documentation     | None — uses bundled `fetch` + `context7` MCPs                                                                                                                                                                                                      |
 | `run-linters`            | Run linters and fix any issues found                            | None — runs project linters already configured in the repo                                                                                                                                                                                         |
 | `sprint-summary`         | Summarize sprint items grouped by repo in ~3-day blocks         | atlassian remote MCP *(or)* `jira init`                                                                                                                                                                                                            |
