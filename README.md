@@ -44,8 +44,7 @@ This plugin provides development workflow automation for Claude Code.
 * Heroku application management and deployment
 * App Store Connect management (builds, TestFlight, reviews, IAPs)
 * Google Play Store review management and analytics
-* Google Workspace integration (Gmail, Calendar, Drive, Docs, Sheets, Slides, Forms, Tasks, Contacts, Chat) via optional [
-  `workspace-mcp`](#google-workspace-mcp-optional) setup
+* Google Workspace integration (Gmail, Calendar, Drive, Docs, Sheets, Slides, Forms, Tasks, Contacts, Chat) via optional [`workspace-mcp`](#google-workspace-mcp-optional) setup
 
 ## Installation
 
@@ -228,8 +227,7 @@ This applies to every OAuth-at-connect remote MCP listed above (`atlassian`, `bi
 ### Google Workspace MCP (optional)
 
 The
-`co-dev` plugin focuses on engineering workflows (issues, PRs, code review, deployments). Pair it with the open-source [
-`workspace-mcp`](https://github.com/taylorwilsdon/google_workspace_mcp) server to add Gmail, Calendar, Drive, Docs, Sheets, Slides, Forms, Tasks, Contacts, and Google Chat — useful alongside several of this plugin's skills (e.g.
+`co-dev` plugin focuses on engineering workflows (issues, PRs, code review, deployments). Pair it with the open-source [`workspace-mcp`](https://github.com/taylorwilsdon/google_workspace_mcp) server to add Gmail, Calendar, Drive, Docs, Sheets, Slides, Forms, Tasks, Contacts, and Google Chat — useful alongside several of this plugin's skills (e.g.
 `weekly-dev-report` can email the report directly once Gmail is wired up, and
 `sprint-summary` output can be pasted straight into a shared Doc or Calendar event).
 
@@ -241,23 +239,17 @@ This MCP is **not bundled
 Sign in at [console.cloud.google.com](https://console.cloud.google.com) **with your Workspace admin account
 ** — the org must be associated with the project, otherwise the **Internal** audience option will not appear later.
 
-1. **Create the project** — top-bar dropdown → **New Project** → name `workspace-mcp`, **Organization
-   ** = your Workspace org (e.g.
-   `yourcompany.com`). If your org doesn't appear, the Workspace and Cloud accounts aren't linked yet — fix at [admin.google.com](https://admin.google.com) → Account → Google Cloud.
-2. **Enable the APIs
-   ** — APIs & Services → Library → enable each, one by one: Gmail, Google Calendar, Google Drive, Google Docs, Google Sheets, Google Slides, Google Forms, Tasks, People (for Contacts), Google Chat.
+1. **Create the project** — top-bar dropdown → **New Project** → name `workspace-mcp`, **Organization** = your Workspace org (e.g. `yourcompany.com`). If your org doesn't appear, the Workspace and Cloud accounts aren't linked yet — fix at [admin.google.com](https://admin.google.com) → Account → Google Cloud.
+2. **Enable the APIs** — APIs & Services → Library → enable each, one by one: Gmail, Google Calendar, Google Drive, Google Docs, Google Sheets, Google Slides, Google Forms, Tasks, People (for Contacts), Google Chat.
 3. **Configure the OAuth consent screen** — APIs & Services → OAuth consent screen → **Get started**.
-  * **App name:** `Workspace MCP`
-  * **User support email:** your admin email
-  * **Audience:** **Internal
-    ** (restricts auth to users in your org, no Google verification, no 100-user testing cap). If only **External
-    ** is offered, you signed in with the wrong account or created the project under No Organization.
-  * **Developer contact:** your admin email
+   * **App name:** `Workspace MCP`
+   * **User support email:** your admin email
+   * **Audience:** **Internal** (restricts auth to users in your org, no Google verification, no 100-user testing cap). If only **External** is offered, you signed in with the wrong account or created the project under No Organization.
+   * **Developer contact:** your admin email
 4. **Create the OAuth client credentials** — APIs & Services → Credentials → **Create Credentials → OAuth Client ID**.
-  * **Application type:** **Desktop app** (Web application will not work — it causes redirect URI errors during auth)
-  * **Name:** `workspace-mcp-desktop`
-5. Copy the **Client ID** (`...apps.googleusercontent.com`) and **Client Secret** (
-   `GOCSPX-...`). Treat the secret like a password; never commit it.
+   * **Application type:** **Desktop app** (Web application will not work — it causes redirect URI errors during auth)
+   * **Name:** `workspace-mcp-desktop`
+5. Copy the **Client ID** (`...apps.googleusercontent.com`) and **Client Secret** (`GOCSPX-...`). Treat the secret like a password; never commit it.
 
 The same Client ID and Secret work for every user in the org since the consent screen is Internal. **Multiple Workspace
 organizations
