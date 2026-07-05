@@ -398,6 +398,7 @@ These official plugins from the `claude-plugins-official` marketplace pair well 
 | `document-skills`      | Anthropic's `xlsx`/`docx`/`pptx`/`pdf` skills — deliver `co-dev` reports (`weekly-dev-report`, `sprint-summary`, `query-db`, …) as Office/PDF files. Separate marketplace (see note). | `claude plugin marketplace add anthropics/skills` then `claude plugin install document-skills@anthropic-agent-skills` |
 | `stripe`               | Stripe's official plugin — integration skills (best practices, SDK/API upgrades) **plus** Stripe's own MCP + agent tools                                                              | `claude plugin install stripe@claude-plugins-official`                                                                |
 | `vercel`               | Vercel's official plugin — deployment ops via the Vercel MCP, plus `/deploy` `/env` `/status` commands and a deployment-expert agent                                                  | `claude plugin install vercel@claude-plugins-official`                                                                |
+| `huggingface-skills`   | Hugging Face's official skills — build, train, evaluate, and use open-source models, datasets, and Spaces (HF CLI, trainers, evaluation, Gradio). For ML/model work.                  | `claude plugin install huggingface-skills@claude-plugins-official`                                                    |
 
 > The `stripe` plugin bundles Stripe's own MCP and agent tools, so you do **not** need a separate
 > `claude mcp add stripe`. For local webhook
@@ -406,7 +407,11 @@ These official plugins from the `claude-plugins-official` marketplace pair well 
 >
 > The `vercel` plugin bundles the Vercel MCP, so no separate `claude mcp add vercel` is needed. That MCP is
 > read-only (docs, list projects/deployments, logs); write operations (`deploy`, `promote`, env changes) run
-> through the `vercel` CLI — install it too: `npm i -g vercel` then `vercel login`.
+> through the `vercel` CLI — install it too: `brew install vercel-cli` then `vercel login`.
+>
+> The `huggingface-skills` plugin's Hub operations use the Hugging Face CLI — install it with
+> `brew install hf` then `hf auth login`. Its training and evaluation skills additionally need a Python ML
+> environment (torch, transformers, TRL) specific to your project.
 >
 > `document-skills` lives on Anthropic's own `anthropic-agent-skills` marketplace (not
 > `claude-plugins-official`), so it needs the one-time `claude plugin marketplace add` step above. It is
