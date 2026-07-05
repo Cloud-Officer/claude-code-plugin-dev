@@ -402,6 +402,7 @@ These official plugins from the `claude-plugins-official` marketplace pair well 
 | `huggingface-skills`   | Hugging Face's official skills — build, train, evaluate, and use open-source models, datasets, and Spaces (HF CLI, trainers, evaluation, Gradio). For ML/model work.                  | `claude plugin install huggingface-skills@claude-plugins-official`                                                    |
 | `sentry`               | Sentry error monitoring — access error reports, analyze stack traces, search issues, debug production errors, and set up Sentry SDKs                                                  | `claude plugin install sentry@claude-plugins-official`                                                                |
 | `azure`                | Microsoft's official Azure plugin — bundles the Azure MCP + ~28 ops skills: list resources, deploy, validate, diagnose, RBAC/Entra, and optimize costs across 50+ services            | `claude plugin install azure@claude-plugins-official`                                                                 |
+| `firebase`             | Google Firebase plugin — bundles the Firebase MCP to manage Firestore, auth, cloud functions, hosting, and storage. Complements `co-dev`'s `crashlytics` skill                        | `claude plugin install firebase@claude-plugins-official`                                                              |
 
 > The `stripe` plugin bundles Stripe's own MCP and agent tools, so you do **not** need a separate
 > `claude mcp add stripe`. For local webhook
@@ -422,6 +423,11 @@ These official plugins from the `claude-plugins-official` marketplace pair well 
 >
 > The `azure` plugin bundles the Azure MCP (`@azure/mcp`), so no separate `claude mcp add` is needed. It
 > authenticates with your Azure CLI credentials — install it with `brew install azure-cli` then `az login`.
+>
+> The `firebase` plugin bundles the Firebase MCP, so no separate `claude mcp add` is needed. Its CLI
+> operations (deploy, emulators, security rules) use the Firebase CLI — install it with
+> `brew install firebase-cli` then `firebase login`. It complements `co-dev`'s `crashlytics` skill (crash
+> data via BigQuery) rather than replacing it.
 >
 > `document-skills` lives on Anthropic's own `anthropic-agent-skills` marketplace (not
 > `claude-plugins-official`), so it needs the one-time `claude plugin marketplace add` step above. It is
