@@ -407,7 +407,7 @@ These official plugins from the `claude-plugins-official` marketplace pair well 
 >
 > The `vercel` plugin bundles the Vercel MCP, so no separate `claude mcp add vercel` is needed. That MCP is
 > read-only (docs, list projects/deployments, logs); write operations (`deploy`, `promote`, env changes) run
-> through the `vercel` CLI — install it too: `npm i -g vercel` then `vercel login`.
+> through the `vercel` CLI — install it too: `brew install vercel-cli` then `vercel login`.
 >
 > The `huggingface-skills` plugin's Hub operations use the Hugging Face CLI — install it with
 > `brew install hf` then `hf auth login`. Its training and evaluation skills additionally need a Python ML
