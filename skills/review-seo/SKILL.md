@@ -1,12 +1,12 @@
 ---
 name: review-seo
-description: Review, audit, or check SEO and GEO (AI answer-engine / generative-engine optimization). Use when the user wants an SEO audit, technical SEO check, GEO/AEO audit, AI-search optimization, llms.txt review, structured-data/schema check, meta-tag/Open-Graph audit, sitemap or robots.txt review, or crawlability analysis. Audits a codebase and/or a live site URL (usually production) and writes docs/seo-audit.md.
-allowed-tools: Bash(curl:*), Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, WebSearch, WebFetch, AskUserQuestion, Skill, mcp__fetch__fetch, mcp__github__get_file_contents
+description: Review, audit, or check SEO, GEO (AI answer-engine / generative-engine optimization), and front-end web quality (performance, Core Web Vitals, accessibility). Use when the user wants an SEO audit, technical SEO check, GEO/AEO audit, AI-search optimization, llms.txt review, structured-data/schema check, meta-tag/Open-Graph audit, sitemap or robots.txt review, crawlability analysis, a Lighthouse or web-quality audit, a performance or Core Web Vitals (LCP/INP/CLS) review, or an accessibility (WCAG) audit. Audits a codebase and/or a live site URL (usually production) and writes docs/seo-audit.md.
+allowed-tools: Bash(curl:*), Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, WebSearch, WebFetch, AskUserQuestion, Skill, mcp__fetch__fetch, mcp__github__get_file_contents, mcp__chrome-devtools__*
 ---
 
 # Review SEO & GEO
 
-Audit a web project for **SEO** (traditional search-engine optimization) and **GEO/AEO** (generative-engine / AI answer-engine optimization — being found and cited by ChatGPT, Perplexity, Google AI Overviews, Claude, and similar). Produce `docs/seo-audit.md` with evidence-backed findings and, on approval, apply the fixes.
+Audit a web project for **SEO** (traditional search-engine optimization), **GEO/AEO** (generative-engine / AI answer-engine optimization — being found and cited by ChatGPT, Perplexity, Google AI Overviews, Claude, and similar), and **front-end web quality** — the remaining Lighthouse pillars beyond SEO: **performance, Core Web Vitals, and accessibility** (Phase 7), audited via the bundled `chrome-devtools` MCP. Produce `docs/seo-audit.md` with evidence-backed findings and, on approval, apply the fixes.
 
 Works against a **codebase**, a **live URL** (usually production), or **both** — the user chooses in Phase 1.
 
@@ -22,7 +22,7 @@ Use `TaskCreate` to track each phase. Mark `in_progress` on entry, `completed` w
 4. Technical SEO audited
 5. GEO / AI answer-engine audited
 6. Content & on-page audited
-7. Performance & accessibility (chrome-devtools handoff)
+7. Performance, Core Web Vitals, accessibility & best practices (chrome-devtools MCP)
 8. Report generated
 9. Fixes applied (if approved)
 10. Linters run (if files changed)
@@ -49,7 +49,7 @@ Prefer MCP tools when available; fall back on errors. Never let one tool failure
 | Raw headers / status / redirects | `curl -sSIL` | n/a |
 | Read source file | `Read` / `cat` | `mcp__github__get_file_contents` |
 | Verify a current standard | `WebSearch` | `mcp__fetch__fetch` |
-| Core Web Vitals / Lighthouse / a11y | `chrome-devtools-mcp` skill (Phase 7) | note as not-run + recommend |
+| Core Web Vitals / Lighthouse / a11y | `mcp__chrome-devtools__*` (bundled: `lighthouse_audit`, perf traces, a11y snapshot) | note as not-run + recommend Lighthouse in Chrome DevTools |
 
 ## Phase 2: Exemption Check
 
@@ -201,11 +201,40 @@ Audit steps:
 - Internal linking: important pages reachable; flag orphan pages (zero internal links).
 - No broken internal links.
 
-## Phase 7: Performance & Accessibility (handoff)
+## Phase 7: Performance, Core Web Vitals, Accessibility & Best Practices
 
-Core Web Vitals (LCP < 2.5s / INP < 200ms / CLS < 0.1), Lighthouse SEO score, and the a11y tree are **not** reimplemented here. If `chrome-devtools-mcp` is available, invoke it (via the `Skill` tool) against the live URL and fold its LCP/CWV/a11y results into the report. If it's not available or scan mode is codebase-only, mark this phase **N/A / not run** and recommend running Lighthouse in Chrome DevTools. Do not guess CWV numbers.
+Beyond SEO, audit the remaining **Lighthouse web-quality pillars** using the **bundled `chrome-devtools` MCP** (`co-dev` ships it — no separate install; the tools are `mcp__chrome-devtools__*`). Run against the live URL; in **codebase-only** mode do the static checks below and mark the live-metric parts **N/A**.
 
-Prefer **field data** (CrUX / Search Console real-user data) over lab data for ranking-relevant CWV. In 2026 **INP is the most commonly failed** metric (JS/main-thread bound) — check it specifically; CWV is now a filter, not just a tiebreaker.
+Engine: `mcp__chrome-devtools__lighthouse_audit` for the category scores (Performance, Accessibility, Best Practices, SEO), plus `performance_start_trace` / `performance_analyze_insight` for CWV detail and `take_snapshot` for the accessibility tree. Prefer **field data** (CrUX / Search Console real-user data) over lab data for ranking-relevant CWV. Record the four Lighthouse category scores (0–100) and back each issue with evidence.
+
+### 7.1 Core Web Vitals (2026 thresholds)
+
+- **LCP < 2.5s** — identify the LCP element; check TTFB/server response, render-blocking CSS/JS, a `preload` for the LCP image or font, and that the LCP image is **not** lazy-loaded.
+- **INP < 200ms** — the **most commonly failed** metric in 2026 (main-thread / JS bound). Check long tasks, heavy event handlers, hydration cost, and input delay. CWV is now a ranking filter, not just a tiebreaker.
+- **CLS < 0.1** — images/video/ads/embeds need explicit `width`/`height` or `aspect-ratio`; check `font-display` swap shift and content injected above existing content.
+
+### 7.2 Performance
+
+- Render-blocking CSS/JS; unused JS/CSS (coverage); code-splitting and lazy-loading of non-critical bundles.
+- Images: modern formats (AVIF/WebP), correct sizing + `srcset`, below-the-fold lazy-loading, no oversized assets.
+- Text compression (gzip/brotli), long-cache headers on static assets, HTTP/2 or /3.
+- Font loading (`font-display`, `preconnect` to font origins, subsetting).
+- Third-party script weight and its main-thread impact; total transfer size and request count.
+
+### 7.3 Accessibility (WCAG 2.2)
+
+- Color contrast ≥ 4.5:1 body text / 3:1 large text and UI components.
+- Meaningful `alt` on informative images (decorative → empty `alt`); every form control has a label; buttons/links have accessible names.
+- Landmarks (`<main>`/`<nav>`/`<header>`), exactly one `<h1>`, ordered headings; logical focus order, visible focus states, full keyboard operability (no traps).
+- Valid ARIA (correct roles/attributes, no redundant/broken ARIA); tap targets ≥ 24×24 CSS px (WCAG 2.2), ~44px comfortable.
+- Honors `prefers-reduced-motion`; content reflows at 320px width and 200% zoom without loss.
+
+### 7.4 Best practices
+
+- HTTPS everywhere, no mixed content; no browser console errors; no deprecated or broken web APIs.
+- CSP present (cross-reference Phase 4 headers); images served at their correct aspect ratio; no known-vulnerable front-end libraries.
+
+Fold results into the report's **Performance, CWV & Accessibility** section, tagging each finding to its pillar. If the MCP is genuinely unavailable (or codebase-only mode), mark the live-metric checks **not run** and recommend Lighthouse in Chrome DevTools — **never guess CWV numbers**.
 
 ## Phase 8: Generate Report
 
@@ -251,15 +280,15 @@ Write `docs/seo-audit.md` (`mkdir -p docs` first). Structure:
 
 [headings, alt text, links, orphans, broken links]
 
-## Performance & Accessibility
+## Performance, CWV & Accessibility
 
-[chrome-devtools/Lighthouse results, or "not run" + recommendation]
+[Lighthouse category scores (Performance / Accessibility / Best Practices / SEO), Core Web Vitals (LCP / INP / CLS), and per-pillar findings — or "not run" + recommendation]
 
 ## Findings
 
 ### [SEO-001] SEVERITY: Title
 
-**Area:** Technical SEO | GEO | Content | Performance
+**Area:** Technical SEO | GEO | Content | Performance | CWV | Accessibility
 **Evidence:** `path/file.erb:42` or `https://…` → `<quoted tag/line>`
 **Issue:** What's wrong.
 **Impact:** Why it matters (ranking / indexing / AI citation).
@@ -306,7 +335,7 @@ If any files changed, run `/co-dev:run-linters` and fix any errors (including ma
 - [ ] GEO: extractability + SSR/crawlability checked
 - [ ] Performance: field data (CrUX/Search Console) preferred; INP checked specifically
 - [ ] Headings, alt text, link text, orphans, broken links checked
-- [ ] CWV/a11y handed off to chrome-devtools or marked not-run
+- [ ] Web quality via bundled chrome-devtools MCP: performance, CWV (LCP·INP·CLS), accessibility (WCAG), best-practices audited — or marked not-run
 - [ ] `docs/seo-audit.md` written; approval requested before fixes
 
 ## Important Rules
@@ -314,7 +343,7 @@ If any files changed, run `/co-dev:run-linters` and fix any errors (including ma
 1. **Never fabricate.** Meta descriptions, titles, and schema must come from real page content — never invent claims.
 2. **Confirm the environment** before hitting a live URL; production is the usual target but say so.
 3. **Reconcile in "both" mode** — a tag present in source but absent in served HTML is a real finding (build/render drift).
-4. **Don't reimplement CWV/a11y** — hand off to `chrome-devtools-mcp`; mark not-run rather than guessing numbers.
+4. **Audit web quality via the bundled `chrome-devtools` MCP** — run `lighthouse_audit` + performance traces + the a11y snapshot for performance / CWV / accessibility / best-practices (Phase 7); mark not-run rather than guessing numbers.
 5. **Fix at the source** — layout/partials over per-page copies; a sitemap generator over a hand-maintained file when the stack supports it.
 6. **Respect deliberate choices** — an intentional `noindex` (staging, thin pages) or a deliberate AI-crawler block is a decision to confirm, not auto-"fix".
 7. **Verify standards, don't trust memory** — llms.txt conventions and schema types evolve; confirm with WebSearch/official docs rather than training data.
