@@ -8,7 +8,7 @@
     {
       "name": "co-dev",
       "source": "./",
-      "description": "Cloud Officer development workflow tools for PR management, issue tracking, code quality, cloud infrastructure (AWS, GCP), deployment (Vercel, Heroku), payments (Stripe, PayPal), observability (New Relic), design (Figma), app stores (App Store Connect, Google Play), and database management",
+      "description": "Cloud Officer development workflow tools for PR management, issue tracking, code quality, cloud infrastructure (AWS, GCP), deployment (Vercel, Heroku), payments (PayPal), observability (New Relic), design (Figma), app stores (App Store Connect, Google Play), and database management",
       "version": "1.0.0"
     }
   ]
