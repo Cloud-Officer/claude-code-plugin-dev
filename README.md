@@ -398,6 +398,7 @@ These official plugins from the `claude-plugins-official` marketplace pair well 
 | `document-skills`      | Anthropic's `xlsx`/`docx`/`pptx`/`pdf` skills — deliver `co-dev` reports (`weekly-dev-report`, `sprint-summary`, `query-db`, …) as Office/PDF files. Separate marketplace (see note). | `claude plugin marketplace add anthropics/skills` then `claude plugin install document-skills@anthropic-agent-skills` |
 | `stripe`               | Stripe's official plugin — integration skills (best practices, SDK/API upgrades) **plus** Stripe's own MCP + agent tools                                                              | `claude plugin install stripe@claude-plugins-official`                                                                |
 | `vercel`               | Vercel's official plugin — deployment ops via the Vercel MCP, plus `/deploy` `/env` `/status` commands and a deployment-expert agent                                                  | `claude plugin install vercel@claude-plugins-official`                                                                |
+| `huggingface-skills`   | Hugging Face's official skills — build, train, evaluate, and use open-source models, datasets, and Spaces (HF CLI, trainers, evaluation, Gradio). For ML/model work.                  | `claude plugin install huggingface-skills@claude-plugins-official`                                                    |
 
 > The `stripe` plugin bundles Stripe's own MCP and agent tools, so you do **not** need a separate
 > `claude mcp add stripe`. For local webhook
