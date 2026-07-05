@@ -134,15 +134,9 @@ If the user explicitly asks to change strictness (e.g. "be aggressive — keep e
 
 ## STEP 3.5 — DEEP DOCUMENTATION & SECURITY REVIEW (opt-in, review-only)
 
-**This step is gated OFF by default.** The workflow already covers documentation presence and a broad security pass on every run — that is the default. Skip this step **unless the user explicitly opts in**. Three independent opt-ins live here — run only the ones the user asked for, and treat the rest as **not run** (N/A) in the Review Coverage checklist:
+**This step is gated OFF by default.** The workflow already covers documentation presence and a broad security pass on every run — that is the default. Skip this step **unless the user explicitly opts in** to a deep review, e.g. by passing a `--docs` / `--deep-docs` flag or asking in words to "also review the README / architecture / user guide content", "include a deep documentation review", or similar. If the user did not opt in, go straight to Step 4 and treat these skills as **not run** (N/A) in the Review Coverage checklist.
 
-- **Deep documentation** — `--docs` / `--deep-docs`, or "also review the README / architecture / user guide content". Runs the three doc skills (they verify doc **content against the code**, which the workflow does not).
-- **Threat model** — `--threat-model`, or "also threat model this", "map trust boundaries", "attack surface". Runs `review-threat-model`.
-- **Ownership map** — `--ownership-map`, or "check bus factor / code ownership / knowledge risk / single points of failure". Runs `review-ownership-map`.
-
-If the user opted into none, go straight to Step 4.
-
-When opted into the documentation review, deep-review the docs with the three dedicated skills, then fold their findings into this report.
+When opted in, run the dedicated skills in review-only mode and fold their findings into this report — the three documentation skills (which verify doc **content against the code**, something the workflow does not) plus the two security-review skills below.
 
 Invoke each via the **Skill** tool in **review-only** mode — they must NOT create or modify any files during a deep review; we only want their findings:
 
@@ -158,9 +152,9 @@ Each skill self-exempts when its document doesn't apply (e.g. no end-user produc
 
 **Fold the results in:** translate each skill's reported issues into the standard finding format under the report's Documentation area, using `DOC-*` IDs, with severity per the skill's own assessment and the file references it cites. Deduplicate against the workflow's `docs` findings (same file + root cause). In the report, note that deep documentation review was performed by the review-readme / review-architecture / review-user-guide skills. Do not let these skills write their own doc files or a separate report.
 
-### Deep security reviews (when opted in)
+### Security-review skills (same opt-in)
 
-When the user opts into `--threat-model` and/or `--ownership-map`, invoke the corresponding skill via the **Skill** tool in **review-only** mode — findings only. They must **not** write `docs/threat-model.md` / `docs/ownership-map.md` during a code review; the deep review consolidates everything into `docs/code-review.md`.
+Under the **same** deep-review opt-in, also invoke these two via the **Skill** tool in **review-only** mode — findings only. They must **not** write `docs/threat-model.md` / `docs/ownership-map.md` during a code review; the deep review consolidates everything into `docs/code-review.md`.
 
 - `co-dev:review-threat-model` — trust boundaries and STRIDE abuse paths. Fold each threat in as a `THREAT-*` finding (label `security`), severity from its likelihood × impact. Cross-link to any `SEC-*` code finding on the same sink and deduplicate (same root cause).
 - `co-dev:review-ownership-map` — bus factor and knowledge risk. Fold single-point-of-failure findings on **sensitive** code (auth/crypto/payment/IaC) as `OWN-*` findings (label `knowledge-risk`), severity by how critical the file is. This complements the workflow's governance / `team_profile` reasoning with file-level detail.
@@ -181,7 +175,7 @@ Then:
 4. Sort by severity (Critical → High → Medium → Low → Info).
 5. Write `docs/code-review.md` (create the directory if needed).
 6. Include `positives` (grouped by area) and the quantitative `counts` in the report.
-7. Build the **Review Coverage** checklist from `agents_run`; add the three doc skills and the two security-review skills (`review-threat-model` / `review-ownership-map`) only for the Step 3.5 sub-parts the user opted into (mark agents/skills that did not run, were not opted into, or self-exempted as N/A, not as failures).
+7. Build the **Review Coverage** checklist from `agents_run`; add the three doc skills and the two security-review skills (`review-threat-model` / `review-ownership-map`) only when Step 3.5 ran (mark agents/skills that did not run, were not opted into, or self-exempted as N/A, not as failures).
 
 Do NOT include internal workflow/phase tracking in the final report.
 
