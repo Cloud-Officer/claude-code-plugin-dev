@@ -38,7 +38,7 @@ This plugin provides development workflow automation for Claude Code.
 * Firebase Crashlytics crash analysis via BigQuery
 * Figma design-to-code review for Android, iOS, and web
 * Vercel deployment management and documentation search
-* Stripe and PayPal payment management
+* PayPal payment management
 * AWS infrastructure management and documentation search
 * Google Cloud infrastructure management via gcloud
 * New Relic observability data and alert management
@@ -80,7 +80,6 @@ Optional service CLIs — install only what you need (each maps to a skill in th
 
 ```bash
 brew install awscli google-cloud-sdk heroku newrelic-cli # cloud
-brew install stripe/stripe-cli/stripe # stripe
 brew tap ankitpokhrel/jira-cli && brew install jira-cli # jira
 brew install mint && mint install zelentsov-dev/asc-mcp # iOS App Store Connect
 npm i -g vercel # vercel
@@ -154,7 +153,7 @@ npx playwright install chromium
 ```
 
 Optional service CLIs: each tool ships its own Linux installer — see official docs for `aws`, `gcloud`, `heroku`,
-`stripe`, `vercel`, `newrelic`, `jira-cli`. App Store Connect is macOS-only.
+`vercel`, `newrelic`, `jira-cli`. App Store Connect is macOS-only.
 
 Language servers (LSPs): the `npm`, `gem`, `go install`, and `rustup`
 install commands listed under the macOS section are cross-platform. Use your distro's package manager for
@@ -199,7 +198,6 @@ claude mcp add figma --transport http https://mcp.figma.com/mcp
 claude mcp add monday --transport http https://mcp.monday.com/mcp --header 'Authorization: Bearer ${MONDAY_TOKEN}'
 claude mcp add newrelic --transport http https://mcp.newrelic.com/mcp/
 claude mcp add paypal --transport http https://mcp.paypal.com/http
-claude mcp add stripe --transport http https://mcp.stripe.com
 claude mcp add vercel --transport http https://mcp.vercel.com
 ```
 
@@ -209,7 +207,7 @@ Most prompt for OAuth on first use. **monday
 ** column in the [Skills](#skills) table for which skill needs which.
 
 **Naming caveat for multi-tenant setups.
-** Each server name owns exactly one OAuth grant — Claude Code stores the access token keyed by the name and reuses it for every call. If you work across multiple tenants of the same service (e.g. two Atlassian sites, two Stripe accounts) from different folders on one machine,
+** Each server name owns exactly one OAuth grant — Claude Code stores the access token keyed by the name and reuses it for every call. If you work across multiple tenants of the same service (e.g. two Atlassian sites, two Vercel teams) from different folders on one machine,
 **give each instance a distinct name
 ** rather than reusing the bare name. Otherwise the OAuth token from whichever folder authorized first leaks into the other folder, even though local-scope registration looks isolated.
 
@@ -222,7 +220,7 @@ claude mcp add atlassian-companyb --transport http https://mcp.atlassian.com/v1/
 ```
 
 This applies to every OAuth-at-connect remote MCP listed above (`atlassian`, `bigquery`, `figma`, `newrelic`, `paypal`,
-`stripe`, `vercel`) — not to stdio servers like
+`vercel`) — not to stdio servers like
 `google-workspace`, which select identity per-call via a parameter. If you rename instances, update the [Recommended Permissions](#recommended-permissions) entries to allow each variant.
 
 ### Google Workspace MCP (optional)
@@ -402,7 +400,13 @@ These official plugins from the `claude-plugins-official` marketplace pair well 
 | `superpowers`          | Brainstorming and subagent-driven workflows                                                                                                                                           | `claude plugin install superpowers@claude-plugins-official`                                                           |
 | `agent-sdk-dev`        | Toolkit for building apps on the Anthropic **Agent SDK** (a different stack from Claude Code plugins)                                                                                 | `claude plugin install agent-sdk-dev@claude-plugins-official`                                                         |
 | `document-skills`      | Anthropic's `xlsx`/`docx`/`pptx`/`pdf` skills — deliver `co-dev` reports (`weekly-dev-report`, `sprint-summary`, `query-db`, …) as Office/PDF files. Separate marketplace (see note). | `claude plugin marketplace add anthropics/skills` then `claude plugin install document-skills@anthropic-agent-skills` |
+| `stripe`               | Stripe's official plugin — integration skills (best practices, SDK/API upgrades) **plus** Stripe's own MCP + agent tools                                                              | `claude plugin install stripe@claude-plugins-official`                                                                |
 
+> The `stripe` plugin bundles Stripe's own MCP and agent tools, so you do **not** need a separate
+> `claude mcp add stripe`. For local webhook
+> testing you can optionally add the Stripe CLI (used by Stripe's plugin and your app dev, not by `co-dev`
+> itself): `brew install stripe/stripe-cli/stripe` then `stripe login` (`stripe listen`, `stripe trigger`).
+>
 > `document-skills` lives on Anthropic's own `anthropic-agent-skills` marketplace (not
 > `claude-plugins-official`), so it needs the one-time `claude plugin marketplace add` step above. It is
 > **not** open source — review each skill's `LICENSE.txt`. Optional: Claude Code can already generate
@@ -473,7 +477,6 @@ If you also use remote MCP servers (see [Configure Remote MCPs](#configure-remot
       "mcp__monday__*",
       "mcp__newrelic__*",
       "mcp__paypal__*",
-      "mcp__stripe__*",
       "mcp__vercel__*"
     ]
   }
@@ -522,7 +525,6 @@ These skills are automatically available to Claude. The **Setup
 | `review-user-guide`      | Review or create docs/user-guide.md with user documentation                                                             | None — uses bundled `fetch` + `context7` MCPs                                                                                                                                                                                                       |
 | `run-linters`            | Run linters and fix any issues found                                                                                    | None — runs project linters already configured in the repo                                                                                                                                                                                          |
 | `sprint-summary`         | Summarize sprint items grouped by repo in ~3-day blocks                                                                 | atlassian remote MCP *(or)* `jira init`                                                                                                                                                                                                             |
-| `stripe`                 | Manage Stripe payments, customers, and subscriptions                                                                    | stripe remote MCP *(or)* `stripe login`                                                                                                                                                                                                             |
 | `vercel`                 | Manage Vercel deployments and projects                                                                                  | vercel remote MCP *(or)* `vercel login`                                                                                                                                                                                                             |
 | `verify-resolved-issues` | Audit resolved/fixed/done issues, verify fixes, close or reopen                                                         | GitHub: `gh auth login` *(or)* `GITHUB_PERSONAL_ACCESS_TOKEN`. Jira: atlassian remote MCP *(or)* `jira init`                                                                                                                                        |
 | `weekly-dev-report`      | Weekly dev activity report from Jira sprint + GitHub                                                                    | atlassian remote MCP *(or)* `jira init`. GitHub: `gh auth login`. Optional env: `WEEKLY_DEV_REPORT_TO` (required for `--send`), `WEEKLY_DEV_REPORT_CC`, `GITHUB_USERNAME_MAP`                                                                       |
