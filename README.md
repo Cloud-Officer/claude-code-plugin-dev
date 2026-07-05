@@ -399,6 +399,7 @@ These official plugins from the `claude-plugins-official` marketplace pair well 
 | `stripe`               | Stripe's official plugin — integration skills (best practices, SDK/API upgrades) **plus** Stripe's own MCP + agent tools                                                              | `claude plugin install stripe@claude-plugins-official`                                                                |
 | `vercel`               | Vercel's official plugin — deployment ops via the Vercel MCP, plus `/deploy` `/env` `/status` commands and a deployment-expert agent                                                  | `claude plugin install vercel@claude-plugins-official`                                                                |
 | `huggingface-skills`   | Hugging Face's official skills — build, train, evaluate, and use open-source models, datasets, and Spaces (HF CLI, trainers, evaluation, Gradio). For ML/model work.                  | `claude plugin install huggingface-skills@claude-plugins-official`                                                    |
+| `sentry`               | Sentry error monitoring — access error reports, analyze stack traces, search issues, debug production errors, and set up Sentry SDKs                                                  | `claude plugin install sentry@claude-plugins-official`                                                                |
 
 > The `stripe` plugin bundles Stripe's own MCP and agent tools, so you do **not** need a separate
 > `claude mcp add stripe`. For local webhook
@@ -412,6 +413,10 @@ These official plugins from the `claude-plugins-official` marketplace pair well 
 > The `huggingface-skills` plugin's Hub operations use the Hugging Face CLI — install it with
 > `brew install hf` then `hf auth login`. Its training and evaluation skills additionally need a Python ML
 > environment (torch, transformers, TRL) specific to your project.
+>
+> The `sentry` plugin is skill-based (SDK setup + debug workflows). For CLI operations — release tracking and
+> source-map uploads — install the Sentry CLI: `brew install sentry-cli` (also packaged as the `sentry-cli`
+> plugin).
 >
 > `document-skills` lives on Anthropic's own `anthropic-agent-skills` marketplace (not
 > `claude-plugins-official`), so it needs the one-time `claude plugin marketplace add` step above. It is
