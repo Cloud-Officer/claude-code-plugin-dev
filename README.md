@@ -409,6 +409,10 @@ These official plugins from the `claude-plugins-official` marketplace pair well 
 > read-only (docs, list projects/deployments, logs); write operations (`deploy`, `promote`, env changes) run
 > through the `vercel` CLI — install it too: `npm i -g vercel` then `vercel login`.
 >
+> The `huggingface-skills` plugin's Hub operations use the Hugging Face CLI — install it with
+> `brew install hf` then `hf auth login`. Its training and evaluation skills additionally need a Python ML
+> environment (torch, transformers, TRL) specific to your project.
+>
 > `document-skills` lives on Anthropic's own `anthropic-agent-skills` marketplace (not
 > `claude-plugins-official`), so it needs the one-time `claude plugin marketplace add` step above. It is
 > **not** open source — review each skill's `LICENSE.txt`. Optional: Claude Code can already generate
