@@ -30,10 +30,15 @@ This plugin provides development workflow automation for Claude Code.
 * PR generation with commit messages
 * Linting and code quality checks
 * Automated test generation with coverage enforcement across 10 languages (RSpec, PHPUnit/Pest, pytest, Jest/Vitest, xUnit, Swift Testing/XCUITest, Kotest, Go, GoogleTest, Rust)
+* Codebase migration between languages and frameworks via a six-step rulebook/translate/compile/test/verify engine
 * Security threat modeling (STRIDE) and code-ownership / bus-factor analysis, ISO 27001-aligned
 * Database schema documentation and natural language querying
 * Project documentation review (README, architecture, user guide)
+* User-facing copy audits (microcopy, voice & tone, i18n readiness)
+* SEO / GEO and front-end web quality audits (performance, Core Web Vitals, accessibility)
 * Sprint work summaries grouped by repository
+* Weekly development and project-status reports from Jira, GitHub, and monday.com
+* Tracker coverage checks — verify a planning doc's items exist in monday.com and/or Jira
 * Translation asset management via Loco (localise.biz) API
 * monday.com board, item, and work-management operations
 * Firebase Crashlytics crash analysis via BigQuery
@@ -51,9 +56,9 @@ This plugin provides development workflow automation for Claude Code.
 
 ### Quick Start
 
-The plugin bundles MCP servers that need `node` (for `npx`) and `uv` (for
-`uvx`). Most skills also use a CLI as a fallback when the MCP isn't available. Install the **core
-** for everyone, then only the optional CLIs for the skills you actually use.
+The plugin bundles MCP servers that need `node` (for `npx`) and `uv` (for `uvx`). Most skills also use a CLI as a
+fallback when the MCP isn't available. Install the **core** for everyone, then only the optional CLIs for the skills you
+actually use.
 
 #### macOS (Homebrew)
 
@@ -126,8 +131,8 @@ brew install llvm
 npm i -g perlnavigator-server
 ```
 
-Each LSP is **inert until matching files exist
-** — you only pay startup cost in repos that actually have those file types.
+Each LSP is **inert until matching files exist** — you only pay startup cost in repos that actually have those file
+types.
 
 #### Linux (Debian/Ubuntu)
 
@@ -187,8 +192,8 @@ install commands listed under the macOS section work on Windows under their resp
 
 ### Configure Remote MCPs (optional)
 
-Some skills use remote MCP servers (no local install). Add only the ones you'll use — `claude mcp add` defaults to *
-*local scope**, so each is registered for the current folder only rather than always-loaded for every project:
+Some skills use remote MCP servers (no local install). Add only the ones you'll use — `claude mcp add` defaults to
+**local scope**, so each is registered for the current folder only rather than always-loaded for every project:
 
 ```bash
 claude mcp add atlassian --transport http https://mcp.atlassian.com/v1/mcp
@@ -199,15 +204,16 @@ claude mcp add newrelic --transport http https://mcp.newrelic.com/mcp/
 claude mcp add paypal --transport http https://mcp.paypal.com/http
 ```
 
-Most prompt for OAuth on first use. **monday
-** is the exception — it authenticates with a personal access token instead of OAuth, so it takes a Bearer header (the token stays a runtime
-`${MONDAY_TOKEN}` reference, never written into the stored config). Skills that need a remote MCP fall back to a CLI when one exists — see the **Setup
-** column in the [Skills](#skills) table for which skill needs which.
+Most prompt for OAuth on first use. **monday** is the exception — it authenticates with a personal access token instead
+of OAuth, so it takes a Bearer header (the token stays a runtime `${MONDAY_TOKEN}` reference, never written into the
+stored config). Skills that need a remote MCP fall back to a CLI when one exists — see the **Setup** column in the
+[Skills](#skills) table for which skill needs which.
 
-**Naming caveat for multi-tenant setups.
-** Each server name owns exactly one OAuth grant — Claude Code stores the access token keyed by the name and reuses it for every call. If you work across multiple tenants of the same service (e.g. two Atlassian sites, two New Relic accounts) from different folders on one machine,
-**give each instance a distinct name
-** rather than reusing the bare name. Otherwise the OAuth token from whichever folder authorized first leaks into the other folder, even though local-scope registration looks isolated.
+**Naming caveat for multi-tenant setups.** Each server name owns exactly one OAuth grant — Claude Code stores the access
+token keyed by the name and reuses it for every call. If you work across multiple tenants of the same service (e.g. two
+Atlassian sites, two New Relic accounts) from different folders on one machine, **give each instance a distinct name**
+rather than reusing the bare name. Otherwise the OAuth token from whichever folder authorized first leaks into the other
+folder, even though local-scope registration looks isolated.
 
 ```bash
 # in ~/work/companya
@@ -227,13 +233,13 @@ The
 `weekly-dev-report` can email the report directly once Gmail is wired up, and
 `sprint-summary` output can be pasted straight into a shared Doc or Calendar event).
 
-This MCP is **not bundled
-** with the plugin — the steps below are independent and only needed if you want Workspace access from Claude Code.
+This MCP is **not bundled** with the plugin — the steps below are independent and only needed if you want Workspace
+access from Claude Code.
 
 #### Step 1 — Google Cloud admin setup (one-time, per Workspace org)
 
-Sign in at [console.cloud.google.com](https://console.cloud.google.com) **with your Workspace admin account
-** — the org must be associated with the project, otherwise the **Internal** audience option will not appear later.
+Sign in at [console.cloud.google.com](https://console.cloud.google.com) **with your Workspace admin account** — the org
+must be associated with the project, otherwise the **Internal** audience option will not appear later.
 
 1. **Create the project** — top-bar dropdown → **New Project** → name `workspace-mcp`, **Organization** = your Workspace org (e.g. `yourcompany.com`). If your org doesn't appear, the Workspace and Cloud accounts aren't linked yet — fix at [admin.google.com](https://admin.google.com) → Account → Google Cloud.
 2. **Enable the APIs** — APIs & Services → Library → enable each, one by one: Gmail, Google Calendar, Google Drive, Google Docs, Google Sheets, Google Slides, Google Forms, Tasks, People (for Contacts), Google Chat.
@@ -248,8 +254,8 @@ Sign in at [console.cloud.google.com](https://console.cloud.google.com) **with y
 5. Copy the **Client ID** (`...apps.googleusercontent.com`) and **Client Secret** (`GOCSPX-...`). Treat the secret like a password; never commit it.
 
 The same Client ID and Secret work for every user in the org since the consent screen is Internal. **Multiple Workspace
-organizations
-** (e.g. a personal org and a separate company org) each need their own Cloud project and credentials — the same Client ID cannot be reused across orgs.
+organizations** (e.g. a personal org and a separate company org) each need their own Cloud project and credentials — the
+same Client ID cannot be reused across orgs.
 
 #### Step 2 — Per-machine install
 
@@ -297,8 +303,8 @@ User-scope env vars are global on Windows, so if you need a second workspace acc
 
 #### Step 3 — Add the MCP server
 
-Run this **from the directory
-** where you want the server active (the default scope is local — the registration is tied to that working directory, not your whole user account). The server inherits
+Run this **from the directory** where you want the server active (the default scope is local — the registration is tied
+to that working directory, not your whole user account). The server inherits
 `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `USER_GOOGLE_EMAIL`, and
 `PORT` from the shell environment Claude Code is launched in, so no `-e` flags are needed:
 
@@ -315,26 +321,25 @@ On first use, a browser window opens for OAuth — sign in with the matching Goo
 * macOS: `~/.google_workspace_mcp/credentials/`
 * Windows: `%USERPROFILE%\.google_workspace_mcp\credentials\`
 
-No browser prompt on subsequent startups. To **update** workspace-mcp:
-`uv cache clean` — Claude Code fetches the latest version on next startup. To **revoke
-** access: delete the credentials directory above, or remove the
-`Workspace MCP` app at [myaccount.google.com/permissions](https://myaccount.google.com/permissions). To **rotate
-** the Client Secret if it leaks: APIs & Services → Credentials → `workspace-mcp-desktop` → **Reset Secret
-**, then update env vars and re-auth.
+No browser prompt on subsequent startups. To **update** workspace-mcp: `uv cache clean` — Claude Code fetches the latest
+version on next startup. To **revoke** access: delete the credentials directory above, or remove the `Workspace MCP` app
+at [myaccount.google.com/permissions](https://myaccount.google.com/permissions). To **rotate** the Client Secret if it
+leaks: APIs & Services → Credentials → `workspace-mcp-desktop` → **Reset Secret**, then update env vars and re-auth.
 
 #### Multi-account & multi-session port assignment (important)
 
 The workspace-mcp server binds a local port for its OAuth callback (default `8000`). **Every workspace-mcp instance
-running concurrently on the machine needs a unique port.
-** There are two scenarios where this matters — most people anticipate the first but not the second:
+running concurrently on the machine needs a unique port.** There are two scenarios where this matters — most people
+anticipate the first but not the second:
 
 1. **Multiple accounts on the same machine** (e.g. personal + company in different folders). Each folder's
    `.envrc` (macOS/direnv) — or each session's PowerShell overrides (Windows) — needs its own
    `PORT`, otherwise both instances try to bind `8000` and the second one fails.
-2. **Multiple Claude Code sessions running at the same time, even from different directories.
-   ** Per-directory env vars don't help if two sessions still resolve to the same
-   `PORT` — every running Claude Code session spawns its own MCP processes, and if any two of them point at the same port, the later one's workspace-mcp won't start. Even with a single account per directory, every directory whose Claude session might run
-   *concurrently* with another needs its own port.
+2. **Multiple Claude Code sessions running at the same time, even from different directories.** Per-directory env vars
+   don't help if two sessions still resolve to the same `PORT` — every running Claude Code session spawns its own MCP
+   processes, and if any two of them point at the same port, the later one's workspace-mcp won't start. Even with a
+   single account per directory, every directory whose Claude session might run *concurrently* with another needs its
+   own port.
 
 Pick ports above 8000 (e.g. `8765`, `8766`, `8767`, …) and assign one per account
 *and* per concurrently-running session. The setup is then **one `.envrc` per directory** plus a single
@@ -437,9 +442,8 @@ These official plugins from the `claude-plugins-official` marketplace pair well 
 
 ### Configure Environment Variables
 
-All credentials are read from **environment variables
-** — they are never stored in the plugin. Each skill's required vars are listed in the **Setup
-** column of the [Skills](#skills) table below.
+All credentials are read from **environment variables** — they are never stored in the plugin. Each skill's required
+vars are listed in the **Setup** column of the [Skills](#skills) table below.
 
 For switching between accounts/projects per directory, see the [Multi-Account Setups](#multi-account-setups-direnv) section.
 
@@ -449,16 +453,16 @@ Every account-bound MCP server in this plugin reads its credentials from environ
 `.mcp.json`. This makes [direnv](https://direnv.net/) a natural fit for switching between accounts (different AWS profiles, separate Postgres instances, multiple GitHub orgs, etc.) by setting per-directory env vars in an
 `.envrc` file.
 
-**Important caveat:** Claude Code spawns MCP servers **once, at startup
-**, and they inherit the shell environment at that moment. The implication:
+**Important caveat:** Claude Code spawns MCP servers **once, at startup**, and they inherit the shell environment at
+that moment. The implication:
 
 * ✓ Works: `cd ~/project-a && claude` — MCPs pick up project-a's env vars from `.envrc`. Quit,
   `cd ~/project-b && claude` — MCPs pick up project-b's env vars.
 * ✗ Does not work: starting Claude Code in one project, then
   `cd`-ing to another mid-session. The already-running MCP servers keep the original env vars and continue talking to the original account.
 
-**Bottom line:
-** to switch accounts, quit Claude Code and relaunch it from the target directory. direnv handles the rest.
+**Bottom line:** to switch accounts, quit Claude Code and relaunch it from the target directory. direnv handles the
+rest.
 
 ### Recommended Permissions
 
@@ -507,17 +511,16 @@ If you also use remote MCP servers (see [Configure Remote MCPs](#configure-remot
 **Note:** These entries merge with your existing
 `allow` list — you don't need to replace it. Only add entries for the MCP servers you actually use.
 
-**Renamed instances
-** (see [Naming caveat for multi-tenant setups](#configure-remote-mcps-optional)) need their own permission entry — e.g.
-`mcp__atlassian-companya__*` and `mcp__atlassian-companyb__*` instead of (or in addition to) the bare
-`mcp__atlassian__*`.
+**Renamed instances** (see [Naming caveat for multi-tenant setups](#configure-remote-mcps-optional)) need their own
+permission entry — e.g. `mcp__atlassian-companya__*` and `mcp__atlassian-companyb__*` instead of (or in addition to) the
+bare `mcp__atlassian__*`.
 
 ## Usage
 
 ### Skills
 
-These skills are automatically available to Claude. The **Setup
-** column lists what you need to configure for each — env vars, one-time auth commands, or remote MCP additions. Skills with no setup work out of the box.
+These skills are automatically available to Claude. The **Setup** column lists what you need to configure for each — env
+vars, one-time auth commands, or remote MCP additions. Skills with no setup work out of the box.
 
 | Skill                    | Description                                                                                                             | Setup                                                                                                                                                                                                                                               |
 |--------------------------|-------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -560,10 +563,11 @@ The plugin declares LSPs for 13 languages. Each is **idle until you open a match
 `app.ts` activates the TypeScript LSP, opening `lib.go` activates
 `gopls`, etc. No LSP runs in a repo that doesn't have matching file extensions.
 
-**Why they matter:** an active LSP gives Claude **real type information
-** from your installed dependencies — function signatures, references, type definitions, completions — instead of inferring from source code. This is what stops Claude from hallucinating method names on third-party libraries or guessing the shape of a return type. Any skill that touches code (
-`code-review-deep`, `migrate-code`, `run-linters`, `work-issue`, `write-tests`,
-`create-pr`, the deep-analysis agents) becomes meaningfully more accurate.
+**Why they matter:** an active LSP gives Claude **real type information** from your installed dependencies — function
+signatures, references, type definitions, completions — instead of inferring from source code. This is what stops Claude
+from hallucinating method names on third-party libraries or guessing the shape of a return type. Any skill that touches
+code (`code-review-deep`, `migrate-code`, `run-linters`, `work-issue`, `write-tests`, `create-pr`, the deep-analysis
+agents) becomes meaningfully more accurate.
 
 **Activation rules:**
 
@@ -571,8 +575,8 @@ The plugin declares LSPs for 13 languages. Each is **idle until you open a match
 * If the LSP binary is not on your
   `PATH`, that language silently falls back to source-only analysis — the rest of the plugin is unaffected.
 * Each LSP communicates over stdio with Claude Code's LSP host; you don't interact with them directly.
-* They are **independent of the bundled MCP servers
-  ** — different protocol, different lifecycle, different purpose. MCPs give Claude tools (e.g., "search GitHub", "query a database"). LSPs give Claude knowledge of your code.
+* They are **independent of the bundled MCP servers** — different protocol, different lifecycle, different purpose. MCPs
+  give Claude tools (e.g., "search GitHub", "query a database"). LSPs give Claude knowledge of your code.
 
 **Bundled LSPs:**
 
