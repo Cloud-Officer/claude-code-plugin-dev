@@ -27,7 +27,22 @@ export const meta = {
 //              args: { issues: [{ ref, tracker }], defaultBranch, repoRoot } })
 // ---------------------------------------------------------------------------
 
-const input = args || {}
+// Some harnesses deliver `args` as a JSON-encoded string rather than an object.
+// Parse that case rather than silently running zero agents.
+function readArgs(raw) {
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw)
+    } catch (e) {
+      log('args arrived as a string but is not valid JSON — ignoring it: ' + e.message)
+      return {}
+    }
+  }
+
+  return raw || {}
+}
+
+const input = readArgs(args)
 const issues = Array.isArray(input.issues) ? input.issues : []
 const defaultBranch = input.defaultBranch || 'main'
 const repoRoot = input.repoRoot || '.'
