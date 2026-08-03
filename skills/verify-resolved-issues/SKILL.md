@@ -191,25 +191,23 @@ Decide one of four outcomes: **VERIFIED** (fix matches issue + present in codeba
 
 ### Step 5-G: Act
 
-Compose comments using the templates below. In `--dry-run`, print them to stdout (one block per issue) with the planned action and stop.
+Post the workflow's `comment_markdown` verbatim — don't rewrite it. In `--dry-run`, print it to stdout (one block per issue) with the planned action and stop.
 
 **On VERIFIED** — close the issue:
 
+- MCP preferred: `mcp__github__add_issue_comment` with `body` = `comment_markdown`, then `mcp__github__update_issue` with `state: "closed"` and `state_reason: "completed"`.
+- CLI fallback:
+
 ```bash
-# MCP preferred
-mcp__github__add_issue_comment ...
-mcp__github__update_issue --state closed --state_reason completed
-# CLI fallback
 gh issue close <NUM> --comment-from-file comment.md --reason completed
 ```
 
 **On NOT_VERIFIED** — comment, ensure the issue is open, reassign to the resolver:
 
+- MCP preferred: `mcp__github__add_issue_comment` with `body` = `comment_markdown`, then `mcp__github__update_issue` with `assignees: ["<resolver-login>"]`.
+- CLI fallback:
+
 ```bash
-# MCP preferred
-mcp__github__add_issue_comment ...
-mcp__github__update_issue --assignees '["<resolver-login>"]'
-# CLI fallback
 gh issue comment <NUM> --body-file comment.md
 gh issue edit <NUM> --add-assignee <resolver-login>
 # also remove a misleading "fixed"/"resolved" label, if present
@@ -276,11 +274,9 @@ project = $PROJECT
 ORDER BY statusCategoryChangedDate DESC
 ```
 
-Run via JQL search (paginate past 100):
+Run via JQL search (paginate past 100) — `mcp__atlassian__searchJiraIssuesUsingJql` with the query above as `jql`, or the CLI fallback:
 
 ```bash
-mcp__atlassian__searchJiraIssuesUsingJql ...
-# or
 jira issue list -q "<JQL>" --plain --no-headers --no-truncate \
   --columns KEY,STATUS,ASSIGNEE,SUMMARY --paginate
 ```
@@ -360,6 +356,8 @@ In `--dry-run`, print the planned action per issue and stop.
 ---
 
 ## Comment Templates
+
+> **Delegated to the workflow.** `verify-resolved-issues.workflow.js` drafts every comment and returns it as `comment_markdown`, ready to post verbatim — you never fill a template yourself. The templates reproduced below are reference only, kept so a reader can see what the workflow's agents produce. The workflow file is authoritative — edits here change nothing at runtime.
 
 The comments you post are the load-bearing artifact of this skill. A vague comment ("looks fixed!", "doesn't seem fixed") is worse than no comment, because it pollutes the audit trail. Be concrete: name files, line numbers, commits, and tests.
 
