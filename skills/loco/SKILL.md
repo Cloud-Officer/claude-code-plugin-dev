@@ -26,31 +26,33 @@ All API calls use the `Authorization` header. **Never pass the API key as a quer
 ### Authentication Header
 
 ```text
-Authorization: Loco $LOCO_KEY
+Authorization: Loco $LOCO_API_KEY
 ```
+
+Every example below writes `$LOCO_API_KEY`. If Step 1 resolved a per-project variable, substitute that name (e.g. `$LOCO_API_KEY_IOS`) everywhere `$LOCO_API_KEY` appears. Always reference the environment variable itself: each command runs in a fresh shell, so a variable assigned by an earlier command is empty in the next one.
 
 ### Verify Credentials
 
 ```bash
-curl -s -f -H "Authorization: Loco $LOCO_KEY" https://localise.biz/api/auth/verify
+curl -s -f -H "Authorization: Loco $LOCO_API_KEY" https://localise.biz/api/auth/verify
 ```
 
 ### List All Assets
 
 ```bash
-curl -s -f -H "Authorization: Loco $LOCO_KEY" https://localise.biz/api/assets
+curl -s -f -H "Authorization: Loco $LOCO_API_KEY" https://localise.biz/api/assets
 ```
 
 ### Get Single Asset
 
 ```bash
-curl -s -f -H "Authorization: Loco $LOCO_KEY" "https://localise.biz/api/assets/$ASSET_ID"
+curl -s -f -H "Authorization: Loco $LOCO_API_KEY" "https://localise.biz/api/assets/$ASSET_ID"
 ```
 
 ### Create Asset
 
 ```bash
-curl -s -f -X POST -H "Authorization: Loco $LOCO_KEY" \
+curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "id=$KEY&text=$TEXT&type=text&context=$CONTEXT" \
   https://localise.biz/api/assets
@@ -59,14 +61,14 @@ curl -s -f -X POST -H "Authorization: Loco $LOCO_KEY" \
 ### Delete Asset
 
 ```bash
-curl -s -f -X DELETE -H "Authorization: Loco $LOCO_KEY" \
+curl -s -f -X DELETE -H "Authorization: Loco $LOCO_API_KEY" \
   "https://localise.biz/api/assets/$ASSET_ID"
 ```
 
 ### Set Translation for a Locale
 
 ```bash
-curl -s -f -X POST -H "Authorization: Loco $LOCO_KEY" \
+curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: text/plain" \
   --data-raw "$TRANSLATION_TEXT" \
   "https://localise.biz/api/translations/$ASSET_ID/$LOCALE"
@@ -75,7 +77,7 @@ curl -s -f -X POST -H "Authorization: Loco $LOCO_KEY" \
 ### Tag an Asset
 
 ```bash
-curl -s -f -X POST -H "Authorization: Loco $LOCO_KEY" \
+curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "name=$TAG_NAME" \
   "https://localise.biz/api/assets/$ASSET_ID/tags"
@@ -84,7 +86,7 @@ curl -s -f -X POST -H "Authorization: Loco $LOCO_KEY" \
 ### List Project Locales
 
 ```bash
-curl -s -f -H "Authorization: Loco $LOCO_KEY" https://localise.biz/api/locales
+curl -s -f -H "Authorization: Loco $LOCO_API_KEY" https://localise.biz/api/locales
 ```
 
 ## Steps
@@ -116,12 +118,12 @@ env | grep -o '^LOCO_API_KEY[^=]*'
 **Verify the key works:**
 
 ```bash
-curl -s -f -H "Authorization: Loco $LOCO_KEY" https://localise.biz/api/auth/verify
+curl -s -f -H "Authorization: Loco $LOCO_API_KEY" https://localise.biz/api/auth/verify
 ```
 
 If verification fails, tell the user the API key is invalid and stop.
 
-**Important:** After resolving the key, store it in a shell variable `LOCO_KEY` for all subsequent API calls. Never echo or log the key value.
+**Important:** Record the resolved *variable name* (e.g. `LOCO_API_KEY_IOS`) and substitute it for `$LOCO_API_KEY` in every subsequent command. Do not assign the key to a shell variable — shell state does not survive between commands. Never echo or log the key value; expanding it inside a `-H` argument does not print it.
 
 ---
 
@@ -144,7 +146,7 @@ Extract from the user's request:
 Fetch existing assets and check if the key already exists. Capture the HTTP status separately so we can distinguish "not found" (good — we can create) from a real error:
 
 ```bash
-STATUS=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Loco $LOCO_KEY" \
+STATUS=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Loco $LOCO_API_KEY" \
   "https://localise.biz/api/assets/$(echo -n "$KEY" | jq -sRr @uri)")
 ```
 
@@ -159,7 +161,7 @@ Do **not** use `curl -f` here — `-f` collapses 404 into a generic non-zero exi
 Fetch a sample of existing keys to detect the project's naming patterns:
 
 ```bash
-curl -s -f -H "Authorization: Loco $LOCO_KEY" https://localise.biz/api/assets | jq -r '.[0:50] | .[].id'
+curl -s -f -H "Authorization: Loco $LOCO_API_KEY" https://localise.biz/api/assets | jq -r '.[0:50] | .[].id'
 ```
 
 Analyze the sample for:
@@ -178,7 +180,7 @@ If the user confirms or the key matches conventions, continue.
 #### Step 5: Create the Asset
 
 ```bash
-curl -s -f -X POST -H "Authorization: Loco $LOCO_KEY" \
+curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   --data-urlencode "id=$KEY" \
   --data-urlencode "text=$TEXT" \
@@ -192,7 +194,7 @@ If the creation fails, report the error and stop.
 #### Step 6: Set English Translation
 
 ```bash
-curl -s -f -X POST -H "Authorization: Loco $LOCO_KEY" \
+curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: text/plain" \
   --data-raw "$TEXT" \
   "https://localise.biz/api/translations/$(echo -n "$KEY" | jq -sRr @uri)/en"
@@ -205,7 +207,7 @@ curl -s -f -X POST -H "Authorization: Loco $LOCO_KEY" \
 Fetch all project locales:
 
 ```bash
-curl -s -f -H "Authorization: Loco $LOCO_KEY" https://localise.biz/api/locales | jq -r '.[].code'
+curl -s -f -H "Authorization: Loco $LOCO_API_KEY" https://localise.biz/api/locales | jq -r '.[].code'
 ```
 
 Filter out English locales (any starting with `en`).
@@ -219,7 +221,7 @@ For each remaining locale:
 3. **Push the translation:**
 
 ```bash
-curl -s -f -X POST -H "Authorization: Loco $LOCO_KEY" \
+curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: text/plain" \
   --data-raw "$TRANSLATED_TEXT" \
   "https://localise.biz/api/translations/$(echo -n "$KEY" | jq -sRr @uri)/$LOCALE"
@@ -230,7 +232,7 @@ curl -s -f -X POST -H "Authorization: Loco $LOCO_KEY" \
 Always tag with `needs-review`:
 
 ```bash
-curl -s -f -X POST -H "Authorization: Loco $LOCO_KEY" \
+curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "name=needs-review" \
   "https://localise.biz/api/assets/$(echo -n "$KEY" | jq -sRr @uri)/tags"
@@ -239,7 +241,7 @@ curl -s -f -X POST -H "Authorization: Loco $LOCO_KEY" \
 If `--tags` was provided, also apply each custom tag:
 
 ```bash
-curl -s -f -X POST -H "Authorization: Loco $LOCO_KEY" \
+curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "name=$TAG" \
   "https://localise.biz/api/assets/$(echo -n "$KEY" | jq -sRr @uri)/tags"
@@ -281,11 +283,17 @@ Use this flow when the user wants to delete a translation key.
 
 #### Step 2: Find the Asset
 
+Capture the body and the HTTP status together — the status is the last line of the output:
+
 ```bash
-curl -s -f -H "Authorization: Loco $LOCO_KEY" "https://localise.biz/api/assets/$(echo -n "$KEY" | jq -sRr @uri)"
+curl -s -w '\n%{http_code}' -H "Authorization: Loco $LOCO_API_KEY" "https://localise.biz/api/assets/$(echo -n "$KEY" | jq -sRr @uri)"
 ```
 
-If the asset is not found (HTTP 404), tell the user: "Key `$KEY` not found." and stop.
+- `200` → asset found; proceed to Step 3 with the body.
+- `404` → tell the user: "Key `$KEY` not found." and stop.
+- Anything else (401/403/5xx/000) → real error. Show the status to the user and stop.
+
+Do **not** use `curl -f` here — `-f` collapses 404 into a generic non-zero exit and hides the case we actually want to detect.
 
 #### Step 3: Show Details
 
@@ -307,7 +315,7 @@ If the user does not confirm, stop here.
 #### Step 5: Delete and Report
 
 ```bash
-curl -s -f -X DELETE -H "Authorization: Loco $LOCO_KEY" \
+curl -s -f -X DELETE -H "Authorization: Loco $LOCO_API_KEY" \
   "https://localise.biz/api/assets/$(echo -n "$KEY" | jq -sRr @uri)"
 ```
 
@@ -324,10 +332,10 @@ Use this flow when the user wants to find unused translation keys in the codebas
 #### Step 2: Fetch All Asset Keys
 
 ```bash
-curl -s -f -H "Authorization: Loco $LOCO_KEY" https://localise.biz/api/assets | jq -r '.[].id'
+curl -s -f -H "Authorization: Loco $LOCO_API_KEY" https://localise.biz/api/assets | jq -r '.[].id' | sort -u | tee /tmp/loco-keys.txt
 ```
 
-Save the full list of keys.
+Write the full list to a file — later commands run in a fresh shell and cannot read it from a variable.
 
 #### Step 3: Detect Platform(s)
 
@@ -394,19 +402,21 @@ AppLocalizations.of(context).KEY
 
 **Efficient batch approach:**
 
-1. Write all keys to a temporary variable/list.
-2. Use the Grep tool to search the entire codebase for each key.
-3. Collect the set of keys that were found.
-4. Compute the difference: keys in Loco but not found in code = potentially unused.
+1. Search the codebase for every key in `/tmp/loco-keys.txt`.
+2. Collect the set of keys that were found.
+3. Compute the difference: keys in Loco but not found in code = potentially unused.
 
-**Important:** For large key sets (>100 keys), search in batches using grep with multiple patterns to avoid per-key overhead:
+For small key sets (<100 keys), use the Grep tool once per key. For larger sets, one batch pass emits the matched keys directly — `-o` prints each matching key, `-h` suppresses the filename prefix:
 
 ```bash
-# Build a pattern file from all keys and grep in one pass
-echo "$ALL_KEYS" | grep -F -r -l -f - --include="*.swift" --include="*.m" --include="*.strings" --include="*.xml" --include="*.rb" --include="*.yml" --include="*.js" --include="*.ts" --include="*.vue" --include="*.jsx" --include="*.tsx" --include="*.dart" --include="*.arb" --include="*.resx" --include="*.go" --include="*.py" .
+grep -F -o -h -r -f /tmp/loco-keys.txt --include="*.swift" --include="*.m" --include="*.strings" --include="*.xml" --include="*.rb" --include="*.yml" --include="*.js" --include="*.ts" --include="*.vue" --include="*.jsx" --include="*.tsx" --include="*.dart" --include="*.arb" --include="*.resx" --include="*.go" --include="*.py" . | sort -u > /tmp/loco-found.txt
 ```
 
-Or use the Grep tool for each key individually if the key set is small (<100 keys).
+The unused keys are then the keys present in Loco but absent from the matched set:
+
+```bash
+comm -23 /tmp/loco-keys.txt /tmp/loco-found.txt
+```
 
 #### Step 5: Report Results
 
@@ -482,8 +492,8 @@ Compare the sets. If any placeholder is missing or added in the translation, the
 ## Safety Guardrails
 
 1. **Always confirm before delete** — Never delete an asset without explicit user confirmation.
-2. **Never echo API key values** — Use `$LOCO_KEY` in commands but never print its value. If debugging, show `LOCO_API_KEY_*** is set` instead.
-3. **Always use Authorization header** — Never pass the API key as a query parameter (`?key=...`). Always use `Authorization: Loco $LOCO_KEY`.
+2. **Never echo API key values** — Reference the environment variable in commands but never print its value. If debugging, show `LOCO_API_KEY_*** is set` instead.
+3. **Always use Authorization header** — Never pass the API key as a query parameter (`?key=...`). Always use `Authorization: Loco $LOCO_API_KEY`.
 4. **Tag all auto-translations** — Every asset with auto-translated text gets the `needs-review` tag.
 5. **Skip on placeholder failure** — If placeholder validation fails for a locale, skip it and report the failure rather than pushing a broken translation.
 
