@@ -131,10 +131,10 @@ Present a compact per-issue summary from `results`: outcome, branch, `test_statu
 
 Once the user is happy, use `AskUserQuestion` to decide how to ship the successful branches:
 
-- **Separate PRs (one per issue)** — for each successful result, open a PR from its branch via the `create-pr` skill, using its `pr_title` and adding its `closing_keyword` to the PR **body** (GitHub). This is the default when the issues are unrelated.
+- **Separate PRs (one per issue)** — `create-pr` takes no branch argument; it pushes and opens the PR for whatever branch is checked out. So for each successful result, `git checkout <branch>` in the main checkout **first**, then invoke `create-pr` with its `pr_title`, adding its `closing_keyword` to the PR **body** (GitHub). `create-pr` returns the tree to the default branch, so the next result starts clean. This is the default when the issues are unrelated.
 - **Single combined PR** — create one integration branch from `origin/$DEFAULT_BRANCH`, merge each successful issue branch into it (`git merge --no-ff <branch>` per issue; resolve any conflicts, re-run tests), then open one PR via `create-pr`. Put **every** issue's closing keyword on its own line in the body (`Closes #123`, `Fixes #124`, …) so all of them auto-close on merge. Use this when the issues are tightly related or the user wants a single review.
 
-In both cases the `create-pr` skill handles running tests locally, pushing, opening the PR, and watching CI (via the Actions runs REST API) — do not `git push` / `gh pr create` yourself. After PRs are open, run Steps 10–11 (update issue, post the tester QA checklist) per issue, and for Jira transition each to **Code Review**. Then clean up worktrees (`git worktree remove .worktrees/<branch>` or the workflow's temporary worktrees) once the user confirms, preserving the branches until the PRs merge.
+In both cases the `create-pr` skill handles running tests locally, pushing, opening the PR, and watching CI (via the Actions runs REST API) — do not `git push` / `gh pr create` yourself. After PRs are open, run Steps 10–11 (update issue, post the tester QA checklist) per issue, and for Jira transition each to **Code Review**. No worktree cleanup is needed here: the workflow's worktrees are harness-managed and already gone, and the issue branches persist in the shared object store — leave them until the PRs merge.
 
 ---
 
