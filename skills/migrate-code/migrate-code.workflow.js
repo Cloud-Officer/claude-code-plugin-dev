@@ -61,6 +61,7 @@ const testCmd = input.testCmd || ''
 const repoRoot = input.repoRoot || '.'
 const maxCompileRounds = Number.isFinite(input.maxCompileRounds) ? input.maxCompileRounds : 4
 const maxTestRounds = Number.isFinite(input.maxTestRounds) ? input.maxTestRounds : 3
+const maxVerifyFiles = Number.isFinite(input.maxVerifyFiles) ? input.maxVerifyFiles : 24
 
 // Right-sizing: bulk translation on a smaller model; authorship + all judgement
 // on the strong model. The skill may override via args.translateModel etc.
@@ -422,7 +423,17 @@ const translated = await pipeline(
       schema: TRANSLATE_SCHEMA,
       model: REVIEW_MODEL,
       effort: 'medium',
-    }).then(rev => rev ? { ...port, ...rev, source_file: f.source_file, target_file: f.target_file, status: port.status } : port)
+    }).then(rev => rev ? {
+      ...port,
+      ...rev,
+      source_file: f.source_file,
+      target_file: f.target_file,
+      status: port.status,
+      // The reviewer's own counts never erase the porter's: `todo_count` is the risk
+      // signal Verify ranks on, and both agents may report rule gaps.
+      todo_count: Math.max(port.todo_count || 0, rev.todo_count || 0),
+      rule_gaps: [...(port.rule_gaps || []), ...(rev.rule_gaps || [])],
+    } : port)
   },
 )
 
@@ -548,13 +559,16 @@ if (!testCmd) {
 // Adversarial behavioral check on the highest-risk ported files. Two reviewers
 // per file; if they disagree on the verdict, a third breaks the tie (2-of-3).
 phase('Verify')
+// 'skipped-exists' files count as candidates: they are ported code that this run
+// never behaviorally checked, and on a RESUMED run they are every file — excluding
+// them would verify nothing while still reporting zero mismatches.
 const verifyCandidates = ported
-  .filter(p => p.status === 'ported')
+  .filter(p => p.status === 'ported' || p.status === 'skipped-exists')
   .sort((a, b) => (b.todo_count || 0) - (a.todo_count || 0))
-const verifyTargets = verifyCandidates.slice(0, Math.min(input.maxVerifyFiles || 24, ported.length))
+const verifyTargets = verifyCandidates.slice(0, maxVerifyFiles)
 const droppedVerifyFiles = verifyCandidates.length - verifyTargets.length
-log('Adversarially verifying ' + verifyTargets.length + ' highest-risk ported file(s) for behavioral fidelity.')
-if (droppedVerifyFiles > 0) log('Capped at ' + verifyTargets.length + ' of ' + verifyCandidates.length + ' ported file(s) — ranked by TODO(migrate) marker count, so the ' + droppedVerifyFiles + ' with the fewest markers are never verified.')
+log('Adversarially verifying ' + verifyTargets.length + ' of ' + verifyCandidates.length + ' ported file(s) for behavioral fidelity.')
+if (droppedVerifyFiles > 0) log('Capped at ' + verifyTargets.length + ' of ' + verifyCandidates.length + ' ported file(s) — ranked by TODO(migrate) marker count (unknown, so ranked last, for files skipped as already-ported), so the ' + droppedVerifyFiles + ' lowest-ranked are never verified.')
 
 function verifyPrompt(p, lens) {
   return [
@@ -620,13 +634,17 @@ return {
     blocked: blocked.length,
     needs_human: needsHuman.length,
     todos: totalTodos,
-    behavioral_mismatches: behavioralMismatches.length,
+    verified: verifyResults.length,
+    // null — NEVER 0 — when nothing was verified: a zero here reads as "verified
+    // clean" when no file was ever checked.
+    behavioral_mismatches: verifyResults.length ? behavioralMismatches.length : null,
   },
   // What the per-phase caps dropped, so the report can say so instead of implying full coverage.
   capped: {
     error_groups: droppedErrorGroups,
     test_failures: droppedTestFailures,
     verify_files: droppedVerifyFiles,
+    unverified_files: verifyCandidates.length - verifyResults.length,
   },
   translated: ported.map(p => ({
     source_file: p.source_file, target_file: p.target_file, status: p.status,
