@@ -321,23 +321,13 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 
    Do not advance to the PR unless the change is covered by tests that pass, or it falls into the narrow no-test exception below. This step belongs in the TodoWrite list (step 0) so it cannot be skipped silently.
 
-   **Use the `write-tests` skill to author them.** This step owns the *gate* (no behavior change ships untested); `write-tests` is *how* you satisfy it — it handles framework detection (including repos with more than one framework for a language), the success/negative/edge/regression case matrix, running to green, and the coverage floor (line ≥ 80% / branch ≥ 80% by default, or the repo's configured threshold if higher). The detection and case guidance below mirrors that skill; keep them in sync.
+   **Use the `write-tests` skill to author them.** This step owns the *gate* (no behavior change ships untested); `write-tests` is *how* you satisfy it. That skill owns the framework detection, the case matrix, the coverage floor and its per-language carve-outs — this step does not restate them.
 
-   1. **Find the project's test setup first — don't guess.** Detect the runner and conventions from the repo before writing anything:
-      - Locate existing tests next to the code you changed (sibling `*_test.*`, `*_spec.*`, or a parallel `test/`, `tests/`, `spec/`, `__tests__/` tree).
-      - Identify the runner from the manifest/config (`package.json` scripts, `Gemfile` + `spec/`, `pytest.ini`/`pyproject.toml`, `go test`, `*.csproj`, etc.). **For Swift/iOS:** `Package.swift` → `swift test`; `*.xcworkspace`/`*.xcodeproj` → `xcodebuild test -scheme <Scheme> -destination 'platform=iOS Simulator,name=iPhone 15'` (find schemes with `xcodebuild -list`). On macOS these run locally — do not treat an Xcode project as "untestable".
-      - Match the nearest existing tests' style — naming, fixtures/factories, mocking approach, assertion library, file placement.
+   1. **Bug fixes need a regression test that fails before the fix and passes after** — run it both ways and state that you confirmed both.
 
-   2. **Write or update tests that cover the change.** Work from the same three sources as the QA checklist (step 11): the issue's objective, the nature of the change, and the blast radius. At minimum cover:
-      - the success path for each new or changed behavior;
-      - the negative/failure paths (invalid input, missing data, permission denied, not-found, boundaries) — not just the happy path;
-      - the regression surface — if you changed a shared function/component/query used in N places, add or extend tests so those callers stay covered.
+   2. **Paste the runner's own pass marker** — `** TEST SUCCEEDED **` / `Test Suite '...' passed` (Xcode), `0 failures` (rspec), `N passed` (pytest), `ok` (go) — not a paraphrased "tests pass". Never claim tests pass when you did not run them. The "can't run it locally" excuse is narrow: only the genuine absence of infrastructure on this machine (live external services, physical hardware) qualifies; say so explicitly and describe how you mitigated it.
 
-      For **Bug** fixes, write a regression test that **fails before the fix and passes after**, and state that you confirmed both.
-
-   3. **Run the tests and make them pass.** Run the narrow suite for the touched area first, then the broader suite if it is fast enough. **Paste the runner's own pass marker** — `** TEST SUCCEEDED **` / `Test Suite '...' passed` (Xcode), `0 failures` (rspec), `N passed` (pytest), `ok` (go) — not a paraphrased "tests pass". The "can't run it locally" excuse is narrow: on macOS, `swift test` and `xcodebuild test` against the iOS Simulator DO run locally — a slow build or a missing `-scheme` is not a reason to skip, find the scheme and run it. Only the genuine absence of infrastructure on this machine (live external services, physical hardware) qualifies; say so explicitly and describe how you mitigated it. Never claim tests pass when you did not run them.
-
-   4. **No-test exception — narrow and explicit.** A few change types have no unit-testable logic: pure copy/i18n, static assets, formatting-only changes, config/docs, or generated files. Only then may you skip tests, and you must tell the user **which** category applies and why. "It's hard to test" is not a valid reason — ask the user for guidance instead of skipping.
+   3. **No-test exception — narrow and explicit.** A few change types have no unit-testable logic: pure copy/i18n, static assets, formatting-only changes, config/docs, or generated files. Only then may you skip tests, and you must tell the user **which** category applies and why. "It's hard to test" is not a valid reason — ask the user for guidance instead of skipping.
 
    If the project has no test harness at all, surface that to the user and propose adding a minimal one (or get explicit acknowledgement to proceed without) rather than silently shipping untested code.
 
