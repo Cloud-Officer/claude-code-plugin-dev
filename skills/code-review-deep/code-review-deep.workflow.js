@@ -524,8 +524,10 @@ function buildVerifyPrompt(findings) {
     description: f.description,
   }))
   return [
-    'Mission: try to DISPROVE each finding below. Phase 2 was biased toward finding issues; you must be biased toward REJECTION.',
-    'Assume every finding is a false positive until proven otherwise.',
+    'Mission: try to DISPROVE each finding below. Phase 2 was biased toward finding issues;',
+    'your job is to hunt for the mitigating factor that kills each one. REJECT only when you',
+    'found a specific disproof and can name it. When you found none, CONFIRM and let the',
+    'confidence score carry your uncertainty. Inconclusive is not a rejection.',
     '',
     repoBlock,
     '',
