@@ -1,7 +1,7 @@
 ---
 name: code-review-deep
 description: "Exhaustive multi-phase code audit using parallel agents (security, dependencies, code quality, infrastructure, tests, and more). Use when the user wants a deep or thorough code review, a comprehensive audit, a security-and-quality sweep of a repo or subsystem, or a multi-agent review that goes beyond the current diff. Optionally scoped to a path or subsystem."
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(jq:*), Bash(awk:*), Bash(cat:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(ls:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, Workflow, Agent, Skill, AskUserQuestion, WebSearch, WebFetch, mcp__github__*, mcp__context7__*
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(jira:*), Bash(jq:*), Bash(awk:*), Bash(cat:*), Bash(date:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(ls:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, Workflow, Agent, Skill, AskUserQuestion, WebSearch, WebFetch, mcp__github__*, mcp__context7__*
 ---
 
 # Deep Code Review (Workflow-Orchestrated)
@@ -363,21 +363,14 @@ NOT executed automatically. After the report is generated, if the user asks ("cr
 
 **Summary format:** `[REPO-NAME][FINDING-ID] Brief description` (e.g., `[pnp-ios][SEC-001] Rotate hardcoded AWS credentials`).
 
-**Before creating:**
+**Dedupe.** List the existing `code-review` issues once before creating and again after, using the tracker `create-issue` resolved to (`gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'`):
 
-```bash
-jira issue list --label "code-review" --plain --columns key,summary
-```
+- GitHub Issues: `gh issue list --label "code-review" --state all --limit 500 --json number,title,state`
+- Jira: `jira issue list --label "code-review" --plain --columns key,summary,status`
 
 Skip any matching by BOTH repo name AND finding ID.
 
-**After creating:**
-
-```bash
-jira issue list --label "code-review" --plain --columns key,summary,status
-```
-
-Report: "Created X new issues, Y already existed, Z total issues".
+Report: "Created X new issues, Y already existed, Z total issues" — Y from the before-list, Z from the after-list.
 
 ### Labels
 
