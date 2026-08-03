@@ -1,93 +1,29 @@
 ---
 name: review-readme
 description: Review, create, update, check, fix, improve, write, or audit README.md. Use when the user wants to review the README, check the README, fix the README, write a README, improve the README, or update the README to match organizational standards with accurate project-specific content.
-allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, WebSearch, Skill, mcp__github__get_file_contents, mcp__fetch__fetch, mcp__context7__resolve-library-id, mcp__context7__query-docs
+allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, WebSearch, Skill, mcp__github__get_file_contents, mcp__fetch__fetch, mcp__context7__resolve-library-id, mcp__context7__query-docs
 ---
 
 # Review README.md
 
 Review the main README.md file in a repository and create or update it to match organizational standards. This skill analyzes the codebase to ensure README content is accurate and complete. Works for all repository types (public/private) and all languages.
 
-## CRITICAL: Mandatory Analysis Tracking
+## Phase Tracking
 
-**You MUST maintain an analysis checklist throughout execution.** At each step, record what was found. This ensures consistent, reproducible results.
+Use `TodoWrite` to track each phase below. Mark `in_progress` on entry, `completed` when results are recorded. Do NOT include the task list in the final output.
 
-**Before starting, create this tracking structure and update it as you progress:**
+**Required phases:**
 
-```text
-=== ANALYSIS CHECKPOINT LOG ===
-[ ] Step 1: Repository Information
-    - organization: (pending)
-    - repository: (pending)
-    - visibility: (pending)
-    - description: (pending)
-    - has_build_yml: (pending)
-    - has_license: (pending)
-    - readme_file: (pending)
+1. Repository information gathered
+2. Project type and stack detected
+3. README structure validated
+4. Introduction section verified
+5. Installation section verified
+6. Usage section verified
+7. License and Contributing validated
+8. Report generated
 
-[ ] Step 2: Project Type Detection
-    - project_type: (pending)
-    - package_manager: (pending)
-    - project_name: (pending)
-    - project_description: (pending)
-    - version: (pending)
-    - entry_points: (pending)
-    - available_scripts: (pending)
-    - dependencies: (pending)
-
-[ ] Step 3: Structure Validation
-    - h1_title_format: (pending) - expected vs actual
-    - required_h2_sections: (pending) - list found vs expected (ONLY 5 allowed)
-    - extra_h2_sections: (pending) - list any H2 not in required set (must be demoted to H3)
-    - section_order: (pending) - correct/incorrect
-
-[ ] Step 4: Introduction Section
-    - section_exists: (pending)
-    - has_project_purpose: (pending)
-    - has_key_features: (pending)
-    - has_target_audience: (pending)
-    - matches_package_description: (pending)
-    - issues: (pending)
-
-[ ] Step 5: Installation Section
-    - section_exists: (pending)
-    - has_prerequisites: (pending)
-    - has_install_commands: (pending)
-    - has_verification_step: (pending)
-    - commands_match_project_type: (pending)
-    - issues: (pending)
-
-[ ] Step 6: Usage Section
-    - section_exists: (pending)
-    - has_basic_usage: (pending)
-    - has_examples: (pending)
-    - has_configuration: (pending)
-    - cli_commands_verified: (pending) - list commands checked
-    - api_exports_verified: (pending) - list exports checked
-    - issues: (pending)
-
-[ ] Step 7: License and Contributing
-    - license_file_exists: (pending)
-    - license_matches_visibility: (pending) - PASS/FAIL
-    - contributing_section_exists: (pending)
-    - contributing_matches_visibility: (pending) - PASS/FAIL
-    - issues: (pending)
-
-[ ] Step 8: Report Generated
-    - all_checks_completed: (pending)
-    - issues_found: (pending)
-=== END CHECKPOINT LOG ===
-```
-
-**COMPLETION REQUIREMENT:** Before generating the final report, you MUST verify that ALL checkpoints show actual values (not "pending"). If any checkpoint is still "pending", go back and complete that analysis step.
-
-**EVIDENCE REQUIREMENT:** For every check, you MUST record:
-
-1. **What the README claims** - the exact text/command/feature described
-2. **What the code shows** - the actual evidence (package.json bin field, entry points, exports, scripts)
-3. **Comparison result** - MATCH, MISMATCH, or MISSING with specific details
-
-A bare "PASS" without evidence is not acceptable. If you cannot provide evidence, the check is incomplete.
+**Evidence rule:** Every check must record (a) what the README claims — the exact text/command/feature, (b) what the code shows (package.json `bin` field, entry points, exports, scripts), (c) MATCH / MISMATCH / MISSING with specific details. A bare "PASS" without evidence is invalid — the check is incomplete.
 
 **DO NOT SKIP STEPS.** Even if an earlier check seems to suggest no issues, you MUST complete ALL steps. Issues are often only revealed when cross-referencing multiple sources.
 
@@ -664,16 +600,7 @@ Pull requests are the best way to propose changes to the codebase. We actively w
 
 ## Step 8: Generate Report and Apply Fixes
 
-**MANDATORY PRE-REPORT VERIFICATION:**
-
-Before generating the report, you MUST:
-
-1. Review your checkpoint log from the start of analysis
-2. Verify ALL checkpoints have actual values (not "pending")
-3. If ANY checkpoint is still pending, STOP and complete that step first
-4. Cross-reference findings: issues found in code analysis MUST appear in the report
-
-**If you skipped any step, the review is incomplete and results will be inconsistent.**
+**MANDATORY PRE-REPORT VERIFICATION:** Every phase must be `completed` before the report is generated — if any phase is unfinished, STOP and complete it first. Every issue found during analysis MUST appear in the report.
 
 After analysis, provide a comprehensive report:
 
@@ -681,10 +608,6 @@ After analysis, provide a comprehensive report:
 
 ```text
 ## README Review Report
-
-### Analysis Checkpoint Log
-
-{Include your completed checkpoint log here - ALL values must be filled in, none should say "pending"}
 
 ### Repository Info
 - **Organization:** {org}
@@ -752,5 +675,4 @@ Fix any linting errors before considering the task complete.
 7. **Keep examples simple** - Show the most common use cases, not every option
 8. **Run linters after changes** - Always run `/co-dev:run-linters` after modifying README.md
 9. **Complete ALL steps** - Never skip analysis steps. Each step may reveal issues not visible in other steps
-10. **Output checkpoint log** - Include the completed checkpoint log in your final report to prove all steps were executed
-11. **Never validate against world knowledge alone** - Do NOT use your training data to fact-check version numbers, release dates, or external claims. If uncertain about something (e.g., "does Ruby 4.0 exist?"), use web search to verify before flagging. Only validate things that can be cross-referenced against actual files in the repository or verified online.
+10. **Never validate against world knowledge alone** - Do NOT use your training data to fact-check version numbers, release dates, or external claims. If uncertain about something (e.g., "does Ruby 4.0 exist?"), use web search to verify before flagging. Only validate things that can be cross-referenced against actual files in the repository or verified online.
