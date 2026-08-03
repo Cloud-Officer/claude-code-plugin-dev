@@ -91,7 +91,7 @@ The expensive part of this skill — reading each issue's claims, reading its li
 **Division of labour:**
 
 - **The skill (this file) does:** tracker detection (Step 1), candidate discovery (Step 2-G / 2-J + 3-J), resolver identification (Step 3-G / 4-J), and finding the linked merged PRs (Step 5-J). Then it **confirms once** before any write (`--apply`) and performs the actual writes (Step 5-G / 7-J).
-- **The workflow does:** the per-issue verification (Step 4-G / 6-J) and comment drafting, returning a structured verdict per issue. The verification checklist, the three-way outcome rules, the `SKIP_NEEDS_MANUAL` guidance, the comment templates, and the language rule all live in `${CLAUDE_PLUGIN_ROOT}/skills/verify-resolved-issues/verify-resolved-issues.workflow.js`. To tune *how a fix is judged or how a comment reads*, edit that file — not the steps below.
+- **The workflow does:** the per-issue verification (Step 4-G / 6-J) and comment drafting, returning a structured verdict per issue. The verification checklist, the four-way outcome rules, the `SKIP_NEEDS_MANUAL` guidance, the comment templates, and the language rule all live in `${CLAUDE_PLUGIN_ROOT}/skills/verify-resolved-issues/verify-resolved-issues.workflow.js`. To tune *how a fix is judged or how a comment reads*, edit that file — not the steps below.
 
 **Before launching**, `cd` into the target repo (its own Bash call) so the workflow's agents inherit the right working directory and direnv token — their `gh`/`git`/test-runner calls depend on it. Then invoke:
 
@@ -173,7 +173,7 @@ For each candidate:
 
 ### Step 4-G: Verify in current codebase
 
-> **Delegated to the workflow.** Don't run this per-issue loop inline — pass all candidates discovered in Steps 2-G / 3-G to `verify-resolved-issues.workflow.js` (see "Parallel verification via workflow" above) and use its returned verdicts. The checklist below documents what each workflow agent does, and stays the source of truth for that logic.
+> **Delegated to the workflow.** Don't run this per-issue loop inline — pass all candidates discovered in Steps 2-G / 3-G to `verify-resolved-issues.workflow.js` (see "Parallel verification via workflow" above) and use its returned verdicts. The checklist below is reference only, kept so a reader can see what each workflow agent does. The workflow file is authoritative — edits here change nothing at runtime.
 
 For each candidate, decide whether the merged PR's intent matches what the issue described AND whether the changes are still present on the default branch.
 
@@ -185,7 +185,7 @@ For each candidate, decide whether the merged PR's intent matches what the issue
    - If the issue was a regression bug: search for the old pattern that was supposed to be removed; if it's still there, the fix didn't take.
 4. **If a linter or test runner is configured**, run it against the affected paths only — don't run the whole suite unless cheap. Look for regressions specifically related to the fix.
 
-Decide one of three outcomes: **VERIFIED** (fix matches issue + present in codebase), **NOT_VERIFIED** (missing, partial, reverted, or never matched the issue's intent), or **SKIP_NEEDS_MANUAL** (the issue's correctness cannot be determined from code alone — it requires a human tester to confirm).
+Decide one of four outcomes: **VERIFIED** (fix matches issue + present in codebase), **NOT_VERIFIED** (missing, partial, reverted, or never matched the issue's intent), **SKIP_NEEDS_MANUAL** (the issue's correctness cannot be determined from code alone — it requires a human tester to confirm), or **SKIP_INSUFFICIENT** (not enough signal to judge: no merged PR actually linked, ambiguous resolver, the referenced code or symbol entirely gone with no traceable history — report-only, like `SKIP_NEEDS_MANUAL`).
 
 `SKIP_NEEDS_MANUAL` covers cases where reading code can't yield a confident verdict: visual / pixel / layout bugs, animation timing, cross-browser or device-specific rendering, end-to-end UX flows behind auth or third-party services, performance perception, audio/video, accessibility behavior with assistive tech, anything depending on a live external integration or staging environment. **When this is the outcome, do nothing** — no comment, no transition, no reassignment. Just record it as skipped in the report so a human can pick it up. A drive-by audit comment on a UX bug helps no one and clutters the ticket.
 
@@ -319,7 +319,7 @@ If dev-info is empty, fall back to a GitHub search for the issue key in PR title
 
 > **Delegated to the workflow.** Like Step 4-G, pass all candidates (with their resolver and linked-PR data from Steps 4-J / 5-J) to `verify-resolved-issues.workflow.js` and act on its verdicts. The procedure below is what each workflow agent runs.
 
-Same procedure as **Step 4-G**, including the three-way outcome: **VERIFIED**, **NOT_VERIFIED**, or **SKIP_NEEDS_MANUAL**. Read the issue description and acceptance criteria, read the touched files in the current working tree, confirm the described behavior is present, run tests/linters narrowly if useful. If the ticket's correctness cannot be determined from code alone (visual/UX bugs, third-party integrations, device-specific behavior — see Step 4-G), mark **SKIP_NEEDS_MANUAL** and **do nothing on the ticket** — no comment, no transition, no reassignment. Skipped tickets only show up in the report.
+Same procedure as **Step 4-G**, including the four-way outcome: **VERIFIED**, **NOT_VERIFIED**, **SKIP_NEEDS_MANUAL**, or **SKIP_INSUFFICIENT** (not enough signal to judge — no merged PR actually linked, ambiguous resolver, the referenced code or symbol entirely gone with no traceable history; report-only, like `SKIP_NEEDS_MANUAL`). Read the issue description and acceptance criteria, read the touched files in the current working tree, confirm the described behavior is present, run tests/linters narrowly if useful. If the ticket's correctness cannot be determined from code alone (visual/UX bugs, third-party integrations, device-specific behavior — see Step 4-G), mark **SKIP_NEEDS_MANUAL** and **do nothing on the ticket** — no comment, no transition, no reassignment. Skipped tickets only show up in the report.
 
 The Jira description format is ADF (Atlassian Document Format) — when fetched via MCP it's typically rendered to text already; via REST you may need `?expand=renderedFields` and read `renderedFields.description` (HTML) or walk the `description` ADF tree. Acceptance criteria often live in a custom field — try `customfield_10100` (Atlassian default) and grep the issue's `fields` for keys whose name contains `Acceptance`.
 
