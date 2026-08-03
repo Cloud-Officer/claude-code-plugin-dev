@@ -276,6 +276,7 @@ Parse what the user is asking for:
 
 ```bash
 MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "
+SET SESSION MAX_EXECUTION_TIME=30000;
 SELECT DATE(created_at) as day, COUNT(*) as orders, SUM(total)/100 as revenue
 FROM orders
 WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
@@ -288,6 +289,7 @@ LIMIT 100;"
 
 ```bash
 psql -c "
+SET statement_timeout = '30s';
 SELECT DATE(created_at) as day, COUNT(*) as orders, SUM(total)/100 as revenue
 FROM orders
 WHERE created_at >= NOW() - INTERVAL '30 days'
@@ -542,7 +544,7 @@ Before executing any query, scan for write/mutate keywords. Match these as **SQL
 **SQL (MySQL/PostgreSQL/SQLite):** `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`, `CREATE`, `REPLACE`
 **MongoDB:** `insertOne`, `insertMany`, `updateOne`, `updateMany`, `deleteOne`, `deleteMany`, `drop`, `replaceOne`
 **Elasticsearch:** `_delete_by_query`, `_update_by_query`, `PUT` (index creation/mapping)
-**Redis:** `DEL`, `FLUSHDB`, `FLUSHALL`, `SET`, `HSET`, `LPUSH`, `SADD`, `ZADD`
+**Redis:** allowlist, not blocklist — Redis has far more write commands than read ones. Only these are read-only and may run without confirmation: `GET`, `MGET`, `GETRANGE`, `STRLEN`, `EXISTS`, `TYPE`, `TTL`, `PTTL`, `HGET`, `HMGET`, `HGETALL`, `HKEYS`, `HVALS`, `HLEN`, `HEXISTS`, `LRANGE`, `LINDEX`, `LLEN`, `SMEMBERS`, `SISMEMBER`, `SCARD`, `SINTER`, `SUNION`, `SDIFF`, `ZRANGE`, `ZREVRANGE`, `ZRANGEBYSCORE`, `ZSCORE`, `ZCARD`, `ZCOUNT`, `PFCOUNT`, `SCAN`, `HSCAN`, `SSCAN`, `ZSCAN`, `XRANGE`, `XREVRANGE`, `XLEN`, `BITCOUNT`, `GETBIT`, `JSON.GET`, `JSON.TYPE`, `DBSIZE`, `INFO`, `PING`. Treat **everything else** as a write — including `GETSET`/`GETDEL` (read-looking but destructive), `EXPIRE`/`PERSIST`, `RENAME`, `INCR`/`DECR`, `LPOP`/`RPOP`/`SPOP`, and `EVAL`/`EVALSHA`/`FCALL`/`SCRIPT` (scripts can write whatever they like). The allowlist governs the `mcp__redis__*` tools as well as `redis-cli`.
 **BigQuery:** `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`, `CREATE`, `MERGE`
 
 **If a write operation is detected:**
@@ -560,7 +562,7 @@ Read table/collection row counts from the "Large Table Warnings" or "All Tables"
 | --- | --- |
 | < 1M rows | LIMIT optional (add if no aggregation) |
 | 1M–10M rows | Inject `LIMIT 1000`; warn user about table size |
-| > 10M rows | Inject `LIMIT 100`; require date range filter if table has a date field |
+| 10M–50M rows | Inject `LIMIT 100`; require date range filter if table has a date field |
 | > 50M rows | **Refuse** query without date range filter; explain why |
 
 **Exception:** Do NOT inject LIMIT on aggregation queries (`COUNT`, `SUM`, `AVG`, `GROUP BY`, MongoDB `$group`, ES `aggs`). Instead, add date-range filters to narrow the source data.
@@ -578,8 +580,8 @@ Prepend or append timeout settings to prevent runaway queries:
 
 | Database | Timeout Setting |
 | --- | --- |
-| MySQL | Prepend `SET SESSION MAX_EXECUTION_TIME=30000;` before the query |
-| PostgreSQL | Prepend `SET statement_timeout = '30s';` before the query |
+| MySQL | Prepend `SET SESSION MAX_EXECUTION_TIME=30000;` to the query, inside the same `-e` string (see Step 6) — a separate `mysql` invocation gets a separate session and the timeout is lost |
+| PostgreSQL | Prepend `SET statement_timeout = '30s';` to the query, inside the same `-c` string (see Step 6) — same session requirement as MySQL |
 | SQLite | No server-side timeout; SQLite is file-based and typically fast. Use `LIMIT` to constrain large result sets |
 | MongoDB | Append `.maxTimeMS(30000)` to `find()` or `aggregate()` calls |
 | Elasticsearch | Add `"timeout": "30s"` to the query body |
