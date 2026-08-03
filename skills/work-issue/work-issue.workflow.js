@@ -47,8 +47,15 @@ const issues = Array.isArray(input.issues) ? input.issues : []
 const defaultBranch = input.defaultBranch || 'main'
 const repoRoot = input.repoRoot || '.'
 
+// An issue ref is only ever a GitHub issue number (`123`) or a Jira key
+// (`PROJ-456`). Refs are spliced into shell commands the implementing agent is
+// told to run, so anything else — spaces, `;`, `|`, backticks — is rejected at
+// this boundary rather than sanitised.
+const REF_PATTERN = /^(?:\d+|[A-Za-z][A-Za-z0-9]*-\d+)$/
+
 function branchName(issue) {
   const ref = String(issue.ref)
+  if (!REF_PATTERN.test(ref)) throw new Error('rejected issue ref: ' + JSON.stringify(ref))
   return issue.tracker === 'jira' ? ref.toUpperCase() : 'issue-' + ref
 }
 
@@ -161,16 +168,27 @@ log('Implementing ' + issues.length + ' issues in parallel, each in its own git 
 
 const results = await pipeline(
   issues,
-  (issue) => agent(buildImplementPrompt(issue), {
-    label: 'impl:' + issue.ref,
-    phase: 'Implement',
-    schema: RESULT_SCHEMA,
-    agentType: 'general-purpose',
-    isolation: 'worktree',
-  }).then(r => {
-    if (!r) return { ref: issue.ref, tracker: issue.tracker, branch: branchName(issue), success: false, summary: '', block_reason: 'agent did not return a result (skipped or errored)' }
-    return { ...r, ref: r.ref ?? issue.ref, tracker: r.tracker || issue.tracker, branch: r.branch || branchName(issue) }
-  })
+  (issue) => {
+    // A malformed ref fails only ITS issue — the rest of the batch still runs.
+    let prompt
+    try {
+      prompt = buildImplementPrompt(issue)
+    } catch (e) {
+      log('Skipping one issue — ' + e.message)
+      return { ref: issue.ref, tracker: issue.tracker, branch: '', success: false, summary: '', block_reason: e.message }
+    }
+
+    return agent(prompt, {
+      label: 'impl:' + issue.ref,
+      phase: 'Implement',
+      schema: RESULT_SCHEMA,
+      agentType: 'general-purpose',
+      isolation: 'worktree',
+    }).then(r => {
+      if (!r) return { ref: issue.ref, tracker: issue.tracker, branch: branchName(issue), success: false, summary: '', block_reason: 'agent did not return a result (skipped or errored)' }
+      return { ...r, ref: r.ref ?? issue.ref, tracker: r.tracker || issue.tracker, branch: r.branch || branchName(issue) }
+    })
+  }
 )
 
 const clean = results.filter(Boolean)
