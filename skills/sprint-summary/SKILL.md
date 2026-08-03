@@ -8,6 +8,13 @@ allowed-tools: Bash(jira:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(ca
 
 Generate a sprint work summary grouped by repository with items organized into approximately 3-day work blocks.
 
+## Arguments
+
+Parse arguments from the user's invocation:
+
+- No flag (default) — compute estimates for items that have none, use them in the report, and write nothing to Jira. The run is read-only; the user must explicitly opt in to writes.
+- `--write-estimates` — after computing them, save the estimates back to Jira as the original estimate on items that had none (Step 4.3). Without this flag, never call `jira issue edit` or `mcp__atlassian__editJiraIssue`.
+
 ## Run from the target repo's directory (direnv)
 
 The `jira` CLI authenticates with the `JIRA_URL`/`JIRA_EMAIL`/`JIRA_API_TOKEN` that [direnv](https://direnv.net/) loads from the `.envrc` of the **current working directory**. Run it from a directory whose `.envrc` belongs to a different project/account and it authenticates as the wrong account — the command fails, or summarizes the wrong sprint.
@@ -108,30 +115,32 @@ For each item, check if a time estimate already exists in Jira:
 
 1. **If `timeoriginalestimate` is set**: Use it directly. Convert seconds to days (divide by 28800 for 8-hour days). Skip AI estimation for this item.
 
-2. **If no estimate exists**: Read the summary and description and estimate the effort in working days using these heuristics:
+2. **If no estimate exists**: Read the summary and description and pick exactly one of the six emittable values below. These six are the **only** values this skill may produce — never 0.75, never 1.5, never 4, never "5+".
 
-   | Indicator | Estimated Days |
-   | --------- | -------------- |
-   | Trivial fix, typo, config change, simple toggle | 0.25 - 0.5 days |
-   | Small bug fix, minor UI change, small refactor | 0.5 - 1 day |
-   | Medium feature, moderate bug, API endpoint, integration | 1 - 2 days |
-   | Large feature, complex bug, multi-component change | 2 - 3 days |
-   | Very large task, architectural change, major feature | 3 - 5 days |
-   | Epic-sized work, full system redesign | 5+ days |
+   | Estimated Days | Select when the described change is |
+   | -------------- | ----------------------------------- |
+   | 0.25 | a one-line edit, a copy/text change, or a config/flag value change only |
+   | 0.5 | confined to one file, adding no new interface (no new endpoint, screen, table, or public function) |
+   | 1 | a few files inside one module, adding no new interface |
+   | 2 | spread across several files in one module, or adding one endpoint, screen, or job |
+   | 3 | spanning two or more modules, or changing an interface other code already calls |
+   | 5 | crossing a service or repository boundary, or changing a database schema or data contract |
 
-   Consider these factors when estimating:
+   **Tie-break**: when the description fits two rows, take the larger of the two. When the description is too vague to place at all, take 2.
+
+   Consider these factors when choosing **between two adjacent rows** — they never produce a value outside the six above:
    - **Priority/severity**: Higher priority bugs often indicate complexity
    - **Keywords**: "refactor", "migrate", "redesign", "overhaul" suggest larger effort
    - **Scope words**: "all", "every", "entire", "complete" suggest larger scope
    - **Specificity**: Very specific tasks ("change button color") are smaller than vague ones ("improve performance")
 
-3. **Save AI estimates back to Jira**: For items where the estimate was AI-generated, save it to Jira as the original estimate in hours:
+3. **Save estimates back to Jira — only with `--write-estimates`**: By default the computed estimate is used in the report and nothing is written to Jira. When the user passed `--write-estimates`, save each computed estimate as the original estimate in hours:
 
    ```bash
    jira issue edit <ISSUE-KEY> --no-input -o "Original Estimate=<HOURS>h"
    ```
 
-   Convert days to hours (multiply by 8). This ensures subsequent runs use the saved estimate directly.
+   Convert days to hours (multiply by 8). This makes subsequent runs use the saved estimate directly. Without the flag, skip this command entirely — the estimate stays local to the report and is recomputed next run.
 
 ## Step 5: Group Items into ~3-Day Blocks
 
@@ -230,11 +239,23 @@ Use the Jira item status (e.g., "In Code Review", "In Progress", "Done") and des
 
    List overloaded persons first, then OK, then underloaded. Unassigned items go last with no status.
 
+5. After the load table, state on its own line how the computed estimates were handled, counting only the items that had no estimate in Jira:
+
+   ```text
+   Estimates: <N> items estimated, not written to Jira (re-run with --write-estimates to save them).
+   ```
+
+   When `--write-estimates` was passed, say so instead:
+
+   ```text
+   Estimates: <N> items estimated and saved to Jira as Original Estimate.
+   ```
+
 ## Important Rules
 
 - **Exclude stories**: Only include Tasks and Bugs (and any sub-types of these). Never include Stories or Epics.
-- **Effort estimation**: Use existing Jira time estimates when present. Only AI-estimate when no estimate exists, and save the AI estimate back to Jira.
-- **Write scope**: The only modification this skill makes to Jira is saving time estimates on items that have none. Never create, delete, move, or change status of any Jira issues.
+- **Effort estimation**: Use existing Jira time estimates when present. Only estimate when no estimate exists, and emit one of the six values 0.25, 0.5, 1, 2, 3, 5 days — nothing between and nothing above.
+- **Write scope**: The skill is read-only by default. The only modification it can ever make to Jira is saving time estimates on items that have none, and only when the user passed `--write-estimates`. Never create, delete, move, or change status of any Jira issues.
 - **Timeout**: Set 15 second timeout on jira commands. If a command hangs, it may be misconfigured.
 - **Link format**: Always use the server URL from the Jira config file, not a hardcoded URL.
 - **Grouping flexibility**: The ~3-day target is approximate. Groups of 2-4 days are acceptable. Prefer logical grouping (related items together) over exact day counts when items are thematically related.
