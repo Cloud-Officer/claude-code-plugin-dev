@@ -22,6 +22,7 @@ Use `TodoWrite` to track each phase below. Mark `in_progress` on entry, `complet
 6. Existing doc structure validated
 7. Report generated
 8. Doc written/updated (if approved)
+9. Linters run
 
 **Evidence rule:** Every check must record (a) what the doc claims, (b) what the code shows (file:function), (c) MATCH / MISMATCH / MISSING. Bare "PASS" without code evidence is invalid.
 
@@ -178,7 +179,7 @@ Run only the sub-phases matching the project type. Record exact counts and file:
 - Python: `find . -name "__init__.py" -not -path "*/venv/*" -not -path "*/.venv/*"` → take parent dirs.
 - Node/TypeScript: `package.json` `main`/`exports`; `src/`, `lib/`.
 - Go: parent dirs of `*.go` (excluding `vendor/`).
-- Rust: parent dirs of `Cargo.toml`.
+- Rust: crate roots (`src/lib.rs`, `src/main.rs`) plus the `mod` declarations they pull in — each `src/**/*.rs` and `mod.rs` is a module. `Cargo.toml` marks crates, not modules.
 
 For each module, extract docstring (head of `__init__.py`), exported symbols (`^class`, `^def`, `export`, `func [A-Z]`).
 
@@ -193,9 +194,15 @@ cat docs/soup.json soup.json 2>/dev/null
 
 Extract dependency lists from lock files: `poetry.lock`, `requirements.txt`, `package.json`, `Gemfile.lock`, `go.mod`, `Cargo.lock`.
 
+Collect every import/require/use site in ONE repo-wide pass, then match those sites against the package list in memory. Never grep once per package — that exhausts context before the review finishes.
+
+```bash
+grep -rnE "^[[:space:]]*(import|from|use|require)[[:space:](]" --include="*.py" --include="*.js" --include="*.ts" --include="*.rb" --include="*.go" --include="*.rs" . | grep -v node_modules | grep -v venv
+```
+
 For **every** package in `soup.json` (not a sample), validate three fields:
 
-1. **Requirements** — does the stated purpose match how the package is actually used? Use `grep -rn "require.*{pkg}\|import.*{pkg}\|from {pkg}\|use {pkg}" --include="*.py" --include="*.js" --include="*.ts" --include="*.rb" --include="*.go" --include="*.rs" .` to find actual usage, then compare:
+1. **Requirements** — does the stated purpose match the usage sites collected above?
 
    - BAD: AWS SDK with Requirements "image processing"
    - GOOD: AWS SDK with Requirements "Cloud infrastructure API access"
