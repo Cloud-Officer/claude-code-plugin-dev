@@ -325,7 +325,7 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 
    1. **Bug fixes need a regression test that fails before the fix and passes after** — run it both ways and state that you confirmed both.
 
-   2. **Paste the runner's own pass marker** — `** TEST SUCCEEDED **` / `Test Suite '...' passed` (Xcode), `0 failures` (rspec), `N passed` (pytest), `ok` (go) — not a paraphrased "tests pass". Never claim tests pass when you did not run them. The "can't run it locally" excuse is narrow: only the genuine absence of infrastructure on this machine (live external services, physical hardware) qualifies; say so explicitly and describe how you mitigated it.
+   2. **Paste the runner's own pass marker** — `** TEST SUCCEEDED **` / `Test Suite '...' passed` (Xcode), `0 failures` (rspec), `N passed` (pytest), `ok` (go) — not a paraphrased "tests pass". Never claim tests pass when you did not run them. The "can't run it locally" excuse is narrow: on macOS, `swift test` and `xcodebuild test` against the iOS Simulator DO run locally — a slow build or a missing `-scheme` is not a reason to skip, find the scheme and run it. Only the genuine absence of infrastructure on this machine (live external services, physical hardware) qualifies; say so explicitly and describe how you mitigated it.
 
    3. **No-test exception — narrow and explicit.** A few change types have no unit-testable logic: pure copy/i18n, static assets, formatting-only changes, config/docs, or generated files. Only then may you skip tests, and you must tell the user **which** category applies and why. "It's hard to test" is not a valid reason — ask the user for guidance instead of skipping.
 
