@@ -147,6 +147,7 @@ const STRESS_SCHEMA = {
     },
     translation_preview: { type: 'string' },         // short excerpt showing the port, for the human to eyeball
     confidence: { type: 'integer' },                 // 0-100 that the rulebook is ready for full scale
+    notes: { type: 'string' },                       // caveats — e.g. only part of the rulebook could be read
   },
   required: ['file', 'systemic_issues'],
 }
@@ -285,6 +286,9 @@ if (mode === 'plan') {
     '   - what to do when there is NO clean equivalent (the escalation rule: flag with `TODO(migrate): …`)',
     '   - a short "DO NOT" list of tempting-but-wrong translations',
     '   Write it so a smaller model can follow it mechanically on one file at a time.',
+    '   WRITE this rulebook to ' + rulebookPath + ' (create the directory if needed) as well as returning it in',
+    '   `rulebook_markdown` — byte-for-byte the same text. The stress test reads it from that file, so anything',
+    '   you leave out of the file is invisible to it.',
     '',
     '2. DEPENDENCY ORDER (`dependency_order`) — every in-scope source file with its intended target path and',
     '   its in-scope dependencies. Order LEAVES FIRST (files that depend on nothing in scope come first), so',
@@ -309,15 +313,16 @@ if (mode === 'plan') {
 
   phase('StressTest')
   log('Stress-testing the rulebook on ' + sample.length + ' representative file(s) before committing to full scale.')
+  log('The stress agents read the draft rulebook from ' + rulebookPath + ', where the foundation agent wrote it.')
 
   const stress = (await parallel(sample.map(file => () => agent([
     'You are stress-testing a DRAFT migration rulebook by translating ONE representative file end to end.',
     CONTEXT,
     '',
-    'Draft rulebook (not yet written to disk — treat this text as the rulebook):',
-    '"""',
-    String(foundation.rulebook_markdown || '').slice(0, 12000),
-    '"""',
+    'The draft rulebook is on disk at ' + rulebookPath + '. READ IT IN FULL — all of it, including the tail —',
+    'before you translate anything; it is the rulebook under test. If you end up with only part of it (the file',
+    'is long, missing, or empty), say so in `notes` and do NOT report the parts you did not read as rulebook',
+    'gaps — a gap you cannot tell apart from an unread section is not a finding.',
     '',
     'File to translate as a trial: ' + file,
     '',
@@ -332,6 +337,9 @@ if (mode === 'plan') {
   const allIssues = stress.flatMap(s => (s.systemic_issues || []).map(i => ({ ...i, file: s.file })))
   const minConfidence = stress.length ? Math.min(...stress.map(s => (typeof s.confidence === 'number' ? s.confidence : 50))) : 0
   log('Stress-test surfaced ' + allIssues.length + ' systemic rule gap(s); lowest readiness confidence ' + minConfidence + '/100.')
+  for (const s of stress) {
+    if (s.notes) log('Stress caveat (' + (s.file || 'sample') + '): ' + s.notes)
+  }
 
   return {
     mode,
