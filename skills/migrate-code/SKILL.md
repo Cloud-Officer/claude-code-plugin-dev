@@ -164,6 +164,7 @@ Operate on the workflow's return value. **Pre-report verification:** confirm the
 - **Lint & coverage backfill (Step 4.5)** — the `run-linters` outcome (clean / fixed / remaining), whether the suite was re-run after autofixes, and, if `write-tests` ran, the coverage numbers and its pass marker.
 - **Blocked & needs-human files** — list them with reasons; these need the user's attention.
 - **Behavioral mismatches** — every `verify` item with `verdict: "mismatch"`, quoting the source-vs-port evidence, sorted by severity. These are the highest-priority follow-ups.
+- **Verification coverage** — state how many ported files were adversarially verified out of how many were ported, and name what the `capped` counts deferred: unverified files (selected by TODO marker count, so a clean-looking file can be skipped entirely), plus any error groups or failing tests the per-round caps dropped. Unverified is not verified — never let the mismatch list read as a full sweep.
 - **Outstanding TODO(migrate) markers** — remind the user to grep for them: `grep -rn "TODO(migrate)" <scope>`.
 - **Rule gaps** — the deduped `rule_gaps`, framed as rulebook amendments to apply before a re-run.
 
