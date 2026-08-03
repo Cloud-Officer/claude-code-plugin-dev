@@ -1,7 +1,7 @@
 ---
 name: review-design
 description: Review, compare, audit, or check UI code against Figma designs. Use when the user wants to compare code to a Figma design, check design implementation, audit UI fidelity, verify design compliance, or review design-to-code accuracy. Supports Android (Jetpack Compose, XML layouts), iOS (SwiftUI, UIKit), and web (HTML/CSS, React, Vue, Angular) platforms.
-allowed-tools: Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Glob, Grep, mcp__figma__get_design_context, mcp__figma__get_screenshot, mcp__figma__search_design_system, mcp__figma__get_metadata, mcp__figma__get_variable_defs, mcp__figma__get_code_connect_map, mcp__figma__get_code_connect_suggestions
+allowed-tools: Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Glob, Grep, Skill, mcp__figma__get_design_context, mcp__figma__get_screenshot, mcp__figma__search_design_system, mcp__figma__get_metadata, mcp__figma__get_variable_defs, mcp__figma__get_code_connect_map, mcp__figma__get_code_connect_suggestions
 ---
 
 # Review Design Implementation

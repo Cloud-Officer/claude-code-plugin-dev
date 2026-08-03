@@ -1,7 +1,7 @@
 ---
 name: review-copy
 description: Review, audit, or improve user-facing copy — UI microcopy (error messages, empty states, confirmation dialogs, loading states, buttons/CTAs), form labels and help text, voice/tone consistency, i18n readiness, and marketing copy. Use when the user wants a copy review, to check or fix UI text, audit microcopy, improve error messages or empty states, tighten button/CTA wording, review form help text, check inclusive/plain language, find hardcoded strings, or review landing-page/marketing copy. Audits a codebase (optionally a path or the current diff) and writes docs/copy-review.md.
-allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, WebSearch, AskUserQuestion, Skill, mcp__github__get_file_contents
+allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, WebSearch, AskUserQuestion, Skill, mcp__github__get_file_contents
 ---
 
 # Review Copy
@@ -12,7 +12,7 @@ This is primarily a **review** skill (find issues, propose fixes, apply on appro
 
 ## Phase Tracking
 
-Use `TaskCreate` to track each phase. Mark `in_progress` on entry, `completed` when recorded. Do NOT include the task list in the final output.
+Use `TodoWrite` to track each phase. Mark `in_progress` on entry, `completed` when recorded. Do NOT include the task list in the final output.
 
 **Required phases:**
 

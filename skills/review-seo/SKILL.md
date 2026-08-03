@@ -1,7 +1,7 @@
 ---
 name: review-seo
 description: Review, audit, or check SEO, GEO (AI answer-engine / generative-engine optimization), and front-end web quality (performance, Core Web Vitals, accessibility). Use when the user wants an SEO audit, technical SEO check, GEO/AEO audit, AI-search optimization, llms.txt review, structured-data/schema check, meta-tag/Open-Graph audit, sitemap or robots.txt review, crawlability analysis, a Lighthouse or web-quality audit, a performance or Core Web Vitals (LCP/INP/CLS) review, or an accessibility (WCAG) audit. Audits a codebase and/or a live site URL (usually production) and writes docs/seo-audit.md.
-allowed-tools: Bash(curl:*), Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, WebSearch, WebFetch, AskUserQuestion, Skill, mcp__fetch__fetch, mcp__github__get_file_contents, mcp__chrome-devtools__*
+allowed-tools: Bash(curl:*), Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, WebSearch, WebFetch, AskUserQuestion, Skill, mcp__fetch__fetch, mcp__github__get_file_contents, mcp__chrome-devtools__*
 ---
 
 # Review SEO & GEO
@@ -12,7 +12,7 @@ Works against a **codebase**, a **live URL** (usually production), or **both** â
 
 ## Phase Tracking
 
-Use `TaskCreate` to track each phase. Mark `in_progress` on entry, `completed` when results are recorded. Do NOT include the task list in the final output.
+Use `TodoWrite` to track each phase. Mark `in_progress` on entry, `completed` when results are recorded. Do NOT include the task list in the final output.
 
 **Required phases:**
 

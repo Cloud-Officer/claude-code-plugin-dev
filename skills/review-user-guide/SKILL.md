@@ -1,7 +1,7 @@
 ---
 name: review-user-guide
 description: Review, create, update, check, write, or audit the user guide (docs/user-guide.md). Use when the user wants to write a user guide, write user docs, create user documentation, review the user guide, check the user guide, update user documentation, or document the product for end users.
-allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, WebSearch, mcp__github__get_file_contents, mcp__fetch__fetch, mcp__context7__resolve-library-id, mcp__context7__query-docs
+allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, WebSearch, Skill, mcp__github__get_file_contents, mcp__fetch__fetch, mcp__context7__resolve-library-id, mcp__context7__query-docs
 ---
 
 # Review User Guide Documentation
@@ -10,7 +10,7 @@ Review or create `docs/user-guide.md` from an end-user perspective. Works for al
 
 ## Phase Tracking
 
-Use `TaskCreate` to track progress: one task per phase below. Mark `in_progress` when starting, `completed` when results are recorded. Do NOT include the task list in the final output — it's internal tracking.
+Use `TodoWrite` to track progress: one task per phase below. Mark `in_progress` when starting, `completed` when results are recorded. Do NOT include the task list in the final output — it's internal tracking.
 
 **Required phases:**
 
