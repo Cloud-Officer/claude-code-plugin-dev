@@ -432,6 +432,7 @@ log('Translated ' + portedOk.length + '/' + files.length + '  ·  ' + blocked.le
 // clean or the round budget is spent.
 phase('Compile')
 const compileRuleGaps = []
+let droppedErrorGroups = 0
 let build = { ran: false, clean: false, summary: 'no build command provided' }
 
 if (!buildCmd) {
@@ -453,8 +454,13 @@ if (!buildCmd) {
     if (!build) { build = { ran: false, clean: false, summary: 'build agent returned nothing' }; break }
     if (build.clean) { log('Build clean after ' + round + ' round(s).'); break }
 
-    const groups = (build.error_groups || []).slice(0, 12)
+    const allGroups = build.error_groups || []
+    const groups = allGroups.slice(0, 12)
     log('Compile round ' + round + ': ' + groups.length + ' error group(s) — dispatching fixers.')
+    if (allGroups.length > groups.length) {
+      droppedErrorGroups += allGroups.length - groups.length
+      log('Capped at 12 of ' + allGroups.length + ' error group(s) this round; ' + (allGroups.length - groups.length) + ' deferred to the next round.')
+    }
     if (!groups.length) break
 
     const fixes = (await parallel(groups.map(g => () => agent([
@@ -481,6 +487,7 @@ if (!buildCmd) {
 // fixers. The suite is the objective signal — an agent never declares "tests
 // pass" without the runner's own marker.
 phase('Test')
+let droppedTestFailures = 0
 let test = { ran: false, green: false, summary: 'no test command provided' }
 
 if (!testCmd) {
@@ -501,8 +508,13 @@ if (!testCmd) {
     if (!test) { test = { ran: false, green: false, summary: 'test agent returned nothing' }; break }
     if (test.green) { log('Test suite green after ' + tround + ' round(s).'); break }
 
-    const fails = (test.failures || []).slice(0, 12)
+    const allFails = test.failures || []
+    const fails = allFails.slice(0, 12)
     log('Test round ' + tround + ': ' + fails.length + ' failing test(s) — dispatching fixers.')
+    if (allFails.length > fails.length) {
+      droppedTestFailures += allFails.length - fails.length
+      log('Capped at 12 of ' + allFails.length + ' failing test(s) this round; ' + (allFails.length - fails.length) + ' deferred to the next round.')
+    }
     if (!fails.length) break
 
     const fixes = (await parallel(fails.map(fl => () => agent([
@@ -528,11 +540,13 @@ if (!testCmd) {
 // Adversarial behavioral check on the highest-risk ported files. Two reviewers
 // per file; if they disagree on the verdict, a third breaks the tie (2-of-3).
 phase('Verify')
-const verifyTargets = ported
+const verifyCandidates = ported
   .filter(p => p.status === 'ported')
   .sort((a, b) => (b.todo_count || 0) - (a.todo_count || 0))
-  .slice(0, Math.min(input.maxVerifyFiles || 24, ported.length))
+const verifyTargets = verifyCandidates.slice(0, Math.min(input.maxVerifyFiles || 24, ported.length))
+const droppedVerifyFiles = verifyCandidates.length - verifyTargets.length
 log('Adversarially verifying ' + verifyTargets.length + ' highest-risk ported file(s) for behavioral fidelity.')
+if (droppedVerifyFiles > 0) log('Capped at ' + verifyTargets.length + ' of ' + verifyCandidates.length + ' ported file(s) — ranked by TODO(migrate) marker count, so the ' + droppedVerifyFiles + ' with the fewest markers are never verified.')
 
 function verifyPrompt(p, lens) {
   return [
@@ -599,6 +613,12 @@ return {
     needs_human: needsHuman.length,
     todos: totalTodos,
     behavioral_mismatches: behavioralMismatches.length,
+  },
+  // What the per-phase caps dropped, so the report can say so instead of implying full coverage.
+  capped: {
+    error_groups: droppedErrorGroups,
+    test_failures: droppedTestFailures,
+    verify_files: droppedVerifyFiles,
   },
   translated: ported.map(p => ({
     source_file: p.source_file, target_file: p.target_file, status: p.status,
