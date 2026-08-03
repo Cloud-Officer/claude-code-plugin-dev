@@ -94,6 +94,7 @@ Store these values:
 - `repository`: The repository name
 - `visibility`: "public" or "private"
 - `description`: Repository description from GitHub
+- `default_branch`: The default branch name from the `git symbolic-ref` command above (e.g. `master`, `main`)
 - `has_build_yml`: true/false
 - `has_license`: true/false
 - `readme_file`: The existing README filename or "README.md" if creating new
@@ -227,6 +228,10 @@ grep "^## " README.md
 
 **No other H2 sections are allowed.** If additional H2 headings exist (e.g., `## Configuration`, `## API`, `## Deployment`, `## Testing`, `## Docker`, `## Troubleshooting`), flag them as issues and convert them to H3 subsections under the appropriate required H2 — typically `## Usage`.
 
+### Table of Contents
+
+`## Table of Contents` must be a nested list of anchor links to every other heading in the README — the four remaining H2 sections and their H3 subsections — in document order, with no entry that does not resolve to a heading. Regenerate it after any heading is added, renamed, or demoted from H2 to H3, so the demotions required above are reflected in the nesting.
+
 ## Step 4: Verify and Update Introduction Section
 
 The Introduction section must accurately describe the project.
@@ -299,7 +304,7 @@ The Installation section must contain accurate, working instructions.
 
 **Node.js:**
 
-```markdown
+````markdown
 ## Installation
 
 ### Prerequisites
@@ -309,17 +314,22 @@ The Installation section must contain accurate, working instructions.
 
 ### Install
 
-\`\`\`bash npm install {package-name} \`\`\`
+```bash
+npm install {package-name}
+```
 
 Or clone and install locally:
 
-\`\`\`bash git clone https://github.com/{org}/{repo}.git
-cd {repo} npm install \`\`\`
+```bash
+git clone https://github.com/{org}/{repo}.git
+cd {repo}
+npm install
 ```
+````
 
 **Python:**
 
-```markdown
+````markdown
 ## Installation
 
 ### Prerequisites
@@ -329,17 +339,22 @@ cd {repo} npm install \`\`\`
 
 ### Install from PyPI
 
-\`\`\`bash pip install {package-name} \`\`\`
+```bash
+pip install {package-name}
+```
 
 ### Install from source
 
-\`\`\`bash git clone https://github.com/{org}/{repo}.git
-cd {repo} pip install -e . \`\`\`
+```bash
+git clone https://github.com/{org}/{repo}.git
+cd {repo}
+pip install -e .
 ```
+````
 
 **Rust:**
 
-```markdown
+````markdown
 ## Installation
 
 ### Prerequisites
@@ -349,17 +364,22 @@ cd {repo} pip install -e . \`\`\`
 
 ### Install from crates.io
 
-\`\`\`bash cargo install {crate-name} \`\`\`
+```bash
+cargo install {crate-name}
+```
 
 ### Build from source
 
-\`\`\`bash git clone https://github.com/{org}/{repo}.git
-cd {repo} cargo build --release \`\`\`
+```bash
+git clone https://github.com/{org}/{repo}.git
+cd {repo}
+cargo build --release
 ```
+````
 
 **Go:**
 
-```markdown
+````markdown
 ## Installation
 
 ### Prerequisites
@@ -368,26 +388,29 @@ cd {repo} cargo build --release \`\`\`
 
 ### Install
 
-\`\`\`bash go install github.com/{org}/{repo}@latest \`\`\`
+```bash
+go install github.com/{org}/{repo}@latest
 ```
+````
 
 **Docker:**
 
-```markdown
+````markdown
 ## Installation
 
 ### Using Docker
 
-\`\`\`bash docker pull {image-name}
+```bash
+docker pull {image-name}
 
 # or build locally
-
-docker build -t {image-name} . \`\`\`
+docker build -t {image-name} .
 ```
+````
 
 **Makefile projects:**
 
-```markdown
+````markdown
 ## Installation
 
 ### Prerequisites
@@ -396,9 +419,13 @@ docker build -t {image-name} . \`\`\`
 
 ### Build and Install
 
-\`\`\`bash git clone https://github.com/{org}/{repo}.git
-cd {repo} make make install \`\`\`
+```bash
+git clone https://github.com/{org}/{repo}.git
+cd {repo}
+make
+make install
 ```
+````
 
 ## Step 6: Verify and Update Usage Section
 
@@ -451,62 +478,72 @@ grep -A 5 'console_scripts' setup.py 2>/dev/null
 
 **For CLI tools:**
 
-```markdown
+````markdown
 ## Usage
 
 ### Basic Usage
 
-\`\`\`bash {command} [options] <arguments>
-\`\`\`
+```bash
+{command} [options] <arguments>
+```
 
 ### Examples
 
 {Example 1 - most common use case}:
 
-\`\`\`bash {command} {args} \`\`\`
+```bash
+{command} {args}
+```
 
 {Example 2 - another common use case}:
 
-\`\`\`bash {command} {args} \`\`\`
+```bash
+{command} {args}
+```
 
 ### Options
 
 | Option | Description |
 |--------|-------------|
-| \`-h, --help\` | Show help |
-| \`{option}\` | {description} |
-```
+| `-h, --help` | Show help |
+| `{option}` | {description} |
+````
 
 **For libraries:**
 
-```markdown
+````markdown
 ## Usage
 
 ### Basic Usage
 
-\`\`\`{language} import {package}
+```{language}
+import {package}
 
 # Basic example
-
-{code example} \`\`\`
+{code example}
+```
 
 ### API Reference
 
-#### \`{function/class name}\`
+#### `{function/class name}`
 
 {Description}
 
-\`\`\`{language} {example} \`\`\`
+```{language}
+{example}
 ```
+````
 
 **For applications:**
 
-```markdown
+````markdown
 ## Usage
 
 ### Running the Application
 
-\`\`\`bash {start command} \`\`\`
+```bash
+{start command}
+```
 
 ### Configuration
 
@@ -516,8 +553,8 @@ grep -A 5 'console_scripts' setup.py 2>/dev/null
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | \`/api/...\` | {description} |
-```
+| GET | `/api/...` | {description} |
+````
 
 ## Step 7: Validate License and Contributing Sections
 
@@ -559,7 +596,7 @@ We love your input! We want to make contributing to this project as easy and tra
 
 Pull requests are the best way to propose changes to the codebase. We actively welcome your pull requests:
 
-1. Fork the repo and create your branch from `master`.
+1. Fork the repo and create your branch from `{default_branch}`.
 2. If you've added code that should be tested, add tests. Ensure the test suite passes.
 3. Update the documentation.
 4. Make sure your code lints.
@@ -591,7 +628,7 @@ We love your input! We want to make contributing to this project as easy and tra
 
 Pull requests are the best way to propose changes to the codebase. We actively welcome your pull requests:
 
-1. Create your branch from `master`.
+1. Create your branch from `{default_branch}`.
 2. If you've added code that should be tested, add tests. Ensure the test suite passes.
 3. Update the documentation.
 4. Make sure your code lints.
@@ -648,6 +685,7 @@ Before completing, verify:
 
 - [ ] H1 title matches expected format (with or without build badge)
 - [ ] Exactly 5 H2 sections present in correct order (no extra H2 sections)
+- [ ] Table of Contents links every other heading and matches the final heading levels
 - [ ] Introduction accurately describes the project
 - [ ] Installation instructions match actual project setup
 - [ ] Usage examples reflect real commands/APIs
