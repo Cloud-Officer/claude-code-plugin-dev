@@ -63,7 +63,17 @@ When the issue description or comments contain Figma URLs (`figma.com/design/...
 
 ## Single issue vs. multiple issues (mode select)
 
-Parse `<issue>` into a list of issue refs (split on whitespace and/or commas; e.g. `123 124 DEV-5` or `123, 124`). Count them:
+Parse `<issue>` into a list of issue refs (split on whitespace and/or commas; e.g. `123 124 DEV-5` or `123, 124`).
+
+**Validate every parsed ref before it goes any further.** A ref is either a GitHub issue number (`123`) or a Jira key (`PROJ-456`) — nothing else is a valid reference:
+
+```text
+^(?:\d+|[A-Za-z][A-Za-z0-9]*-\d+)$
+```
+
+Refs are spliced into the `git`, `gh`, and `jira` commands run further down (branch names, `gh issue view <issue>`, commit messages), so a ref that does not match is **rejected, never sanitised**: tell the user which ref was skipped and why, and carry on with the ones that matched. If nothing matches, stop and ask the user to restate the issues.
+
+Then count the surviving refs:
 
 - **One ref → sequential mode (default).** Run the full interactive workflow below (Steps 0–12) exactly as written. The clarifying-questions gate (Step 5) and architecture-choice gate (Step 6) need a human in the loop, so a single issue keeps the rich back-and-forth.
 - **Two or more refs → parallel mode.** Implement them concurrently via the workflow described in the next section, then open PR(s). Use parallel mode when the user passes a batch of issues — it is best for Bugs and well-specified Tasks. If any ref is a **Feature likely to need design discussion**, tell the user it is better done on its own in sequential mode, and offer to either implement it autonomously (the agent records its assumptions for review) or split it out.
