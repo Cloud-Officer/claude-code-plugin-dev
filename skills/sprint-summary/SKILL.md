@@ -1,6 +1,6 @@
 ---
 name: sprint-summary
-description: Summarize sprint work items grouped by repo and ~3-day blocks. Use when the user wants a sprint summary, sprint report, sprint overview, work summary, sprint breakdown, or wants to see what work is planned in a sprint. Fetches tasks and bugs from Jira (excludes stories), estimates effort from descriptions, and groups items into approximately 3-day work blocks per repository.
+description: Summarize sprint work items grouped by repo and ~3-day blocks. Use when the user wants a sprint summary, a sprint scope report or sprint scope overview broken into work blocks, work summary, sprint breakdown, or wants to see what work is planned in a sprint. Fetches tasks and bugs from Jira (excludes stories), estimates effort from descriptions, and groups items into approximately 3-day work blocks per repository.
 allowed-tools: Bash(jira:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(echo:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(xargs:*), Read, Write, mcp__atlassian__searchJiraIssuesUsingJql, mcp__atlassian__getJiraIssue, mcp__atlassian__editJiraIssue
 ---
 
