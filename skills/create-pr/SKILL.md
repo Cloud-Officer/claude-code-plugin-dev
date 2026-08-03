@@ -32,6 +32,8 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 echo "Default: $DEFAULT_BRANCH | Current: $CURRENT_BRANCH"
 ```
 
+**Every Bash call runs in a fresh shell, so these two values do not persist.** In every later snippet that references `$DEFAULT_BRANCH` or `$CURRENT_BRANCH`, prepend the two assignments above so they are re-derived in that same call. Without that they expand empty — `git push -u origin ""` and `git checkout ""` fail, and `git diff ...HEAD` silently reports no changes.
+
 **Step 1.2:** Get file change summary (THIS IS CRITICAL - you must see ALL files):
 
 ```bash
@@ -128,7 +130,8 @@ Prefer `mcp__github__create_pull_request` when the GitHub MCP server is availabl
 
 ```bash
 PR_URL=$(gh pr create --base "$DEFAULT_BRANCH" --head "$CURRENT_BRANCH" --title "<PR title from Step 2>" --body "<PR body from Step 2>")
-open "$PR_URL"
+echo "$PR_URL"
+open "$PR_URL" 2>/dev/null || true   # macOS only — a no-op elsewhere, never fatal
 ```
 
 If a PR already exists for `$CURRENT_BRANCH` (e.g., the caller already opened it), `gh pr create` will fail — treat that as success and continue to Step 7.
