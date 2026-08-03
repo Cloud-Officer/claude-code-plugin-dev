@@ -34,7 +34,7 @@ Detect per target directory (monorepos may mix stacks — resolve the stack of t
 | `Gemfile` / `*.gemspec` | Ruby | `grep rspec Gemfile*` → **RSpec** (specs in `spec/`); else **Minitest/Test::Unit** (`test/`). Feature/system → **Capybara**. Fixtures → **FactoryBot** if in the Gemfile. |
 | `composer.json` | PHP | `grep pestphp/pest` → **Pest**; `grep behat/behat` → **Behat** (`features/`); else **PHPUnit**. Laravel → run via `php artisan test`. Mocks → **Mockery**. |
 | `pyproject.toml` / `requirements*.txt` / `setup.py` | Python | `grep -ri pytest` → **pytest** (`tests/`); else **unittest**. Mocks → `unittest.mock`; fixtures → `factory_boy` if present; property → `hypothesis` if present. |
-| `package.json` | JS/TS | `grep '"vitest"'` → **Vitest**; `grep '"jest"'` → **Jest**; `grep react-native` → **Jest**. E2E → **Playwright** (`grep '@playwright')` else Cypress if present. Component → Testing-Library. |
+| `package.json` | JS/TS | `grep '"vitest"'` → **Vitest**; `grep '"jest"'` → **Jest**; `grep react-native` → **Jest**. E2E → **Playwright** (`grep '@playwright'`) else Cypress if present. Component → Testing-Library. |
 | `*.csproj` / `*.sln` | C#/.NET | `grep -ri xunit` → **xUnit**; `grep -ri nunit` → **NUnit**; `grep -ri mstest` → **MSTest**. Assertions → FluentAssertions if referenced; mocks → Moq/NSubstitute. |
 | `Package.swift` / `*.xcodeproj` / `*.xcworkspace` | Swift | `grep -rl "import Testing"` → **Swift Testing** for unit; else **XCTest**. UI → **XCUITest** (always XCTest). |
 | `build.gradle(.kts)` / `settings.gradle` | Kotlin/Java | `grep -ri kotest` → **Kotest**; else **JUnit 5** (or JUnit4 if that's what's wired). Mocks → **MockK** (Kotlin) / Mockito (Java). Android UI → `composeTestRule` (Compose) or **Espresso** (Views). Flows → Turbine. |
@@ -108,7 +108,7 @@ For a bug fix, write the regression test **first**, confirm it fails against the
 
 ## Step 5: Run and iterate to green
 
-Run the suite (narrowly — just the new/affected tests first), read failures, fix, repeat until green. Then run coverage if quick.
+Run the suite (narrowly — just the new/affected tests first), read failures, fix, repeat until green. Then measure coverage — Step 6 is mandatory; only its scope is negotiable, so run it on the changed files first.
 
 | Language | Run (narrow → full) | Coverage |
 | --- | --- | --- |
@@ -118,7 +118,7 @@ Run the suite (narrowly — just the new/affected tests first), read failures, f
 | PHP (PHPUnit) | `./vendor/bin/phpunit --filter Name` → `php artisan test` | `--coverage-text` |
 | PHP (Behat) | `./vendor/bin/behat features/x.feature` | n/a |
 | Python (pytest) | `pytest path::test_name` → `pytest` | `pytest --cov=pkg` |
-| Python (unittest) | `python -m unittest module.Class.test` | `coverage run -m pytest && coverage report` |
+| Python (unittest) | `python -m unittest module.Class.test` | `coverage run -m unittest discover && coverage report` |
 | JS/TS (Vitest) | `npx vitest run path` → `npx vitest run` | `npx vitest run --coverage` |
 | JS/TS (Jest) | `npx jest path -t "name"` → `npx jest` | `npx jest --coverage` |
 | JS/TS (Playwright) | `npx playwright test path` | `--reporter=html` |
