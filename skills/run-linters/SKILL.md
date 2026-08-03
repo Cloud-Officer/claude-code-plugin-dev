@@ -168,16 +168,21 @@ echo "${HOME}/.local/bin:${PATH}"
 if [ "${CURRENT_BRANCH}" != "${MASTER_BRANCH}" ]; then
 ```
 
-### SL0002: Use `==` instead of `=` for string comparison
+### SL0002: Use `==` instead of `=` for string comparison — inside `[[ ]]` only
 
-In `[` and `[[` test expressions, use `==` for string equality, not `=`.
+In `[[ ]]` test expressions, use `==` for string equality, not `=`.
+
+Inside single-bracket `[ ]`, keep `=`. `==` is not POSIX there: shellcheck reports SC3014 and dash fails at runtime with `test: ==: unexpected operator`. Never rewrite `=` to `==` in a `#!/bin/sh` script.
 
 ```bash
 # Bad
-if [ "${CONFIGURATION}" = "Debug" ]; then
+if [[ "${CONFIGURATION}" = "Debug" ]]; then
 
 # Good
-if [ "${CONFIGURATION}" == "Debug" ]; then
+if [[ "${CONFIGURATION}" == "Debug" ]]; then
+
+# Also correct - leave as is
+if [ "${CONFIGURATION}" = "Debug" ]; then
 ```
 
 ### General Shell Script Fixes
