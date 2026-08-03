@@ -151,7 +151,7 @@ Within each repository group, organize items into blocks of approximately 3 work
    - **Staging/QA only**: features needing validation before production
    - **No deployment**: documentation, evaluations, reports, test strategy, planning, CI-only changes
 2. **Never mix delivery targets in the same group**. Items that deploy to production must not be grouped with items that don't. This ensures each group has a clear, unambiguous delivery line.
-3. **Sort items by estimated effort** (largest first) within each delivery target
+3. **Sort items by estimated effort** within each delivery target: largest first, ties broken by issue key ascending
 4. **Create groups using bin-packing**:
    - If a single item is 3+ days, it becomes its own group
    - Otherwise, combine smaller items of the same delivery target until the group totals approximately 3 days (2.5 - 3.5 range is acceptable)
@@ -176,6 +176,7 @@ Output the report in this exact format:
 
 ### Formatting Rules
 
+- Repository groups appear in alphabetical order by normalized group name
 - Group titles are numbered sequentially starting at 1 across the entire report (not per repo)
 - Bullets are indented (3 spaces) under the group title so they appear nested one level below the numbered heading
 - No blank line between the group title and the first bullet
@@ -258,5 +259,5 @@ Use the Jira item status (e.g., "In Code Review", "In Progress", "Done") and des
 - **Write scope**: The skill is read-only by default. The only modification it can ever make to Jira is saving time estimates on items that have none, and only when the user passed `--write-estimates`. Never create, delete, move, or change status of any Jira issues.
 - **Timeout**: Set 15 second timeout on jira commands. If a command hangs, it may be misconfigured.
 - **Link format**: Always use the server URL from the Jira config file, not a hardcoded URL.
-- **Grouping flexibility**: The ~3-day target is approximate. Groups of 2-4 days are acceptable. Prefer logical grouping (related items together) over exact day counts when items are thematically related.
+- **Grouping flexibility**: A multi-item group must total 2.5 - 3.5 days; only a single item of 3+ days may stand outside that range. Group thematically related items together when doing so keeps the group inside that range.
 - **Plain descriptions**: Rephrase Jira summaries into clear, readable descriptions. Remove bracket prefixes, ticket-speak, and jargon.
