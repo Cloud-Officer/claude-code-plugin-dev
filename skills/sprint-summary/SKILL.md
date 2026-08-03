@@ -48,12 +48,14 @@ This skill uses MCP tools when available and falls back gracefully if they are u
 1. **Determine the sprint**: The user provides a sprint ID or name. If not provided, use the current active sprint:
 
    ```bash
-   jira sprint list --state active --table --plain --no-headers --columns ID,NAME
+   jira sprint list --state active --table --plain --no-headers --columns ID,NAME,START,END
    ```
 
    If multiple active sprints exist, ask the user which one to use.
 
-2. **Extract the Jira server URL** for building browse links — prefer the env var, fall back to the jira-cli config (path varies by platform):
+2. **Record the sprint's start and end dates.** Step 7 derives capacity from them, so never assume a sprint length. When the user named a specific sprint, drop `--state active` from the command above and take the row whose ID matches.
+
+3. **Extract the Jira server URL** for building browse links — prefer the env var, fall back to the jira-cli config (path varies by platform):
 
    ```bash
    JIRA_SERVER="${JIRA_URL:-$(grep -h '^server:' \
@@ -215,12 +217,14 @@ Use the Jira item status (e.g., "In Code Review", "In Progress", "Done") and des
 3. At the end, add a brief stats line:
 
    ```text
-   Sprint: <sprint name> | <total items> items | ~<total estimated days> days of work | ~<FTE> full-time developers
+   Sprint: <sprint name> | <sprint working days> working days x 0.8 = <effective days> effective days per developer | <total items> items | ~<total estimated days> days of work | ~<FTE> full-time developers
    ```
 
-   **FTE calculation**: Assume a 1-month sprint with developers loaded at 80%. That gives 20 working days x 0.8 = 16 effective days per developer. Divide total estimated days by 16 and round to one decimal. Example: 106 days / 16 = ~6.6 full-time developers.
+   **Capacity**: `sprint working days` = Mon-Fri within `[sprint start, sprint end]` from Step 1. `effective days` = that count x 0.8 (developers are loaded at 80%). **FTE** = total estimated days / effective days, rounded to one decimal. Example: a 10-working-day sprint gives 8 effective days, so 53 days of work = ~6.6 full-time developers.
 
-4. After the stats line, add a **per-person load breakdown** table. Sum the estimated days for all items assigned to each person and compare against the 16 effective days capacity:
+   If the sprint dates could not be resolved, fall back to 16 effective days and say so in the stats line: `... | 16 effective days per developer (sprint dates unavailable, 1-month sprint assumed) | ...`.
+
+4. After the stats line, add a **per-person load breakdown** table. Sum the estimated days for all items assigned to each person and compare against the effective days capacity (the example below uses 16):
 
    ```text
    | Assignee | Est. Days | Load | Status |
@@ -231,7 +235,7 @@ Use the Jira item status (e.g., "In Code Review", "In Progress", "Done") and des
    | Unassigned | 8.0     | -    | -      |
    ```
 
-   **Load calculation**: `(estimated days / 16) x 100`, rounded to nearest percent.
+   **Load calculation**: `(estimated days / effective days) x 100`, rounded to nearest percent — the same `effective days` used for the FTE line, never a hardcoded 16.
 
    **Status icons**:
    - `OK` (70%-100% load) — properly loaded
