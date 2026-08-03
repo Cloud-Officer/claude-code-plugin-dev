@@ -1,7 +1,7 @@
 ---
 name: create-issue
 description: Create, open, file, or report an issue, bug, or ticket in GitHub or Jira. Use when the user wants to open an issue, file a bug, report a bug, create a ticket, log an issue, or submit a bug report. Automatically detects if GitHub issues are enabled; if so creates a GitHub issue, otherwise creates a Jira issue.
-allowed-tools: Bash(gh:*), Bash(jira:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, mcp__github__create_issue, mcp__github__list_issues, mcp__github__search_issues, mcp__github__get_issue, mcp__github__add_issue_comment, mcp__atlassian__createJiraIssue, mcp__atlassian__getJiraIssueTypeMetaWithFields, mcp__atlassian__getJiraProjectIssueTypesMetadata, mcp__atlassian__getVisibleJiraProjects
+allowed-tools: Bash(gh:*), Bash(jira:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(rm:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, mcp__github__create_issue, mcp__github__list_issues, mcp__github__search_issues, mcp__github__get_issue, mcp__github__add_issue_comment, mcp__atlassian__createJiraIssue, mcp__atlassian__getJiraIssueTypeMetaWithFields, mcp__atlassian__getJiraProjectIssueTypesMetadata, mcp__atlassian__getVisibleJiraProjects
 ---
 
 # Create Issue
@@ -105,7 +105,7 @@ If GitHub issues are disabled, create a Jira issue. **Prefer `mcp__atlassian__cr
 
 Use the appropriate template based on issue type (see Templates section below).
 
-**Note:** This file will be deleted after the command runs.
+**Note:** This file is deleted in Step 2c.
 
 ### Step 2b: Run jira command
 
@@ -115,10 +115,18 @@ jira issue create --no-input \
   --priority "<PRIORITY>" \
   --label "<LABEL>" \
   --summary "[<REPO-NAME>] <SUMMARY>" \
-  --template issue-body.md && rm issue-body.md
+  --template issue-body.md
 ```
 
 Add `--assignee "<username>"` if user specified an assignee.
+
+### Step 2c: Delete the temp file
+
+Whichever path you took, remove the temp file once the issue exists — as its own command, never chained onto the create command:
+
+```bash
+rm issue-body.md
+```
 
 ---
 
