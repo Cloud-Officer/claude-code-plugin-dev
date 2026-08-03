@@ -27,11 +27,15 @@ const repoContext = input.repoContext || {}
 const scope = input.scope || 'the whole repository'
 
 // --- Per-severity confidence thresholds (Phase 3.5) ------------------------
-// IMPORTANT: the validator scores on the anchor grid 0/25/50/75/100 (see
-// buildVerifyPrompt). Thresholds MUST land ON those anchors — a threshold of
-// 65 silently rounds a "50 = verified real but minor" finding up into the
-// reject bucket, which is why the main report used to come back empty while
-// the appendix filled up. Keep every value in {25, 50, 75}.
+// IMPORTANT: the validator scores on the anchor grid 0/25/50/75/100. That grid
+// is not an assumption — it is enforced twice: buildVerifyPrompt instructs the
+// validator to output exactly one anchor, and VERDICT_SCHEMA pins
+// confidence_score to enum [0, 25, 50, 75, 100] so an off-grid value fails
+// validation instead of being silently mis-bucketed here. Thresholds MUST land
+// ON those anchors — a threshold of 65 silently rounds a "50 = verified real
+// but minor" finding up into the reject bucket, which is why the main report
+// used to come back empty while the appendix filled up. Keep every value in
+// {25, 50, 75}.
 // Critical/High survive at lower confidence (cost of a miss is high); Low/Info
 // need a higher bar so stochastic re-runs stay deterministic.
 const SEV_THRESHOLDS = { critical: 25, high: 50, medium: 50, low: 50, info: 75 }
@@ -563,8 +567,9 @@ function buildVerifyPrompt(findings) {
     'context, or it would not be re-flagged on a second read. Being unable to open the file in a batched pass is NOT grounds to',
     'reject — cap the confidence at 50 instead. CONFIRM if the checks fail to disprove the finding.',
     '',
-    'Confidence score (CONFIRMs only): output ANY integer 0-100 and interpolate between these anchors — do NOT snap only to',
-    'the round numbers. 0 = false positive / pre-existing; 25 = might be real but unverified or purely stylistic;',
+    'Confidence score (CONFIRMs only): output EXACTLY one of 0, 25, 50, 75, 100. Do not interpolate;',
+    'pick the nearest anchor and justify the choice in confidence_rationale.',
+    '0 = false positive / pre-existing; 25 = might be real but unverified or purely stylistic;',
     '50 = verified real but minor/rare; 75 = double-checked, real, likely to be hit, OR explicitly violates a project convention;',
     '100 = certain, evidence directly confirms it, will happen frequently. REJECTED = 0. CONFIRMED must score >= 25.',
     '',
@@ -635,7 +640,7 @@ const VERDICT_SCHEMA = {
         properties: {
           finding_id: { type: 'string' },
           decision: { type: 'string', enum: ['REJECT', 'CONFIRM'] },
-          confidence_score: { type: 'integer' },
+          confidence_score: { type: 'integer', enum: [0, 25, 50, 75, 100] },
           code_quoted: { type: 'string' },
           mitigating_factors_found: { type: 'array', items: { type: 'string' } },
           repo_settings_checked: { type: 'array', items: { type: 'string' } },
