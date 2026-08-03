@@ -137,6 +137,7 @@ Look for:
 - Soft-delete patterns (`deleted_at`, `is_deleted`).
 - Multi-tenancy patterns (`tenant_id`, `organization_id`).
 - **BI dashboards, report generators, analytics endpoints** — capture common business questions and the tables/joins/filters used. These become the "Common Business Questions" section.
+- **Domain terms** — the words the business uses that do not map 1:1 to a table or column name (e.g. "Buyer", "Active user", "Revenue"), found in those same constants, enums, validation rules, dashboards and comments. Record each term with its definition and the tables/columns/filters that express it. These become the "Business Definitions" section.
 
 ### Step 5 — Generate initial `docs/db.md` draft
 
@@ -201,6 +202,8 @@ Use safe sampling depending on table size:
 
 **Common Business Questions** — from Step 4's BI/dashboard scan, document recurring analytics questions with the correct tables/joins/filters. Helps `query-db` users avoid common mistakes.
 
+**Business Definitions** — from Step 4's domain-term scan, document each real term with its definition and the tables/columns/filters that express it. Only terms you actually found; never invent a definition. `query-db` reads this section to interpret business vocabulary, so an empty or missing section makes it guess.
+
 **Add row/document counts** to listings, **replace enum guesses with actual values + counts**, **document actual indexes**, **add date ranges**.
 
 **"Last verified" line at top of `docs/db.md`:**
@@ -222,16 +225,17 @@ Required sections, in order:
 4. **Database Overview** — one paragraph on what data this system holds.
 5. **All Tables** — single table listing **every** table: `Table | Purpose | Key Fields for Filtering/Grouping | Rows`.
 6. **Field Mappings & Enums** — `Table.Field | Value | Meaning | Count`.
-7. **Relationships** — `parent.fk → child.pk` arrows.
-8. **Date/Time Fields** — `Table.Field | Purpose | Notes` (TZ, granularity).
-9. **Money/Numeric Fields** — `Table.Field | Unit | Notes` (e.g. cents, divide by 100).
-10. **Soft Deletes** — list tables using `deleted_at`/`is_deleted`; remind to add `WHERE deleted_at IS NULL`.
-11. **Multi-Tenancy** — note tenant isolation columns if applicable (`organization_id`, `tenant_id`).
-12. **Framework / Infrastructure Tables** — migration tracking, sessions, queues, cache (still listed in All Tables; this section explains them).
-13. **Large Table Warnings** — `Table | Rows | Required Safeguards`.
-14. **Query Anti-Patterns** — `# | Anti-Pattern | Why It's Bad | Do Instead`. Standard rows: `SELECT *` without WHERE on large tables; unbounded `COUNT(*)`; unfiltered JOIN between large tables; `GROUP BY` on non-indexed columns; ignoring denormalized analytics tables.
-15. **Common Business Questions** — `# | Question | Tables Involved | Key Filters` (from Step 4 BI scan).
-16. **Common Query Patterns** — fenced SQL examples (e.g. Daily Order Summary with date filter + `deleted_at IS NULL`).
+7. **Business Definitions** — `Term | Definition | How it is expressed in the schema` (e.g. "Buyer", "Active user", "Revenue"): the domain vocabulary a query author must get right, with the tables, columns and filters that actually express each term.
+8. **Relationships** — `parent.fk → child.pk` arrows.
+9. **Date/Time Fields** — `Table.Field | Purpose | Notes` (TZ, granularity).
+10. **Money/Numeric Fields** — `Table.Field | Unit | Notes` (e.g. cents, divide by 100).
+11. **Soft Deletes** — list tables using `deleted_at`/`is_deleted`; remind to add `WHERE deleted_at IS NULL`.
+12. **Multi-Tenancy** — note tenant isolation columns if applicable (`organization_id`, `tenant_id`).
+13. **Framework / Infrastructure Tables** — migration tracking, sessions, queues, cache (still listed in All Tables; this section explains them).
+14. **Large Table Warnings** — `Table | Rows | Required Safeguards`.
+15. **Query Anti-Patterns** — `# | Anti-Pattern | Why It's Bad | Do Instead`. Standard rows: `SELECT *` without WHERE on large tables; unbounded `COUNT(*)`; unfiltered JOIN between large tables; `GROUP BY` on non-indexed columns; ignoring denormalized analytics tables.
+16. **Common Business Questions** — `# | Question | Tables Involved | Key Filters` (from Step 4 BI scan).
+17. **Common Query Patterns** — fenced SQL examples (e.g. Daily Order Summary with date filter + `deleted_at IS NULL`).
 
 ### MongoDB
 
@@ -243,12 +247,13 @@ Required sections:
 4. **Database Overview**.
 5. **All Collections** — `Collection | Purpose | Key Fields for Filtering/Grouping | Document Count`.
 6. **Field Mappings & Enums** — `Collection.Field | Value | Meaning`.
-7. **References (Relationships)** — `coll.fkField → otherColl._id`.
-8. **Embedded Documents** — `Collection | Embedded Field | Structure`.
-9. **Date Fields** — `Collection.Field | Purpose`.
-10. **Indexes** — important indexes for query optimization.
-11. **Query Anti-Patterns** — standard rows: unbounded `find({})`; `$lookup` between large collections without `$match` first; large `allowDiskUse` aggregations without `$match`.
-12. **Common Aggregation Patterns** — fenced JS examples (e.g. Daily Revenue with `$match` first).
+7. **Business Definitions** — `Term | Definition | How it is expressed in the schema` (e.g. "Buyer", "Active user", "Revenue"): the domain vocabulary a query author must get right, with the collections, fields and `$match` filters that actually express each term.
+8. **References (Relationships)** — `coll.fkField → otherColl._id`.
+9. **Embedded Documents** — `Collection | Embedded Field | Structure`.
+10. **Date Fields** — `Collection.Field | Purpose`.
+11. **Indexes** — important indexes for query optimization.
+12. **Query Anti-Patterns** — standard rows: unbounded `find({})`; `$lookup` between large collections without `$match` first; large `allowDiskUse` aggregations without `$match`.
+13. **Common Aggregation Patterns** — fenced JS examples (e.g. Daily Revenue with `$match` first).
 
 ### Elasticsearch
 
@@ -288,14 +293,15 @@ Required sections:
 3. **Datasets** — `Dataset | Period | Description`.
 4. **All Tables (per dataset)** — `Table | Purpose | Key Fields | Rows`. Note any datasets with differing schemas.
 5. **Field Mappings & Enums** — `Dataset.Table.Field | Value | Meaning` (use `*.table.field` if uniform across datasets).
-6. **Relationships** — FK arrows.
-7. **Date/Time Fields** — TIMESTAMP type notes.
-8. **Money/Numeric Fields** — units.
-9. **Partitioning & Clustering** — `Dataset.Table | Partition Column | Clustering Columns | Notes` — always filter on partition to reduce bytes scanned.
-10. **Cross-Dataset Query Pattern** — fenced SQL with `UNION ALL` across yearly archives.
-11. **Query Anti-Patterns** — missing partition filter; `SELECT *` on wide tables; `UNION ALL` across all datasets without date filter; `LIMIT` to reduce cost (it doesn't); skipping `--dry_run` for large queries.
-12. **Cost Estimation** — note `--dry_run` workflow and `--maximum_bytes_billed=1000000000` cap. BigQuery pricing ~$5/TB scanned.
-13. **Common Query Patterns** — fenced SQL: Daily Summary (single year) and Cross-Year Comparison.
+6. **Business Definitions** — `Term | Definition | How it is expressed in the schema` (e.g. "Buyer", "Active user", "Revenue"): the domain vocabulary a query author must get right, with the dataset-qualified tables, columns and filters that actually express each term.
+7. **Relationships** — FK arrows.
+8. **Date/Time Fields** — TIMESTAMP type notes.
+9. **Money/Numeric Fields** — units.
+10. **Partitioning & Clustering** — `Dataset.Table | Partition Column | Clustering Columns | Notes` — always filter on partition to reduce bytes scanned.
+11. **Cross-Dataset Query Pattern** — fenced SQL with `UNION ALL` across yearly archives.
+12. **Query Anti-Patterns** — missing partition filter; `SELECT *` on wide tables; `UNION ALL` across all datasets without date filter; `LIMIT` to reduce cost (it doesn't); skipping `--dry_run` for large queries.
+13. **Cost Estimation** — note `--dry_run` workflow and `--maximum_bytes_billed=1000000000` cap. BigQuery pricing ~$5/TB scanned.
+14. **Common Query Patterns** — fenced SQL: Daily Summary (single year) and Cross-Year Comparison.
 
 ### Multi-database projects
 
