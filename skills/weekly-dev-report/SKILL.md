@@ -241,22 +241,10 @@ Carry the resolved `member_role` for every member into Steps 6 (rating + deliver
 For each ticket a member transitioned **into** `Code Review` or `in QA` during the weekly window, compute the most recent prior `In Progress` start time and take the delta:
 
 ```bash
-curl -s -u "$JIRA_EMAIL:$JIRA_API_TOKEN" "$JIRA_URL/rest/api/3/issue/<KEY>?expand=changelog&fields=summary" \
-  | jq '{
-      key: .key,
-      summary: .fields.summary,
-      ip_to_cr_seconds: (
-        (.changelog.histories
-          | map({when: .created, items: .items})
-          | map(.items[] |= ({when: .when} + .))
-          | .[].items[]?
-          | select(.field=="status")) as $h
-        | null  # placeholder — see implementation note below
-      )
-    }'
+curl -s -u "$JIRA_EMAIL:$JIRA_API_TOKEN" "$JIRA_URL/rest/api/3/issue/<KEY>?expand=changelog&fields=summary" | jq '{key, summary: .fields.summary, events: [.changelog.histories[] | {when: .created, items: [.items[] | select(.field=="status") | {from: .fromString, to: .toString}]} | select(.items | length > 0)] | sort_by(.when)}'
 ```
 
-Implementation note: the cleanest way is to walk `.changelog.histories | sort_by(.created)` and remember `last_in_progress_at`. When you hit a status change `to == "Code Review"` (or `to == "in QA"` if no Code Review step happened in between), record `delta = parsed(history.created) - last_in_progress_at`. If multiple In-Progress→Code-Review cycles happened on the same ticket, take the **last full cycle that ended within the weekly window**. Skip tickets whose cycle started before the previous sprint's start date (treat as no signal).
+Implementation note: walk `events` in order and remember the timestamp of the last transition whose `to` is `In Progress`. On the first following transition whose `to` is `Code Review` (or `in QA`, when Code Review was skipped), record `delta = parsed(event.when) - last_in_progress_at`. If multiple In-Progress→Code-Review cycles happened on the same ticket, take the **last full cycle that ended within the weekly window**. Skip tickets whose cycle started before the previous sprint's start date (treat as no signal).
 
 Aggregate per member:
 
