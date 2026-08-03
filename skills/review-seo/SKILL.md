@@ -77,7 +77,9 @@ For **codebase** mode, resolve the concrete files. For **live** mode, this is in
 
 ## Phase 4: Technical SEO Audit
 
-For each item, gather evidence per the Evidence rule. In **codebase** mode, read templates/config; in **live** mode, fetch the homepage plus a representative sample of page types (e.g. one content page, one listing) and inspect served HTML/headers.
+For each item, gather evidence per the Evidence rule. In **codebase** mode, read templates/config; in **live** mode, fetch the **page sample** below and inspect served HTML/headers.
+
+**Page sample** (fixed — every later phase that inspects a subset of pages uses this same set): the homepage, plus the first **5** `sitemap.xml` URLs in document order, deduplicated by path template (`/blog/:slug` counts once); if there is no sitemap, the first 5 internal links on the homepage in document order. Record the sampled URLs in the report header.
 
 ### 4.1 Meta & titles
 
@@ -146,7 +148,7 @@ Validate: the file exists, parses to that shape, links resolve, and it points at
 
 ### 5.3 Per-page Markdown versions
 
-- Spec convention: a clean Markdown twin of each HTML page reachable by appending `.md` (or `index.html.md` for directory URLs) — an LLM-readable version of the page. Sample a few pages and check whether a `.md` version is served (200 + Markdown) and matches the page's real content. Absent → Info/Low opportunity; recommend generating them at build time.
+- Spec convention: a clean Markdown twin of each HTML page reachable by appending `.md` (or `index.html.md` for directory URLs) — an LLM-readable version of the page. Across the Phase 4 page sample, check whether a `.md` version is served (200 + Markdown) and matches the page's real content. Absent → Info/Low opportunity; recommend generating them at build time.
 
 ### 5.4 AI-crawler policy (robots.txt + headers + WAF)
 
@@ -248,6 +250,8 @@ Pre-report verification: every applicable phase task is complete and each findin
 | 🔵 Low | Alt-text gaps, non-descriptive link text, minor polish |
 | ⚪ Info | Observations, GEO opportunities, FYI |
 
+Sort findings by severity (Critical → High → Medium → Low → Info), then by Area, then by evidence path; assign the `SEO-001…` ids only after sorting.
+
 Write `docs/seo-audit.md` (`mkdir -p docs` first). Structure:
 
 ```markdown
@@ -256,6 +260,7 @@ Write `docs/seo-audit.md` (`mkdir -p docs` first). Structure:
 **Project:** [name]
 **Scan mode:** codebase | live | both
 **Target:** [base_url and/or repo]
+**Pages sampled:** [the page sample URLs, or N/A in codebase mode]
 **Date:** [ISO-8601]
 
 ## Summary
@@ -336,6 +341,7 @@ If any files changed, run `/co-dev:run-linters` and fix any errors (including ma
 - [ ] Performance: field data (CrUX/Search Console) preferred; INP checked specifically
 - [ ] Headings, alt text, link text, orphans, broken links checked
 - [ ] Web quality via bundled chrome-devtools MCP: performance, CWV (LCP·INP·CLS), accessibility (WCAG), best-practices audited — or marked not-run
+- [ ] Page sample listed in the report header; findings sorted before `SEO-00N` ids assigned
 - [ ] `docs/seo-audit.md` written; approval requested before fixes
 
 ## Important Rules
