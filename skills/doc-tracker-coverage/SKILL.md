@@ -55,7 +55,7 @@ export MONDAY_TOKEN="your_monday_api_token"   # avatar → Developers → My acc
 claude mcp add monday --transport http https://mcp.monday.com/mcp --header 'Authorization: Bearer ${MONDAY_TOKEN}'
 ```
 
-If `mcp__monday__*` tools are absent (tool-not-found), the server is not added or `MONDAY_TOKEN` is unset. Only fail the **monday side** of teams configured for monday — disclose it in the report ("monday unavailable — monday-tracked teams not verified") and still verify the Jira side. **Only ever issue read queries** through `all_monday_api` (`query { … }`, never `mutation`); the write-capable monday tools are deliberately excluded from `allowed-tools`.
+If `mcp__monday__*` tools are absent (tool-not-found), the server is not added or `MONDAY_TOKEN` is unset. Only fail the **monday side** of teams configured for monday — disclose it in the report ("monday unavailable — monday-tracked teams not verified") and still verify the Jira side. The write-capable monday tools are **excluded from `allowed-tools`**. `all_monday_api` *is* granted — board enumeration and bulk item paging need it — and it is a general GraphQL passthrough that *could* mutate, so read-only on that one tool is a **prompt-level rule, not a configuration guarantee**: **only ever issue read queries through it** (`query { … }`, never `mutation`).
 
 ### Jira (MCP first, curl/CLI fallback) — run from the target repo's directory (direnv)
 
