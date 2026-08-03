@@ -65,26 +65,35 @@ This skill uses MCP tools when available and falls back gracefully if they are u
 
 ## GitHub Issues
 
-If GitHub issues are enabled, use `gh issue create`.
+If GitHub issues are enabled, create a GitHub issue. **Prefer `mcp__github__create_issue`** when available, fall back to `gh issue create` CLI.
 
 ### Step 2a: Write issue body to `issue-body.md`
 
 Use the appropriate template based on issue type (see Templates section below).
 
-**Note:** This file will be deleted after the command runs.
+**Note:** This file is deleted in Step 2c.
 
-### Step 2b: Run gh command
+### Step 2b: Create the issue
+
+With the MCP tool, pass the same values the CLI flags carry: the title, the body (the contents of `issue-body.md`), the labels, and the assignee if the user specified one.
+
+With the CLI:
 
 ```bash
-gh issue create \
-  --title "<SUMMARY>" \
-  --body-file issue-body.md \
-  --label "<LABEL>" && rm issue-body.md
+gh issue create --title "<SUMMARY>" --body-file issue-body.md --label "<LABEL>"
 ```
 
 Add `--assignee "<username>"` if user specified an assignee.
 
 **Note:** No repo name prefix needed - GitHub issues are already scoped to the repository.
+
+### Step 2c: Delete the temp file
+
+Whichever path you took, remove the temp file once the issue exists:
+
+```bash
+rm issue-body.md
+```
 
 ---
 
@@ -292,7 +301,7 @@ Detailed explanation of what should have happened.
 ## Important Rules
 
 - **GitHub Issues:**
-  - Use `gh issue create` with `--body-file`
+  - Prefer `mcp__github__create_issue`; with the CLI fallback, use `gh issue create` with `--body-file`
   - No repo name prefix needed (issues are scoped to repo)
   - Labels are simple strings (e.g., `bug`, `enhancement`, `documentation`)
 - **Jira Issues:**
