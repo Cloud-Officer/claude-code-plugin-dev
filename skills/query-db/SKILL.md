@@ -435,7 +435,7 @@ Run the appropriate CLI command with the generated query.
 - Format the output clearly (tables for SQL, formatted JSON for document stores)
 - Add context to help interpret the numbers
 - **Translate enum values**: Look up the "Field Mappings & Enums" section in `docs/db.md` to convert raw values to human-readable meanings. This is especially important for numeric enums (e.g., `order.state`: `0` = `NEW`, `1` = `COMPLETED`). Never show raw numeric enum values without translation.
-- **Use business definitions**: Check the "Business Definitions" section in `docs/db.md` for terms like "Buyer", "CHP User", "Revenue" to ensure correct interpretation
+- **Use business definitions**: Check the "Business Definitions" section in `docs/db.md` for terms like "Buyer", "CHP User", "Revenue" to ensure correct interpretation. If that section is absent (an older `docs/db.md` predates it) and the question turns on such a term, say the section is missing and ask the user what the term means — never guess a definition, and suggest re-running `analyze-db` to add it
 - Suggest follow-up queries if relevant
 
 ### 10. Export results (when requested)
