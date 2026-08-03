@@ -545,6 +545,8 @@ The point of this section is to tell the reader, in one glance, whether the spri
    - 🔴 **Off track** — `completion_pct < expected_pct − 0.25`, OR `required_rate > current_rate × 1.75`, OR `working_days_left ≤ 0` with `remaining_work > 0`.
    - 🟡 **At risk** — behind by 10–25 points (`expected_pct − completion_pct` in `[0.10, 0.25]`), OR `required_rate` is `1.25×–1.75×` the current rate.
    - 🟢 **On track** — otherwise (`completion_pct ≥ expected_pct − 0.10` and `required_rate ≤ current_rate × 1.25`).
+
+   The two `current_rate` ratio tests apply **only when `current_rate > 0`**. When nothing has completed yet (`current_rate = 0`) the ratio is undefined, not infinite — skip both tests and decide from `completion_pct` vs `expected_pct` alone (the `working_days_left ≤ 0` condition still stands, it is rate-independent). Otherwise every sprint reads 🔴 for its first few days. Say so in the Verdict line: no work has completed yet, so the burn ratio is not yet meaningful.
 5. **At-risk items.** Build the concrete list of what jeopardizes the goal — each with owner (+role), the reason, and a recommended action. Draw from:
    - Not-started or blocked tickets with the largest remaining estimate, and any P1/blocker priority.
    - Stuck tickets (the 🚩 flag above).
@@ -588,7 +590,7 @@ Write to `WEEKLY_REPORT.md` in the current working directory, and print the same
 **Sprint goal status:** <🟢 On track | 🟡 At risk | 🔴 Off track> <br>
 **Progress:** <done_work>/<total_work> <points|tickets> done = <completion_pct>% (≈<expected_pct>% expected by today) <br>
 **Burn:** <current_rate>/day actual vs <required_rate>/day required to finish — <working_days_left> working days left <br>
-**Verdict:** <one sentence: on pace, or "N units behind, needs X/day (Y× current) to catch up">
+**Verdict:** <one sentence: on pace, or "N units behind, needs X/day (Y× current) to catch up"; when `current_rate` is 0, drop the `Y× current` ratio and say "nothing completed yet — needs X/day; burn ratio not yet meaningful">
 
 ### At-risk items
 
