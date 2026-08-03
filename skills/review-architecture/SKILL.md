@@ -1,7 +1,7 @@
 ---
 name: review-architecture
 description: Review, create, update, check, write, document, or audit architecture documentation (docs/architecture.md). Use when the user wants to review the architecture, check architecture docs, write architecture docs, document the architecture, or update architecture documentation to match organizational standards with accurate technical content.
-allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, WebSearch, mcp__github__get_file_contents, mcp__fetch__fetch, mcp__context7__resolve-library-id, mcp__context7__query-docs
+allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, WebSearch, Skill, mcp__github__get_file_contents, mcp__fetch__fetch, mcp__context7__resolve-library-id, mcp__context7__query-docs
 ---
 
 # Review Architecture Documentation
@@ -10,7 +10,7 @@ Review or create `docs/architecture.md` to match organizational standards. Works
 
 ## Phase Tracking
 
-Use `TaskCreate` to track each phase below. Mark `in_progress` on entry, `completed` when results are recorded. Do NOT include the task list in the final output.
+Use `TodoWrite` to track each phase below. Mark `in_progress` on entry, `completed` when results are recorded. Do NOT include the task list in the final output.
 
 **Required phases:**
 

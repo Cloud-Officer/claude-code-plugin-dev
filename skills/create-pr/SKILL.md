@@ -1,7 +1,7 @@
 ---
 name: create-pr
 description: Create, open, submit, or prepare a pull request (PR). Generates the commit message, PR title, and PR body, opens the PR, then returns the repo to its default branch. Use when the user wants to create a PR, open a PR, submit a PR, make a PR, push a PR, send a PR, generate PR content, prepare a pull request, or fill a PR template from code changes.
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(open:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Bash(xcodebuild:*), Bash(swift:*), Bash(xcrun:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(bundle:*), Bash(pytest:*), Bash(go:*), Bash(dotnet:*), Read, Glob
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(open:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Bash(xcodebuild:*), Bash(swift:*), Bash(xcrun:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(bundle:*), Bash(pytest:*), Bash(go:*), Bash(dotnet:*), Read, Glob, Skill, mcp__github__*
 ---
 
 # Create Pull Request

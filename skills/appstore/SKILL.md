@@ -1,7 +1,7 @@
 ---
 name: appstore
 description: Manage App Store Connect apps, builds, or distribution. Use when the user wants to check builds, manage TestFlight beta groups and testers, read or respond to App Store reviews, manage in-app purchases, subscriptions, pricing, list app versions, check app status, manage certificates, provisioning profiles, screenshots, app metadata, or perform any App Store Connect operation.
-allowed-tools: Bash(echo:*), Bash(jq:*), mcp__appstore__*
+allowed-tools: Bash(echo:*), Bash(jq:*), Bash(curl:*), Bash(python3:*), Bash(unzip:*), Bash(xcrun:*), mcp__appstore__*
 ---
 
 # App Store Connect
