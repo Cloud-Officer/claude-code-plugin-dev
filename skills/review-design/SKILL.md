@@ -8,9 +8,22 @@ allowed-tools: Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut
 
 Compare UI code against Figma designs to identify discrepancies in layout, styling, spacing, typography, colors, and component usage. Works for Android, iOS, and web platforms.
 
+## Setup
+
+The Figma MCP server is **not bundled** in the plugin's `.mcp.json` (it would
+always-load for every project). Register it **per folder** with `claude mcp add`,
+which defaults to local scope:
+
+```bash
+claude mcp add --transport http figma https://mcp.figma.com/mcp
+```
+
+This is Figma's hosted endpoint. Authentication is OAuth — run `/mcp`, select
+`figma`, and approve access on first use. There is no token environment variable.
+
 ## MCP Tools with Fallbacks
 
-This skill requires the Figma MCP server for design context. If Figma MCP is unavailable (not authenticated, tool not found), inform the user and stop — this skill cannot function without Figma access.
+This skill requires the Figma MCP server for design context. If Figma MCP is unavailable (not authenticated, tool not found), point the user at the `claude mcp add` command above and stop — this skill cannot function without Figma access.
 
 | Operation | MCP Tool |
 | --- | --- |
@@ -222,4 +235,4 @@ After all fixes, run the linters skill:
 4. **Check both directions** — Flag code that doesn't match design AND design system components that exist but aren't used
 5. **Ask before modifying** — Always show the report and get user approval before changing code
 6. **Run linters after changes** — Always run `/co-dev:run-linters` after modifying code
-7. **Figma MCP is required** — If Figma tools are unavailable, inform the user and stop. This skill cannot function without Figma access.
+7. **Figma MCP is required** — If Figma tools are unavailable, point the user at the Setup section and stop. This skill cannot function without Figma access.

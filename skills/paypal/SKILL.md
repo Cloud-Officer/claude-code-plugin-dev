@@ -8,9 +8,24 @@ allowed-tools: Bash(curl:*), Bash(jq:*), Bash(echo:*), mcp__paypal__*
 
 Manage PayPal invoices, payments, and disputes.
 
+## Setup
+
+The PayPal MCP server is **not bundled** in the plugin's `.mcp.json` (it would
+always-load for every project). Register it **per folder** with `claude mcp add`,
+which defaults to local scope:
+
+```bash
+claude mcp add --transport http paypal https://mcp.paypal.com/mcp
+```
+
+Use `https://mcp.sandbox.paypal.com/mcp` for the sandbox environment. Both endpoints
+authenticate over OAuth — run `/mcp`, select `paypal`, and approve access on first
+use. There is no token environment variable. PayPal's MCP documentation:
+<https://developer.paypal.com/ai-tools/mcp-server>.
+
 ## MCP Tools (no CLI fallback)
 
-Use MCP tools (`mcp__paypal__*`) for all PayPal operations. **There is no PayPal CLI.** If MCP tools are not available, inform the user and stop.
+Use MCP tools (`mcp__paypal__*`) for all PayPal operations. **There is no PayPal CLI.** If MCP tools are not available, point the user at the `claude mcp add` command above and stop.
 
 | Operation | MCP Tool |
 | --- | --- |
@@ -32,4 +47,4 @@ Use MCP tools (`mcp__paypal__*`) for all PayPal operations. **There is no PayPal
 - **Never create invoices or send payments without user confirmation**
 - **Format currency properly** — Display amounts with proper decimal places and currency codes
 - **Mask sensitive data** — Do not display full account numbers or personal details
-- **MCP required** — This skill cannot function without PayPal MCP access. If unavailable, inform the user.
+- **MCP required** — This skill cannot function without PayPal MCP access. If unavailable, point the user at the Setup section and stop.
