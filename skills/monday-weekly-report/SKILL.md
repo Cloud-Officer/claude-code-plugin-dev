@@ -38,7 +38,7 @@ All tool calls execute as that user and are subject to their monday.com permissi
 
 ## MCP tools and the snapshot-vs-activity-log split
 
-This skill calls **read tools only**. The write-capable monday tools (`create_*`, `change_item_column_values`, `move_item_to_group`, `delete_*`, `create_update`) are deliberately **excluded from `allowed-tools`** so the read-only guarantee is enforced by configuration, not just prose. `all_monday_api` is a general GraphQL passthrough that *could* mutate — **only ever issue read queries through it** (`query { … }`, never `mutation`).
+This skill calls **read tools only**. The write-capable monday tools (`create_*`, `change_item_column_values`, `move_item_to_group`, `delete_*`, `create_update`) are **excluded from `allowed-tools`**. `all_monday_api` *is* granted — bulk item paging and activity-log reads need it — and it is a general GraphQL passthrough that *could* mutate, so read-only on that one tool is a **prompt-level rule, not a configuration guarantee**: **only ever issue read queries through it** (`query { … }`, never `mutation`).
 
 | Operation | Tool | Notes |
 | --- | --- | --- |
