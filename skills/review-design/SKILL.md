@@ -102,7 +102,9 @@ Ask the user to confirm which files correspond to the design if the mapping is n
 
 ## Step 4: Compare Design vs Code
 
-For each aspect below, compare the Figma design values against the code implementation. Record findings as MATCH, MISMATCH, or MISSING.
+**Element set** — the frames and components returned by `mcp__figma__get_design_context` for the supplied URL, in the order returned.
+
+Compare each of the 8 aspects below against every element in that set, and emit exactly one row per aspect x element with a MATCH, MISMATCH, or MISSING verdict. An aspect that matches is a MATCH row, not an omission — the findings table always has `8 x elements` rows.
 
 ### 4.1 Layout Structure
 
@@ -171,9 +173,11 @@ For each aspect below, compare the Figma design values against the code implemen
 
 ### Findings
 
-| # | Aspect | Status | Figma Value | Code Value | File:Line | Severity |
-|---|--------|--------|-------------|------------|-----------|----------|
-| 1 | {aspect} | MATCH/MISMATCH/MISSING | {value} | {value} | {file:line} | {LOW/MEDIUM/HIGH} |
+Sorted by severity (HIGH, MEDIUM, LOW, then MATCH rows, which have no severity), then aspect in Step 4 order, then element in Figma order.
+
+| # | Element | Aspect | Status | Figma Value | Code Value | File:Line | Severity |
+|---|---------|--------|--------|-------------|------------|-----------|----------|
+| 1 | {element} | {aspect} | MATCH/MISMATCH/MISSING | {value} | {value} | {file:line} | {LOW/MEDIUM/HIGH} |
 
 ### Severity Guide
 - **HIGH** — Visually noticeable difference (wrong color, missing component, broken layout)
@@ -181,7 +185,7 @@ For each aspect below, compare the Figma design values against the code implemen
 - **LOW** — Minor inconsistency (spacing off by 1-2px, slightly different corner radius)
 
 ### Summary
-- **Total checks:** {count}
+- **Total checks:** {8 x number of elements}
 - **Matches:** {count}
 - **Mismatches:** {count}
 - **Missing:** {count}
@@ -194,6 +198,8 @@ For each aspect below, compare the Figma design values against the code implemen
 **Ask the user before making changes:**
 
 > "I found {N} discrepancies between the design and code. Would you like me to fix them?"
+
+`{N}` is mismatches + missing.
 
 ## Step 6: Apply Fixes (if user approves)
 
