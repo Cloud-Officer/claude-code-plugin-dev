@@ -136,3 +136,4 @@ Pass `markdownlint-cli2` defaults: blank lines around lists/tables/fences, a lan
 - **Don't leak secrets into the doc.** Reference where a secret lives, never paste its value.
 - **Read-only on the codebase.** This skill analyzes and writes the report only — it does not change application code.
 - **No silent scope cuts.** If you sampled (e.g. modeled 2 of 5 services), say so in Scope.
+- **Review-only mode.** When the invoker's args ask for review-only / findings-only (e.g. `code-review-deep` Step 3.5 folding this skill into a larger audit), run Steps 1-5 as normal but **do not write `docs/threat-model.md`** — return the same structure in the conversation instead, so the invoker can fold each threat in as a `THREAT-*` finding. Create or modify **no** file. Keep the DRAFT / human-sign-off framing in the returned text: suppressing the file must not suppress the caveat that a person still owns the accept-vs-mitigate decision.

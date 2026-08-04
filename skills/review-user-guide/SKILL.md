@@ -20,6 +20,7 @@ Use `TodoWrite` to track progress: one task per phase below. Mark `in_progress` 
 4. Existing user-guide validated (if present)
 5. Report generated
 6. User guide written/updated (if approved)
+7. Linters run
 
 **Evidence rule:** Every check must record (a) what the guide claims, (b) what the code shows, (c) MATCH / MISMATCH / MISSING. A bare "PASS" without code evidence is invalid.
 
@@ -320,9 +321,10 @@ Before completing, confirm:
 5. **Document the happy path first**, then edge cases.
 6. **Ask before modifying.** Show proposed changes and get approval.
 7. **Preserve existing valid content** — only update or add, don't strip.
-8. **Walkthrough style, not field tables** — for web app forms (rule 14 is non-negotiable).
+8. **Walkthrough style, not field tables** — for web app forms. This is non-negotiable; see the "Step-by-Step Guides (CRITICAL formatting rule)" guidance in Phase 6.
 9. **Reuse UI help text verbatim** — extract from `help_text:`, `helperText`, `placeholder:`, `list_items:` in the actual code.
 10. **Document conditional visibility** with explicit callouts ("When you check this box, the following fields appear").
 11. **Run linters after changes** — always.
 12. **Never validate against world knowledge alone.** Don't fact-check version numbers or external claims from training data — use web search or repo files.
-13. **Complete all phases** — skipping reveals nothing; cross-referencing reveals everything.
+13. **Complete all phases** — skipping reveals nothing; cross-referencing reveals everything. Review-only mode (rule 14) is the sole exception, and only for the write and linter phases.
+14. **Review-only mode.** When the invoker's args ask for review-only / findings-only (e.g. `code-review-deep` Step 3.5 folding this skill into a larger audit), run Phases 1-5 as normal and return the report in the conversation, then stop: skip the approval prompt, skip **Phase 6 (write/update the guide)** and **Phase 7 (run linters)**, and do not rename `docs/manual.md`. Create or modify **no** file, including any report file. Mark phases 6 and 7 **N/A** in the phase list, not incomplete: a review-only run that skipped them is a complete run, not a failed one.

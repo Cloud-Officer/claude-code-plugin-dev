@@ -75,80 +75,13 @@ Repeat until all issues are resolved.
 - Always fix the actual code, not the linter rules
 - If an issue seems impossible to fix properly, ask the user for guidance
 
-## Forbidden Files - NEVER Modify
+## Forbidden — configs and suppressions
 
-The following configuration files must NEVER be edited to work around linting issues:
+Never edit a file whose purpose is to define lint rules or ignores — any linter, formatter, or type-checker config, in any ecosystem, plus `.editorconfig`. Treat `tsconfig.json` as a linter config for its strict-mode and type-checking options only; other `tsconfig.json` changes are ordinary code changes.
 
-**JavaScript/TypeScript:**
+Never add an inline suppression comment in any language to make a rule pass.
 
-- `.eslintrc`, `.eslintrc.js`, `.eslintrc.json`, `.eslintrc.yml`
-- `.prettierrc`, `.prettierrc.js`, `.prettierrc.json`
-- `eslint.config.js`, `eslint.config.mjs`
-- `tsconfig.json` (for strict mode or type checking options)
-
-**Python:**
-
-- `.flake8`, `setup.cfg` (flake8 section)
-- `pyproject.toml` (tool.flake8, tool.pylint, tool.ruff sections)
-- `.pylintrc`, `pylintrc`
-- `ruff.toml`, `.ruff.toml`
-- `mypy.ini`, `.mypy.ini`
-
-**Ruby:**
-
-- `.rubocop.yml`, `.rubocop_todo.yml`
-
-**Go:**
-
-- `.golangci.yml`, `.golangci.yaml`
-
-**Rust:**
-
-- `clippy.toml`, `.clippy.toml`
-- `rustfmt.toml`, `.rustfmt.toml`
-
-**Markdown:**
-
-- `.markdownlint.json`, `.markdownlint.yaml`, `.markdownlint.yml`
-- `.markdownlintrc`
-
-**General:**
-
-- `.editorconfig`
-- Any file that defines linting rules or ignores
-
-## Forbidden Patterns - NEVER Use
-
-Do NOT add these patterns to bypass linting:
-
-```text
-# JavaScript/TypeScript
-/* eslint-disable */
-// eslint-disable-line
-// eslint-disable-next-line
-/* prettier-ignore */
-// @ts-ignore
-// @ts-nocheck
-
-# Python
-# noqa
-# type: ignore
-# pylint: disable
-# ruff: noqa
-
-# Go
-//nolint
-//nolint:all
-
-# Ruby
-# rubocop:disable
-
-# Rust
-#[allow(...)]
-#![allow(...)]
-```
-
-If you encounter an issue that seems unfixable, explain the problem to the user and ask how they want to proceed.
+Fix the code instead. If an issue seems genuinely unfixable, explain the problem to the user and ask how they want to proceed.
 
 ## Shell Script Linting Rules (SL0001, SL0002)
 

@@ -138,15 +138,15 @@ If the user explicitly asks to change strictness (e.g. "be aggressive — keep e
 
 When opted in, run the dedicated skills in review-only mode and fold their findings into this report — the three documentation skills (which verify doc **content against the code**, something the workflow does not) plus the two security-review skills below.
 
-Invoke each via the **Skill** tool in **review-only** mode — they must NOT create or modify any files during a deep review; we only want their findings:
+Invoke each via the **Skill** tool in **review-only mode** — a mode each of these skills defines in its own Important Rules, where it means: run every analysis phase, return the findings in the conversation, and skip the write and linter phases, marking them N/A rather than incomplete. They must NOT create or modify any file during a deep review; we only want their findings:
 
 - `co-dev:review-readme`
 - `co-dev:review-architecture`
 - `co-dev:review-user-guide`
 
-For each, pass an explicit review-only instruction as the skill's args, e.g.:
+For each, pass the mode by name as the skill's args, e.g.:
 
-> Review-only mode for a larger code audit: analyze and report findings, but DO NOT create, write, or edit README.md / docs/architecture.md / docs/user-guide.md or any other file. Return your findings only — the deep code review will fold them into `docs/code-review.md`.
+> Review-only mode (see your Important Rules) for a larger code audit: run the analysis phases and return your findings in the conversation. Do NOT create, write, or edit README.md / docs/architecture.md / docs/user-guide.md, any report file, or any other file. The deep code review will fold your findings into `docs/code-review.md`.
 
 Each skill self-exempts when its document doesn't apply (e.g. no end-user product → the user-guide skill skips). Treat a skip as **N/A**, not a failure.
 
@@ -154,12 +154,12 @@ Each skill self-exempts when its document doesn't apply (e.g. no end-user produc
 
 ### Security-review skills (same opt-in)
 
-Under the **same** deep-review opt-in, also invoke these two via the **Skill** tool in **review-only** mode — findings only. They must **not** write `docs/threat-model.md` / `docs/ownership-map.md` during a code review; the deep review consolidates everything into `docs/code-review.md`.
+Under the **same** deep-review opt-in, also invoke these two via the **Skill** tool in **review-only mode** — findings only. Both define that mode in their own Important Rules: they run the analysis and return the structure in the conversation instead of writing a file. They must **not** write `docs/threat-model.md` / `docs/ownership-map.md` during a code review; the deep review consolidates everything into `docs/code-review.md`.
 
 - `co-dev:review-threat-model` — trust boundaries and STRIDE abuse paths. Fold each threat in as a `THREAT-*` finding (label `security`), severity from its likelihood × impact. Cross-link to any `SEC-*` code finding on the same sink and deduplicate (same root cause).
 - `co-dev:review-ownership-map` — bus factor and knowledge risk. Fold single-point-of-failure findings on **sensitive** code (auth/crypto/payment/IaC) as `OWN-*` findings (label `knowledge-risk`), severity by how critical the file is. This complements the workflow's governance / `team_profile` reasoning with file-level detail.
 
-Pass each the same review-only instruction (analyze and report findings; do NOT create, write, or edit any file). Each self-exempts when it doesn't apply (e.g. no security-relevant surface); treat a skip as **N/A**. In the report, note that a threat model / ownership map was performed.
+Pass each the same review-only instruction (run the analysis and report findings; do NOT create, write, or edit any file). Each self-exempts when it doesn't apply (e.g. no security-relevant surface); treat a skip as **N/A**. In the report, note that a threat model / ownership map was performed, and carry across the caveats those skills attach to their output (the threat model is a DRAFT pending human sign-off; blame-based ownership is not the same as understanding).
 
 ---
 

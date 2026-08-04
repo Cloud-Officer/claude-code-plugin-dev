@@ -158,6 +158,7 @@ Within each repository group, organize items into blocks of approximately 3 work
    - If a single item is 3+ days, it becomes its own group
    - Otherwise, combine smaller items of the same delivery target until the group totals approximately 3 days (2.5 - 3.5 range is acceptable)
    - Don't split a single item across groups
+5. **Remainder.** Packing the six allowed estimates rarely lands every group inside 2.5 - 3.5 — a leftover 0.25, 0.5, 1, or 2 often has nowhere legal to go. Handle it deterministically: at most **one** group per repository *and delivery target* may fall **below** 2.5 days. It holds whatever is left over and is placed last within its repository. Never merge a leftover into a group that would push that group above 3.5, and never adjust an item's estimate to make a group fit — the six values from Step 4 are fixed.
 
 ## Step 6: Format the Report
 
@@ -263,5 +264,5 @@ Use the Jira item status (e.g., "In Code Review", "In Progress", "Done") and des
 - **Write scope**: The skill is read-only by default. The only modification it can ever make to Jira is saving time estimates on items that have none, and only when the user passed `--write-estimates`. Never create, delete, move, or change status of any Jira issues.
 - **Timeout**: Set 15 second timeout on jira commands. If a command hangs, it may be misconfigured.
 - **Link format**: Always use the server URL from the Jira config file, not a hardcoded URL.
-- **Grouping flexibility**: A multi-item group must total 2.5 - 3.5 days; only a single item of 3+ days may stand outside that range. Group thematically related items together when doing so keeps the group inside that range.
+- **Grouping flexibility**: A multi-item group must total 2.5 - 3.5 days, with exactly two exceptions — a single item of 3+ days, which stands alone, and one trailing remainder group per repository and delivery target, which may fall below 2.5 (Step 5). Group thematically related items together when doing so keeps the group inside the range. Never resize an estimate to make a group fit.
 - **Plain descriptions**: Rephrase Jira summaries into clear, readable descriptions. Remove bracket prefixes, ticket-speak, and jargon.

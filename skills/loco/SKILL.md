@@ -1,7 +1,7 @@
 ---
 name: loco
 description: Manage Loco (localise.biz) translation assets. Use when the user wants to create a translation key, delete a translation key, translate text, manage localization, add a Loco asset, remove unused translations, scan for unused tokens, or manage i18n keys. Supports create, delete, and scan commands with multi-project support and auto-translation.
-allowed-tools: Bash(curl:*), Bash(env:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(comm:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Glob, Grep
+allowed-tools: Bash(curl:*), Bash(env:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(comm:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mktemp:*), Bash(rm:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Glob, Grep
 ---
 
 ## Purpose
@@ -31,6 +31,18 @@ Authorization: Loco $LOCO_API_KEY
 
 Every example below writes `$LOCO_API_KEY`. If Step 1 resolved a per-project variable, substitute that name (e.g. `$LOCO_API_KEY_IOS`) everywhere `$LOCO_API_KEY` appears. Always reference the environment variable itself: each command runs in a fresh shell, so a variable assigned by an earlier command is empty in the next one.
 
+### Never inline text into the command line
+
+The key, the source text, the context, and every generated translation are **content**, not shell syntax. Because shell state does not survive between commands, these cannot be shell variables — so inlining them means pasting the literal string into the command. Inside double quotes that is unsafe: a `"` breaks the command, and a backtick or `$(` runs a subshell. Real copy hits this routinely (`Total: "USD $(subtotal)"`, prices containing `$`, quoted product names).
+
+**So: write the value to a temp file with the Write tool, then let `curl` read the file.** Never paste it between quotes.
+
+```bash
+TEXT_FILE=$(mktemp -t loco-text) && echo "$TEXT_FILE"
+```
+
+Write the value to the path printed above, then substitute that concrete path into the `curl` call (each Bash call is a fresh shell, so `$TEXT_FILE` does not survive). `rm -f` the temp files when the command finishes. The key still goes in the URL path, where `jq -sRr @uri` percent-encodes it.
+
 ### Verify Credentials
 
 ```bash
@@ -54,7 +66,10 @@ curl -s -f -H "Authorization: Loco $LOCO_API_KEY" "https://localise.biz/api/asse
 ```bash
 curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "id=$KEY&text=$TEXT&type=text&context=$CONTEXT" \
+  --data-urlencode "id@$KEY_FILE" \
+  --data-urlencode "text@$TEXT_FILE" \
+  --data-urlencode "context@$CONTEXT_FILE" \
+  -d "type=text" \
   https://localise.biz/api/assets
 ```
 
@@ -70,7 +85,7 @@ curl -s -f -X DELETE -H "Authorization: Loco $LOCO_API_KEY" \
 ```bash
 curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: text/plain" \
-  --data-raw "$TRANSLATION_TEXT" \
+  --data-binary @"$TRANSLATION_FILE" \
   "https://localise.biz/api/translations/$ASSET_ID/$LOCALE"
 ```
 
@@ -179,24 +194,34 @@ If the user confirms or the key matches conventions, continue.
 
 #### Step 5: Create the Asset
 
+Allocate the temp files and write KEY, TEXT and CONTEXT into them with the Write tool (see "Never inline text into the command line"). If there is no context, write an empty file rather than dropping the flag.
+
+```bash
+KEY_FILE=$(mktemp -t loco-key) && TEXT_FILE=$(mktemp -t loco-text) && CONTEXT_FILE=$(mktemp -t loco-ctx) && echo "$KEY_FILE $TEXT_FILE $CONTEXT_FILE"
+```
+
+Then substitute those concrete paths:
+
 ```bash
 curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  --data-urlencode "id=$KEY" \
-  --data-urlencode "text=$TEXT" \
+  --data-urlencode "id@/tmp/loco-key.XXXXXX" \
+  --data-urlencode "text@/tmp/loco-text.XXXXXX" \
+  --data-urlencode "context@/tmp/loco-ctx.XXXXXX" \
   -d "type=text" \
-  --data-urlencode "context=$CONTEXT" \
   https://localise.biz/api/assets
 ```
 
-If the creation fails, report the error and stop.
+If the creation fails, report the error and stop. Keep the temp files until Step 8 finishes, then `rm -f` them.
 
 #### Step 6: Set English Translation
+
+Reuse the `TEXT_FILE` from Step 5 — the English source text is the same string:
 
 ```bash
 curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: text/plain" \
-  --data-raw "$TEXT" \
+  --data-binary @/tmp/loco-text.XXXXXX \
   "https://localise.biz/api/translations/$(echo -n "$KEY" | jq -sRr @uri)/en"
 ```
 
@@ -218,14 +243,22 @@ For each remaining locale:
 
 2. **Validate placeholders** — Extract all placeholders from the source text and verify they appear identically in the translation. If validation fails, skip this locale and include it in the error report.
 
-3. **Push the translation:**
+3. **Push the translation.** Write the translated text to its own temp file first — a generated translation is exactly the kind of string that carries quotes, `$`, and backticks, so it must never be inlined:
+
+```bash
+TRANS_FILE=$(mktemp -t loco-trans) && echo "$TRANS_FILE"
+```
+
+Write the translation to that path, then substitute it:
 
 ```bash
 curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: text/plain" \
-  --data-raw "$TRANSLATED_TEXT" \
+  --data-binary @/tmp/loco-trans.XXXXXX \
   "https://localise.biz/api/translations/$(echo -n "$KEY" | jq -sRr @uri)/$LOCALE"
 ```
+
+`rm -f` the translation temp file before moving to the next locale.
 
 #### Step 8: Tag the Asset
 
@@ -496,6 +529,7 @@ Compare the sets. If any placeholder is missing or added in the translation, the
 3. **Always use Authorization header** — Never pass the API key as a query parameter (`?key=...`). Always use `Authorization: Loco $LOCO_API_KEY`.
 4. **Tag all auto-translations** — Every asset with auto-translated text gets the `needs-review` tag.
 5. **Skip on placeholder failure** — If placeholder validation fails for a locale, skip it and report the failure rather than pushing a broken translation.
+6. **Never inline content into a shell command** — the key, source text, context, and every generated translation go into a `mktemp` file that `curl` reads via `@file`, never between quotes on the command line. Pasting them inline lets a `"` break the command and a backtick or `$(` execute a subshell, silently corrupting what gets pushed to Loco. `rm -f` the temp files when done.
 
 ## Rules
 

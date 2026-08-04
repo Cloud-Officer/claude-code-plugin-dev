@@ -394,5 +394,6 @@ After writing/updating, run `/co-dev:run-linters` and fix any errors.
 9. **Document security deps with extra care** (crypto, auth).
 10. **Keep metrics current** if results files exist.
 11. **Run linters after changes.**
-12. **Complete every phase** — skipping reveals nothing; cross-referencing reveals everything.
-13. **Never validate against world knowledge alone.** Don't fact-check version numbers or external claims from training data — use web search or repo files.
+12. **Complete every phase** — skipping reveals nothing; cross-referencing reveals everything. Review-only mode (rule 13) is the sole exception, and only for the write and linter phases.
+13. **Review-only mode.** When the invoker's args ask for review-only / findings-only (e.g. `code-review-deep` Step 3.5 folding this skill into a larger audit), run Phases 1-7 as normal and return the report in the conversation, then stop: skip the "want me to fix them?" prompt, skip **Phase 8 (write/update the doc)** and **Phase 9 (run linters)**. Create or modify **no** file, including any report file and including the exemption stub in Phase 2 — report the exemption instead of writing it. Mark phases 8 and 9 **N/A** in the phase list, not incomplete: a review-only run that skipped them is a complete run, not a failed one.
+14. **Never validate against world knowledge alone.** Don't fact-check version numbers or external claims from training data — use web search or repo files.

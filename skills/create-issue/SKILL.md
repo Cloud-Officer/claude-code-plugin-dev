@@ -1,7 +1,7 @@
 ---
 name: create-issue
 description: Create, open, file, or report an issue, bug, or ticket in GitHub or Jira. Use when the user wants to open an issue, file a bug, report a bug, create a ticket, log an issue, or submit a bug report. Automatically detects if GitHub issues are enabled; if so creates a GitHub issue, otherwise creates a Jira issue.
-allowed-tools: Bash(gh:*), Bash(jira:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(rm:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, mcp__github__create_issue, mcp__github__list_issues, mcp__github__search_issues, mcp__github__get_issue, mcp__github__add_issue_comment, mcp__atlassian__createJiraIssue, mcp__atlassian__getJiraIssueTypeMetaWithFields, mcp__atlassian__getJiraProjectIssueTypesMetadata, mcp__atlassian__getVisibleJiraProjects
+allowed-tools: Bash(gh:*), Bash(jira:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(mktemp:*), Bash(rm:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, mcp__github__create_issue, mcp__github__list_issues, mcp__github__search_issues, mcp__github__get_issue, mcp__github__add_issue_comment, mcp__atlassian__createJiraIssue, mcp__atlassian__getJiraIssueTypeMetaWithFields, mcp__atlassian__getJiraProjectIssueTypesMetadata, mcp__atlassian__getVisibleJiraProjects
 ---
 
 # Create Issue
@@ -31,7 +31,7 @@ This skill uses MCP tools when available and falls back gracefully if they are u
 | Operation | MCP Tool | CLI Fallback |
 | --- | --- | --- |
 | Check issues enabled | `mcp__github__list_issues` (if it succeeds, issues are enabled) | `gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'` |
-| Create issue | `mcp__github__create_issue` | `gh issue create --title "..." --body-file issue-body.md --label "..."` |
+| Create issue | `mcp__github__create_issue` | `gh issue create --title "..." --body-file "$BODY" --label "..."` (`$BODY` is the `mktemp` path from Step 2a, never a file in the repo) |
 | Get repo owner/name | Parse from `git remote get-url origin` | `gh repo view --json owner,name` |
 
 ### Jira Access
@@ -67,20 +67,26 @@ This skill uses MCP tools when available and falls back gracefully if they are u
 
 If GitHub issues are enabled, create a GitHub issue. **Prefer `mcp__github__create_issue`** when available, fall back to `gh issue create` CLI.
 
-### Step 2a: Write issue body to `issue-body.md`
+### Step 2a: Write the issue body to a temp file
 
-Use the appropriate template based on issue type (see Templates section below).
+**Never write the body into the repository working tree.** A fixed name like `./issue-body.md` overwrites any file the user already has under that name, and a stray copy left behind by a failed run gets swept up by the next `git add -A`. Allocate a unique path outside the repo instead, and reuse it for the rest of this issue:
+
+```bash
+BODY=$(mktemp -t issue-body) && echo "$BODY"
+```
+
+Write the body to `$BODY` (the path printed above) using the appropriate template for the issue type (see Templates section below).
 
 **Note:** This file is deleted in Step 2c.
 
 ### Step 2b: Create the issue
 
-With the MCP tool, pass the same values the CLI flags carry: the title, the body (the contents of `issue-body.md`), the labels, and the assignee if the user specified one.
+With the MCP tool, pass the same values the CLI flags carry: the title, the body (the contents of the temp file), the labels, and the assignee if the user specified one.
 
-With the CLI:
+With the CLI — substitute the concrete path printed in Step 2a, since each Bash call runs in a fresh shell and `$BODY` does not survive:
 
 ```bash
-gh issue create --title "<SUMMARY>" --body-file issue-body.md --label "<LABEL>"
+gh issue create --title "<SUMMARY>" --body-file /tmp/issue-body.XXXXXX --label "<LABEL>"
 ```
 
 Add `--assignee "<username>"` if user specified an assignee.
@@ -89,10 +95,10 @@ Add `--assignee "<username>"` if user specified an assignee.
 
 ### Step 2c: Delete the temp file
 
-Whichever path you took, remove the temp file once the issue exists:
+Whichever path you took, remove the temp file once the issue exists — and remove it even if creation failed, so nothing is left behind:
 
 ```bash
-rm issue-body.md
+rm -f /tmp/issue-body.XXXXXX
 ```
 
 ---
@@ -101,13 +107,21 @@ rm issue-body.md
 
 If GitHub issues are disabled, create a Jira issue. **Prefer `mcp__atlassian__createJiraIssue`** when available, fall back to `jira issue create` CLI.
 
-### Step 2a: Write issue body to `issue-body.md`
+### Step 2a: Write the issue body to a temp file
 
-Use the appropriate template based on issue type (see Templates section below).
+Same rule as the GitHub flow — **never write the body into the repository working tree.** Allocate a unique path outside the repo:
+
+```bash
+BODY=$(mktemp -t issue-body) && echo "$BODY"
+```
+
+Write the body to `$BODY` (the path printed above) using the appropriate template for the issue type (see Templates section below).
 
 **Note:** This file is deleted in Step 2c.
 
 ### Step 2b: Run jira command
+
+Substitute the concrete path printed in Step 2a — each Bash call runs in a fresh shell, so `$BODY` does not survive:
 
 ```bash
 jira issue create --no-input \
@@ -115,17 +129,17 @@ jira issue create --no-input \
   --priority "<PRIORITY>" \
   --label "<LABEL>" \
   --summary "[<REPO-NAME>] <SUMMARY>" \
-  --template issue-body.md
+  --template /tmp/issue-body.XXXXXX
 ```
 
 Add `--assignee "<username>"` if user specified an assignee.
 
 ### Step 2c: Delete the temp file
 
-Whichever path you took, remove the temp file once the issue exists — as its own command, never chained onto the create command:
+Whichever path you took, remove the temp file once the issue exists — as its own command, never chained onto the create command, and run it even if creation failed:
 
 ```bash
-rm issue-body.md
+rm -f /tmp/issue-body.XXXXXX
 ```
 
 ---
@@ -322,4 +336,4 @@ Detailed explanation of what should have happened.
   - Use `##` for main headings, `-` for bullet points
   - Use backticks for inline code
   - For sections not applicable, write "N/A" or "Nothing to mention"
-  - Delete the temp file (`issue-body.md`) after creating the issue
+  - Write the issue body to a `mktemp` path **outside** the repo, never to a fixed name in the working tree, and `rm -f` it once the issue exists (or once creation has failed). A body file inside the repo clobbers any file of that name and can be committed by a later `git add -A`

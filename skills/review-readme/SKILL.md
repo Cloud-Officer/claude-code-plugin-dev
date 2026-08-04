@@ -22,10 +22,11 @@ Use `TodoWrite` to track each phase below. Mark `in_progress` on entry, `complet
 6. Usage section verified
 7. License and Contributing validated
 8. Report generated
+9. Linters run
 
 **Evidence rule:** Every check must record (a) what the README claims — the exact text/command/feature, (b) what the code shows (package.json `bin` field, entry points, exports, scripts), (c) MATCH / MISMATCH / MISSING with specific details. A bare "PASS" without evidence is invalid — the check is incomplete.
 
-**DO NOT SKIP STEPS.** Even if an earlier check seems to suggest no issues, you MUST complete ALL steps. Issues are often only revealed when cross-referencing multiple sources.
+**DO NOT SKIP STEPS.** Even if an earlier check seems to suggest no issues, you MUST complete ALL steps. Issues are often only revealed when cross-referencing multiple sources. The one exception is **review-only mode** (see Important Rules), which skips the write and linter phases by design.
 
 ## Required README Structure
 
@@ -712,5 +713,6 @@ Fix any linting errors before considering the task complete.
 6. **Use exact formatting** - The build badge URL format must match exactly for CI validation
 7. **Keep examples simple** - Show the most common use cases, not every option
 8. **Run linters after changes** - Always run `/co-dev:run-linters` after modifying README.md
-9. **Complete ALL steps** - Never skip analysis steps. Each step may reveal issues not visible in other steps
-10. **Never validate against world knowledge alone** - Do NOT use your training data to fact-check version numbers, release dates, or external claims. If uncertain about something (e.g., "does Ruby 4.0 exist?"), use web search to verify before flagging. Only validate things that can be cross-referenced against actual files in the repository or verified online.
+9. **Complete ALL steps** - Never skip analysis steps. Each step may reveal issues not visible in other steps. Review-only mode (rule 10) is the sole exception, and only for the write and linter phases
+10. **Review-only mode** - When the invoker's args ask for review-only / findings-only (e.g. `code-review-deep` Step 3.5 folding this skill into a larger audit), run Steps 1-8 as normal and return the report in the conversation, then stop: skip the "would you like me to fix them?" prompt, skip every edit to `README.md`, and skip Step 9 (Run Linters). Create or modify **no** file, including any report file — the invoker consolidates the findings itself. Mark phase 9 **N/A** in the phase list, not incomplete: a review-only run that skipped it is a complete run, not a failed one
+11. **Never validate against world knowledge alone** - Do NOT use your training data to fact-check version numbers, release dates, or external claims. If uncertain about something (e.g., "does Ruby 4.0 exist?"), use web search to verify before flagging. Only validate things that can be cross-referenced against actual files in the repository or verified online.

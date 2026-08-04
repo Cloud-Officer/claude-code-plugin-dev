@@ -99,7 +99,7 @@ const GOVERNANCE = [
 const SHARED_RULES = [
   '## Output requirements',
   'Return BOTH issues[] and positives[]. Acknowledge what the team is doing well, not just defects.',
-  'Each finding needs: id (use the ID prefix for its category, e.g. SEC-001, BUG-003), severity',
+  'Each finding needs: id (exactly as the ID PREFIX rule above dictates), severity',
   '(Critical|High|Medium|Low|Info), category, file, line (when applicable), description, impact, fix.',
   'Include exact quantitative counts where the prompt asks for them (never "some"/"a few").',
   '',
@@ -137,9 +137,31 @@ const SHARED_RULES = [
   'nesting >6, cyclomatic complexity >25.',
 ].join('\n')
 
+// The finding-id prefix is injected HERE, at the single place the prompt is
+// built, because it is otherwise invisible to the agent: `idPrefixes` used to be
+// declared on every agent and read by nothing, so each agent guessed its prefix
+// from a generic "e.g. SEC-001" example. That guess drifts between runs (DOC vs
+// DOCS, CI vs CICD), which breaks both the report's category-label mapping and
+// the create-issue dedupe, which matches on repo name + finding id.
+function idPrefixRule(a) {
+  const prefixes = a.idPrefixes || []
+  if (prefixes.length === 1) {
+    return 'ID PREFIX: every finding id you return MUST be exactly `' + prefixes[0] + '-NNN`, '
+      + 'zero-padded to three digits and numbered from 001 within this response. '
+      + 'Do not invent, abbreviate, pluralize, or otherwise alter the prefix.'
+  }
+  return 'ID PREFIXES: every finding id you return MUST use one of these exact prefixes — '
+    + prefixes.map(p => '`' + p + '`').join(', ') + ' — in the form `PREFIX-NNN`, zero-padded to '
+    + 'three digits and numbered from 001 per prefix within this response. Route each finding to '
+    + 'the prefix its sub-section names above. Do not invent, abbreviate, pluralize, or otherwise '
+    + 'alter a prefix, and do not use a prefix outside this list.'
+}
+
 function buildAnalysisPrompt(a) {
   return [
     a.prompt,
+    '',
+    idPrefixRule(a),
     '',
     repoBlock,
     '',
@@ -182,7 +204,7 @@ const P1_STRUCTURE = [
 
 // --- Phase 2 core agents ---------------------------------------------------
 const A_SECURITY = {
-  key: 'security', idPrefix: 'SEC',
+  key: 'security', idPrefixes: ['SEC'],
   prompt: [
     'Audit for security vulnerabilities and secret exposure.',
     'Secrets: hardcoded API keys, tokens, credentials in source/config/plist/xml. Patterns: AKIA (AWS),',
@@ -225,7 +247,7 @@ const A_SECURITY = {
 }
 
 const A_QUALITY = {
-  key: 'quality', idPrefix: 'QUAL',
+  key: 'quality', idPrefixes: ['QUAL'],
   prompt: [
     'Review structural code quality and in-code comment accuracy. Bug patterns and error-handling are Agent C - do not duplicate.',
     'Quality metrics - flag explicitly: methods >100 lines, classes >1000 lines, >8 parameters, >6 nesting depth, cyclomatic complexity >25.',
@@ -250,7 +272,7 @@ const A_QUALITY = {
 }
 
 const A_BUGS = {
-  key: 'bugs', idPrefix: 'BUG',
+  key: 'bugs', idPrefixes: ['BUG'],
   prompt: [
     'Review common bug patterns and the error-handling strategy. Structural quality/comments are Agent B - focus on defects and error flow.',
     'Bug patterns:',
@@ -279,7 +301,7 @@ const A_BUGS = {
 }
 
 const A_TESTING = {
-  key: 'testing', idPrefix: 'TEST',
+  key: 'testing', idPrefixes: ['TEST'],
   prompt: [
     'Assess test coverage AND quality. Favor behavioral coverage (would tests catch real regressions?) over line coverage.',
     'Coverage ceiling: determine overall coverage from reports if available, else estimate from test_files/source_files.',
@@ -296,7 +318,7 @@ const A_TESTING = {
 }
 
 const A_DEPS = {
-  key: 'deps', idPrefix: 'DEP',
+  key: 'deps', idPrefixes: ['DEP'],
   prompt: [
     'Dependency health AND breaking-change risk.',
     'Dependencies:',
@@ -314,7 +336,7 @@ const A_DEPS = {
 }
 
 const A_REPO_CI = {
-  key: 'repo-ci', idPrefix: 'CI',
+  key: 'repo-ci', idPrefixes: ['CI'],
   prompt: [
     'Git/repo hygiene AND CI/CD pipeline.',
     'Git & Repo:',
@@ -347,7 +369,7 @@ const A_REPO_CI = {
 }
 
 const A_DOCS = {
-  key: 'docs', idPrefix: 'DOC',
+  key: 'docs', idPrefixes: ['DOC'],
   prompt: [
     'Project documentation AND configuration management.',
     'SCOPE NOTE: deep content-accuracy review of README.md, docs/architecture.md, and docs/user-guide.md is an OPTIONAL, opt-in pass',
@@ -379,7 +401,7 @@ const A_DOCS = {
 }
 
 const A_CONSISTENCY = {
-  key: 'consistency', idPrefix: 'CONS',
+  key: 'consistency', idPrefixes: ['CONS'],
   prompt: [
     'Review CONSISTENCY WITH THE REST OF THE CODEBASE — does the code look like it was written by the same team, following',
     'the conventions already established here? Establish the repo\'s dominant patterns FIRST (read a representative sample of',
@@ -411,7 +433,7 @@ const A_CONSISTENCY = {
 
 // --- Phase 2 conditional agents -------------------------------------------
 const A_BACKEND = {
-  key: 'backend', idPrefix: 'PERF',
+  key: 'backend', idPrefixes: ['PERF'],
   prompt: [
     'Backend concerns (only because a backend/API was detected): performance, observability, API design, concurrency, DB migrations.',
     'Performance - DB: N+1 queries, missing indexes on FKs/filtered columns, unbounded queries without LIMIT, large OFFSET pagination',
@@ -440,7 +462,7 @@ const A_BACKEND = {
 }
 
 const A_INFRA = {
-  key: 'infra-compliance', idPrefix: 'IAC',
+  key: 'infra-compliance', idPrefixes: ['IAC'],
   prompt: [
     'Infrastructure-as-Code review AND compliance/privacy (only because IaC or regulated data was detected).',
     'IaC (CloudFormation, SAM, Terraform, CDK, Kubernetes):',
@@ -463,7 +485,7 @@ const A_INFRA = {
 }
 
 const A_LOCALE_ML = {
-  key: 'i18n-ml', idPrefix: 'I18N',
+  key: 'i18n-ml', idPrefixes: ['I18N', 'A11Y', 'ML'],
   prompt: [
     'Localization, ACCESSIBILITY, AND AI/ML practices (only because user-facing UI or ML was detected). Run only the relevant sub-sections.',
     'i18n uniformity (if user-facing UI) - the guiding question is "does EVERY user-facing string go through the project\'s',
@@ -493,7 +515,7 @@ const A_LOCALE_ML = {
 }
 
 const A_PROMPTS = {
-  key: 'prompt-artifacts', idPrefix: 'PROMPT',
+  key: 'prompt-artifacts', idPrefixes: ['PLUGIN', 'PROMPT'],
   prompt: [
     'Review AI prompt-engineering quality (only because Claude Code plugin artifacts and/or embedded LLM prompts were detected). Run ONLY the relevant sub-section(s).',
     'Treat prompts and instruction files as load-bearing source: vague, conflicting, or stale instructions are real defects, not style nits.',
