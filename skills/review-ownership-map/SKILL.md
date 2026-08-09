@@ -29,7 +29,7 @@ Say plainly in the output: **git blame shows who last touched a line, not who un
 
 ## Step 1: Scope and gather git data
 
-Work from the repo root on the default branch. Respect `--since` if the user gives a window (default: full history, but weight the last 12 months). Exclude vendored/generated paths (`node_modules`, `vendor`, `dist`, `build`, `Pods`, `.build`, generated protobufs, lockfiles) so ownership reflects authored code.
+Work from the repo root on the default branch. Respect `--since` if the user gives a window (default: full history, but weight the last 12 months). Exclude vendored/generated paths (`node_modules`, `vendor`, `dist`, `build`, `Pods`, `.build`, generated protobufs, lockfiles) so ownership reflects authored code. Every path and every user-supplied window is passed as a quoted shell variable, never interpolated into command text.
 
 Useful primitives:
 
@@ -38,13 +38,13 @@ Useful primitives:
 git log --since="12 months ago" --format='%aN <%aE>' | sort | uniq -c | sort -rn
 
 # Per-file commit share (top author + how dominant)
-git log --format='%aN' -- <path> | sort | uniq -c | sort -rn
+git log --format='%aN' -- "$path" | sort | uniq -c | sort -rn
 
 # Blame-based line ownership for a file (current lines per author)
-git blame --line-porcelain <path> | sed -n 's/^author //p' | sort | uniq -c | sort -rn
+git blame --line-porcelain -- "$path" | sed -n 's/^author //p' | sort | uniq -c | sort -rn
 
 # Last time a file changed (staleness)
-git log -1 --format='%ci' -- <path>
+git log -1 --format='%ci' -- "$path"
 
 # Co-change: files that change together (commits touching multiple paths)
 git log --name-only --format='%H' | awk 'NF' | ...   # group paths by commit, count co-occurrences

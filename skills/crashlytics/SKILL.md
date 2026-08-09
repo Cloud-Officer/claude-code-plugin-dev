@@ -80,6 +80,8 @@ The fully qualified table name is: `` `$BQ_PROJECT.$BQ_CRASHLYTICS_DATASET.$TABL
 
 Use `bq query` with `--use_legacy_sql=false` and `--project_id="$BQ_PROJECT"`.
 
+Pass the SQL as a single-quoted shell argument and bind user-supplied values as query parameters, e.g. `bq query --use_legacy_sql=false --parameter=issue_id:STRING:"$ISSUE_ID" '... WHERE issue_id = @issue_id'`.
+
 Always add `--max_rows=100` to prevent huge outputs unless the user asks for more.
 
 ### 6. Present results
@@ -108,7 +110,7 @@ SELECT
   device.os_version AS os_version,
   threads
 FROM `PROJECT.DATASET.TABLE`
-WHERE issue_id = 'ISSUE_ID'
+WHERE issue_id = @issue_id
 ORDER BY event_timestamp DESC
 LIMIT 5
 ```
@@ -156,7 +158,7 @@ SELECT
   COUNT(*) AS crash_count,
   COUNT(DISTINCT installation_uuid) AS affected_users
 FROM `PROJECT.DATASET.TABLE`
-WHERE issue_id = 'ISSUE_ID'
+WHERE issue_id = @issue_id
   AND event_timestamp > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
 GROUP BY day
 ORDER BY day DESC
@@ -212,6 +214,7 @@ LIMIT 20
 ## Rules
 
 - **Read-only**: BigQuery Crashlytics tables are read-only. No write operations.
+- **No concatenation**: no user-supplied value is ever concatenated into SQL or into a double-quoted shell argument — bind it with `--parameter` and pass the SQL single-quoted.
 - **Always show query first**: Display every query before executing it.
 - **Default to 7 days**: Use a 7-day window unless the user specifies otherwise.
 - **Default to all platforms**: Query all platforms unless the user specifies one.

@@ -142,7 +142,11 @@ For an HTTPS remote, plain `git push -u origin "$CURRENT_BRANCH"` is fine (the `
 Prefer `mcp__github__create_pull_request` when the GitHub MCP server is available. Otherwise use the GitHub CLI:
 
 ```bash
-PR_URL=$(gh pr create --base "$DEFAULT_BRANCH" --head "$CURRENT_BRANCH" --title "<PR title from Step 2>" --body-file - <<'PR_BODY_EOF'
+PR_TITLE=$(cat <<'PR_TITLE_EOF'
+<PR title from Step 2>
+PR_TITLE_EOF
+)
+PR_URL=$(gh pr create --base "$DEFAULT_BRANCH" --head "$CURRENT_BRANCH" --title "$PR_TITLE" --body-file - <<'PR_BODY_EOF'
 <PR body from Step 2>
 PR_BODY_EOF
 )
@@ -150,7 +154,7 @@ echo "$PR_URL"
 open "$PR_URL" 2>/dev/null || true   # macOS only — a no-op elsewhere, never fatal
 ```
 
-The body arrives on stdin through `--body-file -` and a quoted heredoc, never as a double-quoted `--body` argument: Step 2 authorises the body to be any valid markdown, backticks and quotes included, and inside a double-quoted argument a backtick executes and a `"` truncates. The quoted delimiter suppresses all expansion, so the body needs no escaping — this is the same answer `create-issue` uses for the identical sink, without its temp file. If the body itself contains a line reading exactly `PR_BODY_EOF`, pick a different delimiter for that run. The `--title` value stays on the command line, so keep the PR title free of backticks and double quotes; the title guidelines below say the same.
+The body arrives on stdin through `--body-file -` and a quoted heredoc, never as a double-quoted `--body` argument: Step 2 authorises the body to be any valid markdown, backticks and quotes included, and inside a double-quoted argument a backtick executes and a `"` truncates. The quoted delimiter suppresses all expansion, so the body needs no escaping — this is the same answer `create-issue` uses for the identical sink, without its temp file. If the body or title itself contains a line reading exactly its heredoc delimiter, pick a different delimiter for that run. The title travels the same channel: it is captured into `PR_TITLE` through a quoted heredoc and passed as `"$PR_TITLE"` — a variable's value is not re-scanned for expansion inside double quotes, so the title needs no escaping either.
 
 If a PR already exists for `$CURRENT_BRANCH` (e.g., the caller already opened it), `gh pr create` will fail — treat that as success and continue to Step 7.
 
@@ -207,7 +211,7 @@ In a worktree, leave the branch in place and let the caller `cd` back to the mai
 - One line only, maximum 80 characters
 - Should summarize the overall purpose of the PR
 - Can be similar to commit message but may be slightly more descriptive
-- No backticks or double quotes: the title is the one Step 2 value interpolated into a double-quoted shell argument (the body and commit message travel over stdin and carry no such restriction)
+- Any characters are safe: the title reaches `gh pr create` through the quoted-heredoc `PR_TITLE` variable (Step 6), the same channel the body and commit message use
 
 ## PR Body Guidelines
 

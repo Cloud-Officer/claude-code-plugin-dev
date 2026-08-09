@@ -274,12 +274,7 @@ project = $PROJECT
 ORDER BY statusCategoryChangedDate DESC
 ```
 
-Run via JQL search (paginate past 100) — `mcp__atlassian__searchJiraIssuesUsingJql` with the query above as `jql`, or the CLI fallback:
-
-```bash
-jira issue list -q "<JQL>" --plain --no-headers --no-truncate \
-  --columns KEY,STATUS,ASSIGNEE,SUMMARY --paginate
-```
+Run via JQL search (paginate past 100) — prefer `mcp__atlassian__searchJiraIssuesUsingJql` with the query above as `jql`, which never crosses a shell. On the CLI fallback, pass the query as `jira issue list -q "$JQL" --plain --no-headers --no-truncate --columns KEY,STATUS,ASSIGNEE,SUMMARY --paginate`. Rule for every command in this skill: no tracker-supplied name (status, sprint, login, display name, issue summary) is ever pasted into a command line; assign it to a shell variable and reference it as `"$VAR"`, and abort on any value containing a quote, backtick or `$`.
 
 Apply `--limit` after sorting by most-recently-resolved-first. Most-recent first matters: a 6-month-old "Resolved" ticket is much more likely to have been overtaken by code changes, so processing recent ones first surfaces clean closes faster and gives you signal early about workflow misconfigurations.
 
