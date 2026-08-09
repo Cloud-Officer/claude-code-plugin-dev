@@ -244,8 +244,12 @@ const A_QUALITY = {
     '- Pattern duplication count: total duplicated blocks, with one example per group.',
     'Comment quality (in-code only - README/architecture is Agent G): factually inaccurate (signature mismatch),',
     'outdated references, stale TODOs without owner/ticket, restating obvious code, misleading phrasing, misplaced doc blocks,',
-    'refactor scars that no longer carry information, missing critical context on complex code.',
-    'DO NOT FLAG: standard license headers, generated-code comments, comments correctly explaining WHY, accurate type-system docs.',
+    'refactor scars that no longer carry information, missing critical context on complex code,',
+    'overlong narrative comments no human will maintain (multi-sentence blocks narrating implementation, history or',
+    'obvious intent where one line or none would do - flag the block, quote its first line, propose the one-line',
+    'replacement or deletion), and comments citing an issue/ticket/PR number as justification (that context belongs',
+    'in the commit message and tracker; the number goes stale and means nothing at the call site).',
+    'DO NOT FLAG: standard license headers, generated-code comments, comments correctly explaining WHY in a line or two, accurate type-system docs.',
   ].join('\n'),
 }
 
