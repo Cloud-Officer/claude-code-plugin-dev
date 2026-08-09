@@ -73,14 +73,16 @@ Use these exact command formats:
 ### MySQL
 
 ```bash
-MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "SQL_QUERY"
+MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" <<'SQL'
+SQL_QUERY
+SQL
 ```
 
 > Pass the password via `MYSQL_PWD` (env var) instead of `--password=`. The latter exposes the password to other users via `ps`/process listings.
 
 **Useful flags:**
 
-- `-e "query"` - Execute query and exit
+- `<<'SQL' … SQL` - Pass the query on stdin via a quoted heredoc (never `-e "query"` — the shell would parse the query text)
 - `-N` - Skip column names (headers)
 - `-B` - Batch mode (tab-separated, no grid lines)
 - `--table` - Force table output format
@@ -88,12 +90,14 @@ MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER"
 ### PostgreSQL
 
 ```bash
-psql -c "SQL_QUERY"
+psql -f - <<'SQL'
+SQL_QUERY
+SQL
 ```
 
 **Useful flags:**
 
-- `-c "query"` - Execute query and exit
+- `-f -` - Read the query from stdin (pass it via a quoted heredoc, never `-c "query"`)
 - `-t` - Tuples only (no headers or footers)
 - `-A` - Unaligned output (no padding)
 - `-F ","` - Set field separator (e.g., for CSV)
@@ -117,12 +121,14 @@ sqlite3 "$SQLITE_DB" "SQL_QUERY"
 ### MongoDB
 
 ```bash
-mongosh "$MONGODB_URI" --eval "JS_CODE"
+mongosh "$MONGODB_URI" --file - <<'JS'
+JS_CODE
+JS
 ```
 
 **Useful flags:**
 
-- `--eval "code"` - Execute JavaScript and exit
+- `--file -` - Execute JavaScript from stdin (pass it via a quoted heredoc, never `--eval "code"`)
 - `--quiet` - Suppress connection messages
 - `--json` - Output in JSON format
 
@@ -230,9 +236,9 @@ For PostgreSQL, MySQL, MongoDB, and Redis, check whether MCP tools are available
 
 | Database | MCP Tool | CLI Fallback |
 | --- | --- | --- |
-| PostgreSQL | `mcp__postgres__query` | `psql -c "SQL"` |
-| MySQL | `mcp__mysql__mysql_query` | `mysql -h ... -e "SQL"` |
-| MongoDB | `mcp__mongodb__find`, `mcp__mongodb__aggregate` | `mongosh --eval "JS"` |
+| PostgreSQL | `mcp__postgres__query` | `psql -f -` (stdin heredoc) |
+| MySQL | `mcp__mysql__mysql_query` | `mysql -h ...` (stdin heredoc) |
+| MongoDB | `mcp__mongodb__find`, `mcp__mongodb__aggregate` | `mongosh --file -` (stdin heredoc) |
 | Redis | `mcp__redis__get`, `mcp__redis__hgetall`, `mcp__redis__lrange`, `mcp__redis__zrange`, `mcp__redis__json_get`, etc. | `redis-cli -u ... COMMAND` |
 | BigQuery | `mcp__bigquery__query` | `bq query --use_legacy_sql=false "SQL"` |
 
@@ -275,27 +281,29 @@ Parse what the user is asking for:
 #### For MySQL
 
 ```bash
-MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "
+MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" <<'SQL'
 SET SESSION MAX_EXECUTION_TIME=30000;
 SELECT DATE(created_at) as day, COUNT(*) as orders, SUM(total)/100 as revenue
 FROM orders
 WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
 GROUP BY DATE(created_at)
 ORDER BY day DESC
-LIMIT 100;"
+LIMIT 100;
+SQL
 ```
 
 #### For PostgreSQL
 
 ```bash
-psql -c "
+psql -f - <<'SQL'
 SET statement_timeout = '30s';
 SELECT DATE(created_at) as day, COUNT(*) as orders, SUM(total)/100 as revenue
 FROM orders
 WHERE created_at >= NOW() - INTERVAL '30 days'
 GROUP BY DATE(created_at)
 ORDER BY day DESC
-LIMIT 100;"
+LIMIT 100;
+SQL
 ```
 
 #### For SQLite
@@ -313,16 +321,18 @@ LIMIT 100;"
 #### For MongoDB
 
 ```bash
-mongosh "$MONGODB_URI" --eval "db.orders.aggregate([
-  { \$match: { createdAt: { \$gte: new Date(Date.now() - 30*24*60*60*1000) } } },
-  { \$group: {
-      _id: { \$dateToString: { format: '%Y-%m-%d', date: '\$createdAt' } },
-      total: { \$sum: '\$total' },
-      count: { \$sum: 1 }
+mongosh "$MONGODB_URI" --file - <<'JS'
+db.orders.aggregate([
+  { $match: { createdAt: { $gte: new Date(Date.now() - 30*24*60*60*1000) } } },
+  { $group: {
+      _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+      total: { $sum: '$total' },
+      count: { $sum: 1 }
   }},
-  { \$sort: { _id: -1 } },
-  { \$limit: 100 }
-])"
+  { $sort: { _id: -1 } },
+  { $limit: 100 }
+])
+JS
 ```
 
 #### For Elasticsearch
@@ -425,10 +435,10 @@ Run the appropriate CLI command with the generated query.
 
 **Important formatting notes:**
 
-- **MySQL**: Use `-e "query"` for single queries, or `-N` to skip column headers, `-B` for batch mode (tab-separated)
-- **PostgreSQL**: Use `-c "query"` for single queries, `-t` for tuples only (no headers), `-A` for unaligned output
+- **MySQL**: Pass the query on stdin via a quoted heredoc (see Step 6), `-N` to skip column headers, `-B` for batch mode (tab-separated)
+- **PostgreSQL**: Use `-f -` with a quoted heredoc (see Step 6), `-t` for tuples only (no headers), `-A` for unaligned output
 - **SQLite**: Use `"query"` as second argument, `-header` for column headers, `-csv` or `-json` for output format
-- **MongoDB**: Use `--eval "code"` for JavaScript execution, `--quiet` to suppress connection messages
+- **MongoDB**: Use `--file -` with a quoted heredoc (see Step 6), `--quiet` to suppress connection messages
 - **Elasticsearch**: Use `curl` with `-s` (silent) and pipe to `jq` for formatting
 - **Redis**: Commands are executed directly with `redis-cli`
 
@@ -506,7 +516,7 @@ When the user wants chart data, structure the output as:
 - Remember `_id` is ObjectId by default
 - Dates are ISODate objects
 - For references, may need `$lookup` for joins
-- Escape `$` as `\$` in bash commands
+- No `$` escaping needed — the JS arrives via a quoted heredoc (`--file -`), never a double-quoted shell string
 
 ### Elasticsearch
 
@@ -580,8 +590,8 @@ Prepend or append timeout settings to prevent runaway queries:
 
 | Database | Timeout Setting |
 | --- | --- |
-| MySQL | Prepend `SET SESSION MAX_EXECUTION_TIME=30000;` to the query, inside the same `-e` string (see Step 6) — a separate `mysql` invocation gets a separate session and the timeout is lost |
-| PostgreSQL | Prepend `SET statement_timeout = '30s';` to the query, inside the same `-c` string (see Step 6) — same session requirement as MySQL |
+| MySQL | Prepend `SET SESSION MAX_EXECUTION_TIME=30000;` to the query, inside the same heredoc (see Step 6) — a separate `mysql` invocation gets a separate session and the timeout is lost |
+| PostgreSQL | Prepend `SET statement_timeout = '30s';` to the query, inside the same heredoc (see Step 6) — same session requirement as MySQL |
 | SQLite | No server-side timeout; SQLite is file-based and typically fast. Use `LIMIT` to constrain large result sets |
 | MongoDB | Append `.maxTimeMS(30000)` to `find()` or `aggregate()` calls |
 | Elasticsearch | Add `"timeout": "30s"` to the query body |

@@ -103,7 +103,7 @@ Boards are the lens (the monday analog of a Jira sprint). Resolve the set in thi
    - If the dynamic API is **not** available, the skill cannot list boards — ask the user to type the board IDs or names directly (and suggest setting `MONDAY_WEEKLY_REPORT_BOARDS` so future runs don't re-ask).
    - Cache the chosen set to `boards.json`.
 
-Resolve each name to a numeric board ID (via the `boards` query when available, else `get_board_schema`/`get_board_items_by_name` confirmation). If a name is ambiguous (multiple matches), ask the user to disambiguate by ID. Support **multiple boards** — every section is computed per board and rolled up across boards in the at-a-glance view.
+Resolve each name to a numeric board ID (via the `boards` query when available, else `get_board_schema`/`get_board_items_by_name` confirmation). Before interpolating any board argument into any query — the activity-log query, `items_page`, and every future query built from a board argument — reject it unless it matches `^[0-9]+$`: resolve names to a numeric id first and splice only that id. If a name is ambiguous (multiple matches), ask the user to disambiguate by ID. Support **multiple boards** — every section is computed per board and rolled up across boards in the at-a-glance view.
 
 For a non-interactive `--send` run with no `--board`, no cache, and no `MONDAY_WEEKLY_REPORT_BOARDS`, abort with a message asking the user to set `MONDAY_WEEKLY_REPORT_BOARDS` or pass `--board`.
 
@@ -434,7 +434,7 @@ If run **with** `--send`:
 
 ## Caches
 
-All caches live under `~/.config/monday-weekly-report/` (override paths via the env vars below). Create the directory with `mkdir -p` before writing. Read with the Read tool, treating a missing file as empty.
+All caches live under `~/.config/monday-weekly-report/` (override paths via the env vars below). Create the directory with `mkdir -p` before writing. Read with the Read tool, treating a missing file as empty. Every cache path read from an env var is used double-quoted in shell and is rejected — falling back to the default path with a printed note — unless it matches `^[A-Za-z0-9._/-]+$`; this one rule covers `roles.json`, `statuses.json`, and `boards.json`.
 
 - `roles.json` — `user_id → { name, role, confirmedAt, auto? }` (Step 4). Set `auto: true` on entries written from an auto-default (a `--send` run) so a later preview knows they were never human-confirmed and re-proposes them; drop the flag once the human confirms.
 - `statuses.json` — `board_id → { <label>: <bucket> }` (Step 3.5)

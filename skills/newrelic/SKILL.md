@@ -14,10 +14,10 @@ Query observability data, alerts, and application health.
 
 | Operation | MCP Tool | CLI Fallback |
 | --- | --- | --- |
-| Run NRQL query | `mcp__newrelic__run_nrql_query` | `newrelic nrql query --query "..."` |
+| Run NRQL query | `mcp__newrelic__run_nrql_query` | `newrelic nrql query --query '...'` |
 | Natural language to NRQL | `mcp__newrelic__nrql_from_natural_language` | N/A (no CLI equivalent) |
-| Get entity by GUID | `mcp__newrelic__get_entity_by_guid` | `newrelic entity get --guid "..."` |
-| Search entities | `mcp__newrelic__search_entities` | `newrelic entity search --name "..."` |
+| Get entity by GUID | `mcp__newrelic__get_entity_by_guid` | `newrelic entity get --guid '...'` |
+| Search entities | `mcp__newrelic__search_entities` | `newrelic entity search --name '...'` |
 | List alert conditions | `mcp__newrelic__list_alert_conditions` | `newrelic alert condition list --policyId ...` |
 | Search incidents | `mcp__newrelic__search_incidents` | `newrelic alert incident list` |
 | Analyze application logs | `mcp__newrelic__analyze_application_logs` | N/A (use NRQL via CLI) |
@@ -50,5 +50,6 @@ SELECT * FROM Deployment SINCE 1 week ago
 ## Important Rules
 
 - **Read-only by default** — Only query data, never modify alert policies or configurations without user confirmation
+- **Single-quoted CLI arguments** — Build every CLI argument as a single-quoted shell string; if a value derived from the user or from a tool return contains a single quote, backtick, `$` or `;`, do not run the command, show the value and ask the user to restate it
 - **Time ranges** — Always include `SINCE` in NRQL queries to scope results
 - **Entity context** — When the user asks about "the app", search for the entity first to get the GUID

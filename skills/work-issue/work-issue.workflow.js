@@ -44,8 +44,15 @@ function readArgs(raw) {
 
 const input = readArgs(args)
 const issues = Array.isArray(input.issues) ? input.issues : []
-const defaultBranch = input.defaultBranch || 'main'
+const defaultBranch = String(input.defaultBranch ?? '')
 const repoRoot = input.repoRoot || '.'
+
+// defaultBranch is spliced into shell commands the implementing agents run —
+// like refs below, a bad value is rejected at this boundary, never sanitised.
+if (!/^[A-Za-z0-9][A-Za-z0-9._\/-]*$/.test(defaultBranch)) {
+  log('rejected defaultBranch: ' + JSON.stringify(defaultBranch))
+  return { defaultBranch, repoRoot, results: [] }
+}
 
 // An issue ref is only ever a GitHub issue number (`123`) or a Jira key
 // (`PROJ-456`). Refs are spliced into shell commands the implementing agent is

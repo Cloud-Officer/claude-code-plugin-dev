@@ -19,6 +19,8 @@ Parse arguments from the user's invocation:
 - `--sprint <ID|name>` — override sprint detection (rare; usually the active sprint is correct).
 - `--reconfirm-roles` — force the interactive role prompt for **every** roster member, ignoring the cache (Step 2.5). Use after team changes. Without it, only members missing from the role cache are prompted.
 
+Every user-supplied argument and env value must match an explicit pattern before it reaches any command string — `--sprint` must be `^[0-9]+$`, or a name resolved to an ID by exact match against `jira sprint list` output; `GITHUB_USERNAME_MAP` entries must match `^[^,=]+=[A-Za-z0-9-]+$`; recipients must match a plain address pattern — and anything else aborts with a message.
+
 If the user did not pass `--send`, treat the run as a preview. Never send email unless `--send` is present. Role prompting (Step 2.5) only happens in a preview/interactive run — a `--send` run never prompts and instead falls back to the cached roles plus auto-detected defaults.
 
 ## Run from the target repo's directory (direnv)

@@ -318,6 +318,7 @@ Detailed explanation of what should have happened.
   - Do NOT specify a project (`-p` or `--project`) - use default from user's config
   - Set 15 second timeout - if it hangs, the command is malformed
 - **Both:**
+  - Never interpolate user-supplied text into a shell command string. Prefer the MCP tool, whose arguments are passed structurally; with the CLI, write every user-supplied value to a file and pass it by path (`--body-file`, `--template`), or pass it as a single-quoted literal with embedded single quotes escaped
   - Use Markdown format
   - Use `##` for main headings, `-` for bullet points
   - Use backticks for inline code

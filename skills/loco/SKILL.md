@@ -54,7 +54,10 @@ curl -s -f -H "Authorization: Loco $LOCO_API_KEY" "https://localise.biz/api/asse
 ```bash
 curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "id=$KEY&text=$TEXT&type=text&context=$CONTEXT" \
+  --data-urlencode "id=$KEY" \
+  --data-urlencode "text=$TEXT" \
+  -d "type=text" \
+  --data-urlencode "context=$CONTEXT" \
   https://localise.biz/api/assets
 ```
 
@@ -147,7 +150,10 @@ Fetch existing assets and check if the key already exists. Capture the HTTP stat
 
 ```bash
 STATUS=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Loco $LOCO_API_KEY" \
-  "https://localise.biz/api/assets/$(echo -n "$KEY" | jq -sRr @uri)")
+  "https://localise.biz/api/assets/$(jq -sRr 'rtrimstr("\n")|@uri' <<'LOCO_KEY_EOF'
+$KEY
+LOCO_KEY_EOF
+)")
 ```
 
 - `STATUS == 200` → key already exists. Tell the user: "Key `$KEY` already exists. Use a different key or delete the existing one first." Stop.
@@ -196,8 +202,13 @@ If the creation fails, report the error and stop.
 ```bash
 curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: text/plain" \
-  --data-raw "$TEXT" \
-  "https://localise.biz/api/translations/$(echo -n "$KEY" | jq -sRr @uri)/en"
+  --data-binary @- \
+  "https://localise.biz/api/translations/$(jq -sRr 'rtrimstr("\n")|@uri' <<'LOCO_KEY_EOF'
+$KEY
+LOCO_KEY_EOF
+)/en" <<'LOCO_EOF'
+$TEXT
+LOCO_EOF
 ```
 
 #### Step 7: Auto-Translate to All Locales
@@ -223,8 +234,13 @@ For each remaining locale:
 ```bash
 curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: text/plain" \
-  --data-raw "$TRANSLATED_TEXT" \
-  "https://localise.biz/api/translations/$(echo -n "$KEY" | jq -sRr @uri)/$LOCALE"
+  --data-binary @- \
+  "https://localise.biz/api/translations/$(jq -sRr 'rtrimstr("\n")|@uri' <<'LOCO_KEY_EOF'
+$KEY
+LOCO_KEY_EOF
+)/$LOCALE" <<'LOCO_EOF'
+$TRANSLATED_TEXT
+LOCO_EOF
 ```
 
 #### Step 8: Tag the Asset
@@ -235,7 +251,10 @@ Always tag with `needs-review`:
 curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "name=needs-review" \
-  "https://localise.biz/api/assets/$(echo -n "$KEY" | jq -sRr @uri)/tags"
+  "https://localise.biz/api/assets/$(jq -sRr 'rtrimstr("\n")|@uri' <<'LOCO_KEY_EOF'
+$KEY
+LOCO_KEY_EOF
+)/tags"
 ```
 
 If `--tags` was provided, also apply each custom tag:
@@ -244,7 +263,10 @@ If `--tags` was provided, also apply each custom tag:
 curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "name=$TAG" \
-  "https://localise.biz/api/assets/$(echo -n "$KEY" | jq -sRr @uri)/tags"
+  "https://localise.biz/api/assets/$(jq -sRr 'rtrimstr("\n")|@uri' <<'LOCO_KEY_EOF'
+$KEY
+LOCO_KEY_EOF
+)/tags"
 ```
 
 #### Step 9: Report Summary
@@ -286,7 +308,10 @@ Use this flow when the user wants to delete a translation key.
 Capture the body and the HTTP status together — the status is the last line of the output:
 
 ```bash
-curl -s -w '\n%{http_code}' -H "Authorization: Loco $LOCO_API_KEY" "https://localise.biz/api/assets/$(echo -n "$KEY" | jq -sRr @uri)"
+curl -s -w '\n%{http_code}' -H "Authorization: Loco $LOCO_API_KEY" "https://localise.biz/api/assets/$(jq -sRr 'rtrimstr("\n")|@uri' <<'LOCO_KEY_EOF'
+$KEY
+LOCO_KEY_EOF
+)"
 ```
 
 - `200` → asset found; proceed to Step 3 with the body.
@@ -316,7 +341,10 @@ If the user does not confirm, stop here.
 
 ```bash
 curl -s -f -X DELETE -H "Authorization: Loco $LOCO_API_KEY" \
-  "https://localise.biz/api/assets/$(echo -n "$KEY" | jq -sRr @uri)"
+  "https://localise.biz/api/assets/$(jq -sRr 'rtrimstr("\n")|@uri' <<'LOCO_KEY_EOF'
+$KEY
+LOCO_KEY_EOF
+)"
 ```
 
 Report: "Deleted `$KEY` and all its translations."
@@ -496,6 +524,7 @@ Compare the sets. If any placeholder is missing or added in the translation, the
 3. **Always use Authorization header** — Never pass the API key as a query parameter (`?key=...`). Always use `Authorization: Loco $LOCO_API_KEY`.
 4. **Tag all auto-translations** — Every asset with auto-translated text gets the `needs-review` tag.
 5. **Skip on placeholder failure** — If placeholder validation fails for a locale, skip it and report the failure rather than pushing a broken translation.
+6. **No inline pasting of untrusted values** — No user- or model-supplied value is ever pasted inline into a command: every such value enters a command only through a quoted heredoc (`<<'LOCO_EOF'`), which is literal by definition.
 
 ## Rules
 

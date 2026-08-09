@@ -336,14 +336,17 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 
     **Precondition — tests gate (step 8):** Do not create the PR unless step 8 is satisfied: tests covering the change exist and pass, *or* a stated no-test exception applies. If neither holds, go back and write the tests first.
 
-    **Commit (with the issue-tagged message):**
+    **Commit (with the issue-tagged message):** the message arrives on stdin through `git commit -F -` and a quoted heredoc, never as a double-quoted `-m` argument — the quoted delimiter (`<<'EOF'`) suppresses all expansion, so the message needs no escaping:
 
     ```bash
     git add .
+    git commit -F - <<'COMMIT_MSG_EOF'
+    <PREFIX> #<issue>: <brief description>
+    COMMIT_MSG_EOF
     ```
 
-    - GitHub: `git commit -m "<PREFIX> #<issue>: <brief description>"` (use the commit prefix from the issue type table above)
-    - Jira: `git commit -m "<issue>: <brief description>"`
+    - GitHub: message = `<PREFIX> #<issue>: <brief description>` (use the commit prefix from the issue type table above)
+    - Jira: message = `<issue>: <brief description>`
     - NO footers, NO co-authors, NO "Generated with Claude Code" signatures
 
     **Open the PR via the `create-pr` skill:**
@@ -353,6 +356,8 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 
     - GitHub: title = `<PREFIX> #<issue>: <summary>`
     - Jira: title = `<issue> <summary>`
+
+    Only titles stay on the command line — a title carries no backtick or double quote.
 
     **GitHub — auto-close the issue on merge (REQUIRED):** the `#<issue>:` title prefix is only a *mention* and does NOT close the issue. Ensure the PR **body** (not the title) contains a GitHub closing keyword referencing the issue, so merging the PR closes it automatically. Add a dedicated line to the body using the verb that matches the issue type:
 
@@ -371,15 +376,46 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 10. **Update issue if needed** (all types)
     If the implementation differs from the original or additional context would be helpful, update the issue.
     Write in a prospective tone (as if before implementation, not after):
-    - GitHub: `mcp__github__update_issue` (preferred) or `gh issue edit <issue> --title "<updated title>" --body "<updated description>"`
-    - Jira: `mcp__atlassian__editJiraIssue` (preferred) or `jira issue edit <issue> --summary "<updated title>" --description "<updated description>"`
+    The updated description arrives on stdin through a quoted heredoc (`<<'EOF'` suppresses all expansion, so it needs no escaping), never as a double-quoted argument. Only the title stays on the command line — a title carries no backtick or double quote:
+
+    - GitHub: `mcp__github__update_issue` (preferred), or:
+
+      ```bash
+      gh issue edit <issue> --title "<updated title>" --body-file - <<'BODY_EOF'
+      <updated description>
+      BODY_EOF
+      ```
+
+    - Jira: `mcp__atlassian__editJiraIssue` (preferred), or (the CLI reads the description from stdin):
+
+      ```bash
+      jira issue edit <issue> --no-input --summary "<updated title>" <<'BODY_EOF'
+      <updated description>
+      BODY_EOF
+      ```
 
 11. **Post a tester QA checklist on the issue** (all types)
 
     Once the PR is open and the issue is updated, post a comment on the issue aimed at the **testers / QA team**. This is the hand-off gate right before the task moves through code review — it gives a tester an explicit, checkable list to confirm the work is *actually* done, not just merged.
 
-    - GitHub: `mcp__github__add_issue_comment` (preferred) or `gh issue comment <issue> --body "..."`
-    - Jira: `mcp__atlassian__addCommentToJiraIssue` (preferred) or `jira issue comment add <issue> "..."`
+    The comment body arrives on stdin through a quoted heredoc (`<<'EOF'` suppresses all expansion, so the checklist's backticked identifiers and `- [ ]` lines need no escaping), never as a double-quoted argument:
+
+    - GitHub: `mcp__github__add_issue_comment` (preferred), or:
+
+      ```bash
+      gh issue comment <issue> --body-file - <<'QA_EOF'
+      <checklist body>
+      QA_EOF
+      ```
+
+    - Jira: `mcp__atlassian__addCommentToJiraIssue` (preferred), or:
+
+      ```bash
+      jira issue comment add <issue> --template - <<'QA_EOF'
+      <checklist body>
+      QA_EOF
+      ```
+
     - Jira note: post this comment as part of (or right after) the move to **Code Review** in step 9, so testers picking up the ticket find the checklist waiting.
 
     ### Where the checks come from

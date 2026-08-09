@@ -168,6 +168,8 @@ If the user declines or can't provide credentials, **skip Steps 7-8** and procee
 
 **CRITICAL — enumerate ALL objects first.** List every table / collection / index in the live database before anything else. Compare against what you documented from code in Steps 3-4. Add anything missing.
 
+**Quote database-derived names.** Never interpolate a database-derived name into a command unquoted; any name not matching `^[A-Za-z0-9_]+$` must go through the engine's identifier-quoting form or be reported and skipped.
+
 **Performance safeguards for large tables:**
 
 - Use estimated counts from system tables (`information_schema.tables.table_rows`, `pg_stat_user_tables.n_live_tup`, `estimatedDocumentCount()`); never `COUNT(*)` on large tables.
@@ -178,7 +180,7 @@ If the user declines or can't provide credentials, **skip Steps 7-8** and procee
 
 Use the schema commands from the "CLI Command Reference" table above, then for each table/collection capture:
 
-- **Indexes** — MySQL: `SHOW INDEX FROM <table>`. PostgreSQL: `SELECT indexname, indexdef FROM pg_indexes WHERE tablename = '<table>';`. MongoDB: `db.<coll>.getIndexes()`. Elasticsearch: `curl -s "$ES_URL/<index>/_mapping" | jq`.
+- **Indexes** — MySQL: ``SHOW INDEX FROM `<table>`;``. PostgreSQL: `psql -v tbl="<table>" -c "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = :'tbl';"`. MongoDB: `db.getCollection("<coll>").getIndexes()`. Elasticsearch: `curl -s "$ES_URL/<index>/_mapping" | jq` with `<index>` URL-encoded.
 - **Date ranges** — `SELECT MIN(created_at), MAX(created_at) FROM <table>;` (or MongoDB `$min`/`$max` aggregation).
 - **Sample document** — MongoDB `db.<coll>.findOne()`; Redis `HGETALL`/`TTL`.
 - **BigQuery** — iterate datasets: `for ds in $(echo "$BQ_DATASETS" | tr ',' ' '); do echo "=== $ds ==="; bq ls --project_id="$BQ_PROJECT" "$ds"; done`. For each table: `bq show --schema --format=prettyjson --project_id="$BQ_PROJECT" "$DATASET.<table>"` and `bq show --project_id="$BQ_PROJECT" "$DATASET.<table>"` (row count, partitioning).
