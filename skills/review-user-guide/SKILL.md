@@ -8,6 +8,8 @@ allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:
 
 Review or create `docs/user-guide.md` from an end-user perspective. Works for all project types and languages.
 
+When another skill invokes this one with a review-only instruction (e.g. code-review-deep's opt-in deep documentation pass), analyze and report findings only — do not create, write, or edit any file.
+
 ## Phase Tracking
 
 Use `TodoWrite` to track progress: one task per phase below. Mark `in_progress` when starting, `completed` when results are recorded. Do NOT include the task list in the final output — it's internal tracking.
@@ -22,6 +24,8 @@ Use `TodoWrite` to track progress: one task per phase below. Mark `in_progress` 
 6. User guide written/updated (if approved)
 
 **Evidence rule:** Every check must record (a) what the guide claims, (b) what the code shows, (c) MATCH / MISMATCH / MISSING. A bare "PASS" without code evidence is invalid.
+
+**Failure rule:** a command that fails or returns nothing stops that step and is reported; never continue on a fabricated value. In particular, if no Phase 2 detection signal matches (the files it reads are absent or unreadable), ask the user for the product type instead of guessing.
 
 ## User Guide Document Structure
 

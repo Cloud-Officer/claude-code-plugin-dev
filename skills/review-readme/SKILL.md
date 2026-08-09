@@ -45,6 +45,8 @@ The README.md must have **exactly** these H2 sections in this exact order — no
 
 This skill uses MCP tools when available and falls back gracefully if they are unavailable or return errors.
 
+**Failure policy (applies to every command and tool call in this skill):** a command that fails or returns nothing stops that step — report what failed and ask how to proceed. Falling back to a documented alternative (MCP → CLI) is allowed; silently substituting fabricated or assumed values for the stored metadata is not.
+
 ### GitHub Access
 
 **Prefer MCP tools** (`mcp__github__*`) when available. If MCP tools are not available (tool not found errors), **fall back to the `gh` CLI**.
@@ -714,3 +716,4 @@ Fix any linting errors before considering the task complete.
 8. **Run linters after changes** - Always run `/co-dev:run-linters` after modifying README.md
 9. **Complete ALL steps** - Never skip analysis steps. Each step may reveal issues not visible in other steps
 10. **Never validate against world knowledge alone** - Do NOT use your training data to fact-check version numbers, release dates, or external claims. If uncertain about something (e.g., "does Ruby 4.0 exist?"), use web search to verify before flagging. Only validate things that can be cross-referenced against actual files in the repository or verified online.
+11. **Review-only invocation** - When another skill invokes this one with a review-only instruction (e.g. code-review-deep's opt-in deep documentation pass), analyze and report findings only: do not create, write, or edit README.md or any other file

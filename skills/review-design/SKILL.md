@@ -236,3 +236,4 @@ After all fixes, run the linters skill:
 5. **Ask before modifying** — Always show the report and get user approval before changing code
 6. **Run linters after changes** — Always run `/co-dev:run-linters` after modifying code
 7. **Figma MCP is required** — If Figma tools are unavailable, point the user at the Setup section and stop. This skill cannot function without Figma access.
+8. **Any failure stops its step** — A command or MCP call that fails or returns nothing stops that step and is reported; never continue on a fabricated value. In particular, if none of the Step 1 auto-detect commands prints a platform, ask the user for the platform instead of guessing.

@@ -16,7 +16,6 @@ Manage AWS infrastructure and services.
 | --- | --- | --- |
 | Search documentation | `mcp__aws__aws___search_documentation` | N/A (no CLI equivalent) |
 | Read documentation page | `mcp__aws__aws___read_documentation` | N/A |
-| Suggest a command | `mcp__aws__aws___suggest_aws_commands` | N/A |
 | Execute API call | `mcp__aws__aws___call_aws` | `aws <service> <command>` |
 | List resources | `mcp__aws__aws___call_aws` | `aws <service> list-*` / `aws <service> describe-*` |
 | List regions | `mcp__aws__aws___list_regions` | `aws ec2 describe-regions` |
