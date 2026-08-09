@@ -129,13 +129,9 @@ Run the project's existing test suite before pushing. A red CI run that a local 
 
 ## Step 5: Push the Branch
 
-**When `git remote get-url origin` starts with `git@` or `ssh://`, push over HTTPS with the gh credential helper instead of SSH:**
-
 ```bash
-git -c credential.helper='!gh auth git-credential' -c 'url.https://github.com/.insteadOf=git@github.com:' push -u origin "$CURRENT_BRANCH"
+git push -u origin "$CURRENT_BRANCH"
 ```
-
-For an HTTPS remote, plain `git push -u origin "$CURRENT_BRANCH"` is fine (the `insteadOf` rewrite simply never matches, so the flags are also harmless to leave on). The reason for avoiding SSH: git opens a fresh SSH session per network command, and IDS routers (Firewalla and similar) read repeated short-lived SSH sessions to github.com as a password-guessing attempt and raise an alarm on the machine running this skill. HTTPS authenticates over TLS with the same `GITHUB_TOKEN` direnv already loaded — no SSH session, no alarm. Both `-c` flags are per-invocation; nothing persistent changes in the repo or global git config. A non-GitHub SSH remote is out of scope for the rewrite — leave it on SSH.
 
 ## Step 6: Open the Pull Request
 
@@ -185,10 +181,8 @@ Leave the repo on the default branch so the user is back at a clean starting poi
 
 ```bash
 git checkout "$DEFAULT_BRANCH"
-git -c credential.helper='!gh auth git-credential' -c 'url.https://github.com/.insteadOf=git@github.com:' pull --ff-only
+git pull --ff-only
 ```
-
-The `-c` flags on the pull are the same SSH-avoidance rule as Step 5, for the same reason: the pull is this skill's other network git command.
 
 **Skip this step when running inside a `git worktree`.** A branch can only be checked out by one worktree at a time, so `git checkout` will fail (or pull the branch out from under the main checkout). Detect with:
 
