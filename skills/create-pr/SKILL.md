@@ -27,12 +27,15 @@ Run the `cd` as a **separate** call — never chain it as `cd … && gh …`. di
 **Step 1.1:** Capture branch info (used in later steps):
 
 ```bash
-DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "master")
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+DEFAULT_BRANCH=${DEFAULT_BRANCH:-master}
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 echo "Default: $DEFAULT_BRANCH | Current: $CURRENT_BRANCH"
 ```
 
-**Every Bash call runs in a fresh shell, so these two values do not persist.** In every later snippet that references `$DEFAULT_BRANCH` or `$CURRENT_BRANCH`, prepend the two assignments above so they are re-derived in that same call. Without that they expand empty — `git push -u origin ""` and `git checkout ""` fail, and `git diff ...HEAD` silently reports no changes.
+The fallback is the `${DEFAULT_BRANCH:-master}` expansion on its own line, never `|| echo "master"` inside the substitution: a pipeline's exit status is its last command's, `sed` exits 0 on empty input, so that `||` can never fire and `DEFAULT_BRANCH` would be silently empty on any clone lacking `refs/remotes/origin/HEAD` — exactly the empty-expansion breakage the next paragraph warns about. The `:-` form tests emptiness, which is the condition that actually occurs.
+
+**Every Bash call runs in a fresh shell, so these two values do not persist.** In every later snippet that references `$DEFAULT_BRANCH` or `$CURRENT_BRANCH`, prepend the assignments above so they are re-derived in that same call. Without that they expand empty — `git push -u origin ""` and `git checkout ""` fail, and `git diff ...HEAD` silently reports no changes.
 
 **Step 1.2:** Get file change summary (THIS IS CRITICAL - you must see ALL files):
 
@@ -92,12 +95,18 @@ If there are unstaged or staged-but-uncommitted changes, commit them now using t
 
 ```bash
 git add -A
-git diff --cached --quiet || git commit -m "<commit message from Step 2>"
+git diff --cached --quiet || git commit -F - <<'COMMIT_MSG_EOF'
+<commit message from Step 2>
+COMMIT_MSG_EOF
 ```
+
+The message arrives on stdin through a quoted heredoc, never as a double-quoted `-m` argument: inside double quotes a backtick is command substitution and a literal `"` ends the argument, and generated text routinely carries both. The quoted delimiter (`<<'...'`) suppresses all expansion, so the message body needs no escaping of any kind.
 
 ## Step 4: Run Tests Locally (gate before pushing)
 
 Run the project's existing test suite before pushing. A red CI run that a local test would have caught is exactly what this step exists to prevent. **If a test harness exists and you have not run it, do not push.**
+
+**Run this suite in the FOREGROUND. Never use `run_in_background` here, and never end your turn while it is running.** This step is a *gate* — unlike the CI watch in Step 7, which is genuinely a background task. Backgrounding a gate does not pause the skill, it abandons it: when this runs headless (`claude -p`), the turn ends as soon as you stop emitting tool calls, so "test started, will push when it finishes" leaves the work committed but never pushed and no PR ever opens. A slow `xcodebuild test` is worth the wait — announcing the wait instead of doing it is not. Raise the Bash tool's `timeout` (up to 600000 ms) for suites that need it, and if the suite genuinely cannot finish inside one call, apply the Step 4.3 exception and say you are skipping it — do **not** background it.
 
 **Step 4.1 — Detect the runner from the repo, including compiled/mobile stacks:**
 
@@ -120,19 +129,28 @@ Run the project's existing test suite before pushing. A red CI run that a local 
 
 ## Step 5: Push the Branch
 
+**When `git remote get-url origin` starts with `git@` or `ssh://`, push over HTTPS with the gh credential helper instead of SSH:**
+
 ```bash
-git push -u origin "$CURRENT_BRANCH"
+git -c credential.helper='!gh auth git-credential' -c 'url.https://github.com/.insteadOf=git@github.com:' push -u origin "$CURRENT_BRANCH"
 ```
+
+For an HTTPS remote, plain `git push -u origin "$CURRENT_BRANCH"` is fine (the `insteadOf` rewrite simply never matches, so the flags are also harmless to leave on). The reason for avoiding SSH: git opens a fresh SSH session per network command, and IDS routers (Firewalla and similar) read repeated short-lived SSH sessions to github.com as a password-guessing attempt and raise an alarm on the machine running this skill. HTTPS authenticates over TLS with the same `GITHUB_TOKEN` direnv already loaded — no SSH session, no alarm. Both `-c` flags are per-invocation; nothing persistent changes in the repo or global git config. A non-GitHub SSH remote is out of scope for the rewrite — leave it on SSH.
 
 ## Step 6: Open the Pull Request
 
 Prefer `mcp__github__create_pull_request` when the GitHub MCP server is available. Otherwise use the GitHub CLI:
 
 ```bash
-PR_URL=$(gh pr create --base "$DEFAULT_BRANCH" --head "$CURRENT_BRANCH" --title "<PR title from Step 2>" --body "<PR body from Step 2>")
+PR_URL=$(gh pr create --base "$DEFAULT_BRANCH" --head "$CURRENT_BRANCH" --title "<PR title from Step 2>" --body-file - <<'PR_BODY_EOF'
+<PR body from Step 2>
+PR_BODY_EOF
+)
 echo "$PR_URL"
 open "$PR_URL" 2>/dev/null || true   # macOS only — a no-op elsewhere, never fatal
 ```
+
+The body arrives on stdin through `--body-file -` and a quoted heredoc, never as a double-quoted `--body` argument: Step 2 authorises the body to be any valid markdown, backticks and quotes included, and inside a double-quoted argument a backtick executes and a `"` truncates. The quoted delimiter suppresses all expansion, so the body needs no escaping — this is the same answer `create-issue` uses for the identical sink, without its temp file. If the body itself contains a line reading exactly `PR_BODY_EOF`, pick a different delimiter for that run. The `--title` value stays on the command line, so keep the PR title free of backticks and double quotes; the title guidelines below say the same.
 
 If a PR already exists for `$CURRENT_BRANCH` (e.g., the caller already opened it), `gh pr create` will fail — treat that as success and continue to Step 7.
 
@@ -163,8 +181,10 @@ Leave the repo on the default branch so the user is back at a clean starting poi
 
 ```bash
 git checkout "$DEFAULT_BRANCH"
-git pull --ff-only
+git -c credential.helper='!gh auth git-credential' -c 'url.https://github.com/.insteadOf=git@github.com:' pull --ff-only
 ```
+
+The `-c` flags on the pull are the same SSH-avoidance rule as Step 5, for the same reason: the pull is this skill's other network git command.
 
 **Skip this step when running inside a `git worktree`.** A branch can only be checked out by one worktree at a time, so `git checkout` will fail (or pull the branch out from under the main checkout). Detect with:
 
@@ -187,6 +207,7 @@ In a worktree, leave the branch in place and let the caller `cd` back to the mai
 - One line only, maximum 80 characters
 - Should summarize the overall purpose of the PR
 - Can be similar to commit message but may be slightly more descriptive
+- No backticks or double quotes: the title is the one Step 2 value interpolated into a double-quoted shell argument (the body and commit message travel over stdin and carry no such restriction)
 
 ## PR Body Guidelines
 

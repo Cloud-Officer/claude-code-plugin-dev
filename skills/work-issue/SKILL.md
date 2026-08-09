@@ -315,6 +315,7 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
    - For Feature type, follow the architecture chosen in step 6
    - For Bug/Task, implement the fix directly
    - If Figma design context was extracted in step 2, use it to match the design (spacing, colors, typography, component structure)
+   - **Comment discipline: first decide whether a comment is needed at all, and prefer none** — the code and its names should carry the meaning. When one is genuinely needed, keep it to one brief line stating what the code cannot say, and never reference an issue, ticket or PR number in it: those belong in the commit message and the tracker, and a comment narrating the change or its history is reviewer-talk that rots the moment it merges
    - Implement incrementally, get user approval before proceeding to the next major change
 
 8. **Write and run unit tests** (hard gate — required for any change that alters behavior: Bug, Feature, and Task alike)

@@ -249,7 +249,8 @@ modules.xml
 .LSOverride
 
 # Icon must end with two \r
-Icon
+Icon
+
 
 # Thumbnails
 ._*
@@ -477,3 +478,4 @@ $RECYCLE.BIN/
 # END AI Assistants
 
 docs/code-review.md
+docs/prompt-review.md
