@@ -1,6 +1,6 @@
 ---
 name: appstore
-description: Manage App Store Connect apps, builds, or distribution. Use when the user wants to check builds, manage TestFlight beta groups and testers, read or respond to App Store reviews, manage in-app purchases, subscriptions, pricing, list app versions, check app status, manage certificates, provisioning profiles, screenshots, app metadata, or perform any App Store Connect operation.
+description: Manage App Store Connect apps, builds, or distribution. Use when the user wants to check builds, manage TestFlight beta groups and testers, read or respond to App Store reviews, manage in-app purchases and their price schedules, list app versions, check app status, or investigate Xcode Cloud build failures.
 allowed-tools: Bash(echo:*), Bash(jq:*), Bash(curl:*), Bash(python3:*), Bash(unzip:*), Bash(xcrun:*), mcp__appstore__*
 ---
 
@@ -12,7 +12,7 @@ Manage iOS/macOS apps on App Store Connect.
 
 Use MCP tools (`mcp__appstore__*`) for all App Store Connect operations. **There is no separate CLI.** The `asc-mcp` binary IS the MCP server. If MCP tools are not available, inform the user and stop.
 
-The MCP server provides ~60 tools across these categories:
+The MCP server runs the `apps,builds,versions,reviews,beta_groups,iap` workers, providing tools across these categories (and only these — subscriptions, certificates, provisioning profiles, screenshots and app metadata are not served):
 
 | Category | Operations |
 | --- | --- |
@@ -22,7 +22,6 @@ The MCP server provides ~60 tools across these categories:
 | TestFlight | Manage beta groups, beta testers, beta app review submissions |
 | Reviews | List customer reviews, get review details, respond to reviews |
 | In-App Purchases | List IAPs, get IAP details, manage IAP price schedules |
-| Subscriptions | List subscription groups, subscriptions, manage pricing |
 
 ## Prerequisites
 

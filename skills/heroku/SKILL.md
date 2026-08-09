@@ -40,7 +40,7 @@ This skill uses the `heroku` CLI for all operations.
 ## Important Rules
 
 - **Never scale, restart, or modify config without user confirmation**
-- **Every value interpolated into a heroku command is untrusted** — pass it as a single-quoted shell argument, and reject any app or pipeline name not matching `^[a-z0-9][a-z0-9-]*$` and any dyno count that is not a bare integer
+- **Every value interpolated into a heroku command is untrusted** — pass it as a single-quoted shell argument with every embedded `'` rewritten as `'\''` before quoting (this covers `<SQL>` and every other free-text placeholder), and reject any app or pipeline name not matching `^[a-z0-9][a-z0-9-]*$` and any dyno count that is not a bare integer
 - **Mask config vars** — Config vars may contain secrets; do not display values unless explicitly asked
 - **Log tail** — When viewing logs, use `--num 100` or similar limit to avoid flooding output
 - **Cost awareness** — Warn when scaling up dynos as it affects billing

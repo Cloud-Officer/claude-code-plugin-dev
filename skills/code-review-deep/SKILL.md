@@ -46,6 +46,10 @@ Prefer MCP tools (`mcp__github__*`, `mcp__context7__*`) when available; fall bac
 | Issues enabled | `gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'` | n/a |
 | Library docs | `mcp__context7__*` | `WebSearch` |
 
+## Failure Policy
+
+A command or tool call that fails or returns nothing stops the step it belongs to and is reported to the user — never continue on a fabricated, empty, or defaulted value. In Step 2 specifically: if `gh repo view` fails (direnv did not load, token lacks scope, no GitHub remote), `OWNER_REPO` is empty and the fallback values would fabricate the repository context — stop and report instead of computing `team_profile` from made-up numbers. If the workflow returns `ok: false`, stop and report its `reason` (e.g. `stack-scout-failed`); write no report.
+
 ---
 
 ## STEP 1 — PRE-FLIGHT CHECK: Existing Report
@@ -120,6 +124,7 @@ The workflow runs in the background and notifies you on completion. It **returns
 {
   phase1:     { stack, configs, structure },
   agents_run: ["security", "quality", ...],   // for the Review Coverage checklist
+  agents_failed: ["backend", ...],            // agents that errored or returned nothing — mark ❌, their areas were NOT reviewed
   kept:       [ { id, severity, category, file, line, description, impact, fix,
                   agent, confidence_score, code_quoted, confirmation_evidence } ],
   filtered:   [ ... same shape; survived validation but below threshold ],
@@ -138,7 +143,7 @@ If the user explicitly asks to change strictness (e.g. "be aggressive — keep e
 
 When opted in, run the dedicated skills in review-only mode and fold their findings into this report — the three documentation skills (which verify doc **content against the code**, something the workflow does not) plus the two security-review skills below.
 
-Invoke each via the **Skill** tool in **review-only** mode — they must NOT create or modify any files during a deep review; we only want their findings:
+Invoke each via the **Skill** tool. "Review-only" is **not a mode these skills document** — it is a constraint imposed here, solely by the instruction passed as each skill's args below — so state it explicitly on every invocation: they must NOT create or modify any files during a deep review; we only want their findings. After each skill returns, run `git status --short` to verify it wrote nothing; if it did create or modify files, revert them and note the incident in the report.
 
 - `co-dev:review-readme`
 - `co-dev:review-architecture`
@@ -154,7 +159,7 @@ Each skill self-exempts when its document doesn't apply (e.g. no end-user produc
 
 ### Security-review skills (same opt-in)
 
-Under the **same** deep-review opt-in, also invoke these two via the **Skill** tool in **review-only** mode — findings only. They must **not** write `docs/threat-model.md` / `docs/ownership-map.md` during a code review; the deep review consolidates everything into `docs/code-review.md`.
+Under the **same** deep-review opt-in, also invoke these two via the **Skill** tool with the same explicit review-only instruction in their args (and the same `git status --short` check afterwards) — findings only. They must **not** write `docs/threat-model.md` / `docs/ownership-map.md` during a code review; the deep review consolidates everything into `docs/code-review.md`.
 
 - `co-dev:review-threat-model` — trust boundaries and STRIDE abuse paths. Fold each threat in as a `THREAT-*` finding (label `security`), severity from its likelihood × impact. Cross-link to any `SEC-*` code finding on the same sink and deduplicate (same root cause).
 - `co-dev:review-ownership-map` — bus factor and knowledge risk. Fold single-point-of-failure findings on **sensitive** code (auth/crypto/payment/IaC) as `OWN-*` findings (label `knowledge-risk`), severity by how critical the file is. This complements the workflow's governance / `team_profile` reasoning with file-level detail.
@@ -175,7 +180,7 @@ Then:
 4. Sort by severity (Critical → High → Medium → Low → Info).
 5. Write `docs/code-review.md` (create the directory if needed).
 6. Include `positives` (grouped by area) and the quantitative `counts` in the report.
-7. Build the **Review Coverage** checklist from `agents_run`; add the three doc skills and the two security-review skills (`review-threat-model` / `review-ownership-map`) only when Step 3.5 ran (mark agents/skills that did not run, were not opted into, or self-exempted as N/A, not as failures).
+7. Build the **Review Coverage** checklist from `agents_run`; mark every agent listed in `agents_failed` as ❌ with a note that its area was not reviewed; add the three doc skills and the two security-review skills (`review-threat-model` / `review-ownership-map`) only when Step 3.5 ran (mark agents/skills that did not run, were not opted into, or self-exempted as N/A, not as failures).
 
 Do NOT include internal workflow/phase tracking in the final report.
 

@@ -37,6 +37,8 @@ Prefer MCP tools when available — they handle connection management. Fall back
 
 ## CLI Command Reference
 
+**One interpolation rule for every command and query in this skill.** Never interpolate into a command any name, pattern or value that did not originate in this file — whether it came from the database, the repository, an existing `docs/db.md`, or the environment. Pass each one as a quoted shell variable; any identifier not matching `^[A-Za-z0-9_]+$` must go through the engine's identifier-quoting form or be reported and skipped. BigQuery dataset names come only from `$BQ_DATASETS`, must match that pattern, and are always bound as Step 7's loop variable `$ds` — never any other variable.
+
 | Database | Connect / Query | List schema |
 | -------- | --------------- | ----------- |
 | MySQL | `MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "<SQL>"` | `SELECT table_name, table_rows FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY table_rows DESC;` (estimates, instant) |
@@ -45,7 +47,7 @@ Prefer MCP tools when available — they handle connection management. Fall back
 | MongoDB | `mongosh "$MONGODB_URI" --eval "<JS>"` | `db.getCollectionNames().forEach(c => print(c + ': ' + db[c].estimatedDocumentCount()))` |
 | Elasticsearch | `curl -s "$ES_URL/<endpoint>"` (add `-H "Authorization: ApiKey $ES_API_KEY"` if set) | `curl -s "$ES_URL/_cat/indices?v&h=index,docs.count,store.size"` |
 | Redis | `redis-cli -u "$REDIS_URL" <CMD>` | `DBSIZE`, `SCAN 0 MATCH <pattern> COUNT 100` |
-| BigQuery | `bq query --use_legacy_sql=false --format=prettyjson --project_id="$BQ_PROJECT" "<SQL>"` | `bq ls --project_id="$BQ_PROJECT" "$DATASET"`; `bq show --schema --format=prettyjson --project_id="$BQ_PROJECT" "$DATASET.<table>"` |
+| BigQuery | `bq query --use_legacy_sql=false --format=prettyjson --project_id="$BQ_PROJECT" "<SQL>"` | inside Step 7's `for ds` loop: `bq ls --project_id="$BQ_PROJECT" "$ds"`; `bq show --schema --format=prettyjson --project_id="$BQ_PROJECT" "$ds.<table>"` |
 
 ## Steps
 
@@ -168,7 +170,7 @@ If the user declines or can't provide credentials, **skip Steps 7-8** and procee
 
 **CRITICAL — enumerate ALL objects first.** List every table / collection / index in the live database before anything else. Compare against what you documented from code in Steps 3-4. Add anything missing.
 
-**Quote database-derived names.** Never interpolate a database-derived name into a command unquoted; any name not matching `^[A-Za-z0-9_]+$` must go through the engine's identifier-quoting form or be reported and skipped.
+**Objects that error are unreadable, not nonexistent.** If any per-object query fails mid-run (permission denied, table dropped between enumeration and inspection, a dataset the caller cannot list), still list the object in "All Tables / Collections / Indices" with its columns marked `not readable — <error>`, and count it for Step 9's `(partial: N objects unreadable)` note. Never silently drop it.
 
 **Performance safeguards for large tables:**
 
@@ -183,7 +185,7 @@ Use the schema commands from the "CLI Command Reference" table above, then for e
 - **Indexes** — MySQL: ``SHOW INDEX FROM `<table>`;``. PostgreSQL: `psql -v tbl="<table>" -c "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = :'tbl';"`. MongoDB: `db.getCollection("<coll>").getIndexes()`. Elasticsearch: `curl -s "$ES_URL/<index>/_mapping" | jq` with `<index>` URL-encoded.
 - **Date ranges** — `SELECT MIN(created_at), MAX(created_at) FROM <table>;` (or MongoDB `$min`/`$max` aggregation).
 - **Sample document** — MongoDB `db.<coll>.findOne()`; Redis `HGETALL`/`TTL`.
-- **BigQuery** — iterate datasets: `for ds in $(echo "$BQ_DATASETS" | tr ',' ' '); do echo "=== $ds ==="; bq ls --project_id="$BQ_PROJECT" "$ds"; done`. For each table: `bq show --schema --format=prettyjson --project_id="$BQ_PROJECT" "$DATASET.<table>"` and `bq show --project_id="$BQ_PROJECT" "$DATASET.<table>"` (row count, partitioning).
+- **BigQuery** — iterate datasets: `for ds in $(echo "$BQ_DATASETS" | tr ',' ' '); do echo "=== $ds ==="; bq ls --project_id="$BQ_PROJECT" "$ds"; done`. For each table, inside the same `for ds` loop: `bq show --schema --format=prettyjson --project_id="$BQ_PROJECT" "$ds.<table>"` and `bq show --project_id="$BQ_PROJECT" "$ds.<table>"` (row count, partitioning).
 
 ### Step 8 — Sample enum / status field values
 
@@ -194,7 +196,7 @@ Use safe sampling depending on table size:
 | MySQL/PostgreSQL | `SELECT status, COUNT(*) FROM TABLE GROUP BY status ORDER BY count DESC;` | Add `WHERE created_at >= NOW() - INTERVAL 30 DAY` (PG: `INTERVAL '30 days'`) | `SELECT DISTINCT status FROM TABLE LIMIT 20;` |
 | MongoDB | `db.COLL.aggregate([{$group: {_id: "$status", count: {$sum: 1}}}, {$sort: {count: -1}}])` | Prepend `{$sample: {size: 10000}}` to the pipeline | (sampled) |
 | Elasticsearch | `terms` aggregation with `size: 0` (always safe — uses approximate counts) | same | same |
-| BigQuery | `SELECT status, COUNT(*) FROM \`$BQ_PROJECT.$DATASET.TABLE\` GROUP BY status ORDER BY count DESC LIMIT 20;` | Use `APPROX_COUNT_DISTINCT(ID)` and always include partition filter | `--dry_run` first to estimate cost |
+| BigQuery | inside Step 7's `for ds` loop: `SELECT status, COUNT(*) FROM \`$BQ_PROJECT.$ds.TABLE\` GROUP BY status ORDER BY count DESC LIMIT 20;` | Use `APPROX_COUNT_DISTINCT(ID)` and always include partition filter | `--dry_run` first to estimate cost |
 
 ### Step 9 — Update `docs/db.md` with verified data
 
@@ -211,6 +213,7 @@ Use safe sampling depending on table size:
 **"Last verified" line at top of `docs/db.md`:**
 
 - Live DB verified: `> **Last verified**: YYYY-MM-DD — verified against live database`
+- Live DB verified but some objects errored in Steps 7-8: `> **Last verified**: YYYY-MM-DD — verified against live database (partial: N objects unreadable)`
 - Code-only (Steps 7-8 skipped): `> **Last verified**: YYYY-MM-DD — derived from code analysis only (not verified against live database)`
 
 ## Document Templates
@@ -330,6 +333,7 @@ If multiple DBs are used, the file has one H1 + a "Databases Used" list, then on
 
 ## Rules
 
+- **Failure policy** — any command or query that fails or returns nothing stops that step and is reported with the exact command and its output; never continue on a fabricated or assumed value. The one sanctioned deviation is Step 7's per-object rule: an object that errors is still listed as `not readable — <error>` and the "Last verified" line records the partial coverage.
 - Keep descriptions concise and focused on querying needs.
 - Use actual values from the codebase, not placeholders.
 - Note gotchas (soft deletes, tenant isolation, TTLs, partitioning).

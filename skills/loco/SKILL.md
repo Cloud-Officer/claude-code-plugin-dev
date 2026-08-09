@@ -52,14 +52,25 @@ curl -s -f -H "Authorization: Loco $LOCO_API_KEY" "https://localise.biz/api/asse
 ### Create Asset
 
 ```bash
+jq -sRj 'rtrimstr("\n")' <<'LOCO_ID_EOF' >/tmp/loco-id.txt
+$KEY
+LOCO_ID_EOF
+jq -sRj 'rtrimstr("\n")' <<'LOCO_TEXT_EOF' >/tmp/loco-text.txt
+$TEXT
+LOCO_TEXT_EOF
+jq -sRj 'rtrimstr("\n")' <<'LOCO_CTX_EOF' >/tmp/loco-context.txt
+$CONTEXT
+LOCO_CTX_EOF
 curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  --data-urlencode "id=$KEY" \
-  --data-urlencode "text=$TEXT" \
+  --data-urlencode "id@/tmp/loco-id.txt" \
+  --data-urlencode "text@/tmp/loco-text.txt" \
   -d "type=text" \
-  --data-urlencode "context=$CONTEXT" \
+  --data-urlencode "context@/tmp/loco-context.txt" \
   https://localise.biz/api/assets
 ```
+
+The heredocs and the curl run in the same command — later commands run in a fresh shell. Omit the `context` line (and its heredoc) when no context was given.
 
 ### Delete Asset
 
@@ -73,17 +84,31 @@ curl -s -f -X DELETE -H "Authorization: Loco $LOCO_API_KEY" \
 ```bash
 curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: text/plain" \
-  --data-raw "$TRANSLATION_TEXT" \
-  "https://localise.biz/api/translations/$ASSET_ID/$LOCALE"
+  --data-binary @- \
+  "https://localise.biz/api/translations/$(jq -sRr 'rtrimstr("\n")|@uri' <<'LOCO_KEY_EOF'
+$ASSET_ID
+LOCO_KEY_EOF
+)/$(jq -sRr 'rtrimstr("\n")|@uri' <<'LOCO_LOCALE_EOF'
+$LOCALE
+LOCO_LOCALE_EOF
+)" <<'LOCO_EOF'
+$TRANSLATION_TEXT
+LOCO_EOF
 ```
 
 ### Tag an Asset
 
 ```bash
+jq -sRj 'rtrimstr("\n")' <<'LOCO_TAG_EOF' >/tmp/loco-tag.txt
+$TAG_NAME
+LOCO_TAG_EOF
 curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "name=$TAG_NAME" \
-  "https://localise.biz/api/assets/$ASSET_ID/tags"
+  --data-urlencode "name@/tmp/loco-tag.txt" \
+  "https://localise.biz/api/assets/$(jq -sRr 'rtrimstr("\n")|@uri' <<'LOCO_KEY_EOF'
+$ASSET_ID
+LOCO_KEY_EOF
+)/tags"
 ```
 
 ### List Project Locales
@@ -185,17 +210,28 @@ If the user confirms or the key matches conventions, continue.
 
 #### Step 5: Create the Asset
 
+Use the fenced form from the API Reference — the heredocs and the curl in one command, values entering only through files:
+
 ```bash
+jq -sRj 'rtrimstr("\n")' <<'LOCO_ID_EOF' >/tmp/loco-id.txt
+$KEY
+LOCO_ID_EOF
+jq -sRj 'rtrimstr("\n")' <<'LOCO_TEXT_EOF' >/tmp/loco-text.txt
+$TEXT
+LOCO_TEXT_EOF
+jq -sRj 'rtrimstr("\n")' <<'LOCO_CTX_EOF' >/tmp/loco-context.txt
+$CONTEXT
+LOCO_CTX_EOF
 curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  --data-urlencode "id=$KEY" \
-  --data-urlencode "text=$TEXT" \
+  --data-urlencode "id@/tmp/loco-id.txt" \
+  --data-urlencode "text@/tmp/loco-text.txt" \
   -d "type=text" \
-  --data-urlencode "context=$CONTEXT" \
+  --data-urlencode "context@/tmp/loco-context.txt" \
   https://localise.biz/api/assets
 ```
 
-If the creation fails, report the error and stop.
+Omit the `context` line (and its heredoc) when `--context` was not given. If the creation fails, report the error and stop.
 
 #### Step 6: Set English Translation
 
@@ -238,7 +274,10 @@ curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   "https://localise.biz/api/translations/$(jq -sRr 'rtrimstr("\n")|@uri' <<'LOCO_KEY_EOF'
 $KEY
 LOCO_KEY_EOF
-)/$LOCALE" <<'LOCO_EOF'
+)/$(jq -sRr 'rtrimstr("\n")|@uri' <<'LOCO_LOCALE_EOF'
+$LOCALE
+LOCO_LOCALE_EOF
+)" <<'LOCO_EOF'
 $TRANSLATED_TEXT
 LOCO_EOF
 ```
@@ -257,12 +296,15 @@ LOCO_KEY_EOF
 )/tags"
 ```
 
-If `--tags` was provided, also apply each custom tag:
+If `--tags` was provided, also apply each custom tag — the tag enters through a heredoc-written file, never inline:
 
 ```bash
+jq -sRj 'rtrimstr("\n")' <<'LOCO_TAG_EOF' >/tmp/loco-tag.txt
+$TAG
+LOCO_TAG_EOF
 curl -s -f -X POST -H "Authorization: Loco $LOCO_API_KEY" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "name=$TAG" \
+  --data-urlencode "name@/tmp/loco-tag.txt" \
   "https://localise.biz/api/assets/$(jq -sRr 'rtrimstr("\n")|@uri' <<'LOCO_KEY_EOF'
 $KEY
 LOCO_KEY_EOF
@@ -364,6 +406,8 @@ curl -s -f -H "Authorization: Loco $LOCO_API_KEY" https://localise.biz/api/asset
 ```
 
 Write the full list to a file — later commands run in a fresh shell and cannot read it from a variable.
+
+The pipeline's exit status is `tee`'s, not curl's, so a failed fetch shows up as an empty file, not an error. Before continuing, check `wc -l </tmp/loco-keys.txt`: if the file is empty, stop and report the fetch failure (Guardrail 7) — scanning against an empty key list would produce a clean-looking report from no data.
 
 #### Step 3: Detect Platform(s)
 
@@ -524,7 +568,8 @@ Compare the sets. If any placeholder is missing or added in the translation, the
 3. **Always use Authorization header** — Never pass the API key as a query parameter (`?key=...`). Always use `Authorization: Loco $LOCO_API_KEY`.
 4. **Tag all auto-translations** — Every asset with auto-translated text gets the `needs-review` tag.
 5. **Skip on placeholder failure** — If placeholder validation fails for a locale, skip it and report the failure rather than pushing a broken translation.
-6. **No inline pasting of untrusted values** — No user- or model-supplied value is ever pasted inline into a command: every such value enters a command only through a quoted heredoc (`<<'LOCO_EOF'`), which is literal by definition.
+6. **Fence every value this skill does not control** — Every such value — user-supplied arguments (key, text, context, tags), model-generated translations, and anything returned by the Loco API (asset IDs, locale codes, tag names) — enters a command only through a quoted heredoc (`<<'LOCO_EOF'`), which is literal by definition: request bodies via `--data-binary @-`, form fields via `--data-urlencode "field@/tmp/loco-*.txt"` with the file written by a heredoc in the same command, and URL path segments via the `jq -sRr 'rtrimstr("\n")|@uri'` heredoc encoder. Nothing in this class is ever pasted inline into a command, in any step or reference template, present or future.
+7. **Stop on any failure** — Any command that fails, times out, or returns empty where content is required stops that unit of work: name the failing step and the error, and never substitute a guessed, partial, or empty result and continue as if it succeeded.
 
 ## Rules
 

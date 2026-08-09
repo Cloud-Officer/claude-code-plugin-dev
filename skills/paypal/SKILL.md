@@ -45,6 +45,7 @@ Use MCP tools (`mcp__paypal__*`) for all PayPal operations. **There is no PayPal
 ## Important Rules
 
 - **Never create invoices or send payments without user confirmation**
+- **Any failure stops its step** — An MCP call that fails or returns nothing stops that step and is reported to the user; never continue on a fabricated or assumed value, and never present results built from a failed call
 - **Format currency properly** — Display amounts with proper decimal places and currency codes
 - **Mask sensitive data** — Do not display full account numbers or personal details
 - **MCP required** — This skill cannot function without PayPal MCP access. If unavailable, point the user at the Setup section and stop.

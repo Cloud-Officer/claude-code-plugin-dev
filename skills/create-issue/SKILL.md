@@ -31,7 +31,7 @@ This skill uses MCP tools when available and falls back gracefully if they are u
 | Operation | MCP Tool | CLI Fallback |
 | --- | --- | --- |
 | Check issues enabled | `mcp__github__list_issues` (if it succeeds, issues are enabled) | `gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'` |
-| Create issue | `mcp__github__create_issue` | `gh issue create --title "..." --body-file issue-body.md --label "..."` |
+| Create issue | `mcp__github__create_issue` | `gh issue create --title '...' --body-file issue-body.md --label '...'` |
 | Get repo owner/name | Parse from `git remote get-url origin` | `gh repo view --json owner,name` |
 
 ### Jira Access
@@ -40,7 +40,7 @@ This skill uses MCP tools when available and falls back gracefully if they are u
 
 | Operation | MCP Tool | CLI Fallback |
 | --- | --- | --- |
-| Create issue | `mcp__atlassian__createJiraIssue` | `jira issue create --no-input --type "..." --priority "..." --summary "..."` |
+| Create issue | `mcp__atlassian__createJiraIssue` | `jira issue create --no-input --type '...' --priority '...' --summary '...'` |
 | Get issue type metadata | `mcp__atlassian__getJiraIssueTypeMetaWithFields` | N/A (not needed with CLI) |
 | Get project issue types | `mcp__atlassian__getJiraProjectIssueTypesMetadata` | N/A (not needed with CLI) |
 | List projects | `mcp__atlassian__getVisibleJiraProjects` | N/A (not needed with CLI) |
@@ -56,6 +56,7 @@ This skill uses MCP tools when available and falls back gracefully if they are u
 
    - If `true` → Create GitHub issue
    - If `false` → Create Jira issue
+   - Any other output (error, empty — e.g. non-GitHub remote, unauthenticated `gh`) → stop and report the raw output; never pick a tracker by guess
 
 3. **Determine issue type**: Task, Bug, or Story
 4. **Check for assignee** in user's request
@@ -80,10 +81,10 @@ With the MCP tool, pass the same values the CLI flags carry: the title, the body
 With the CLI:
 
 ```bash
-gh issue create --title "<SUMMARY>" --body-file issue-body.md --label "<LABEL>"
+gh issue create --title '<SUMMARY>' --body-file issue-body.md --label '<LABEL>'
 ```
 
-Add `--assignee "<username>"` if user specified an assignee.
+Add `--assignee '<username>'` if user specified an assignee.
 
 **Note:** No repo name prefix needed - GitHub issues are already scoped to the repository.
 
@@ -111,14 +112,14 @@ Use the appropriate template based on issue type (see Templates section below).
 
 ```bash
 jira issue create --no-input \
-  --type "<TYPE>" \
-  --priority "<PRIORITY>" \
-  --label "<LABEL>" \
-  --summary "[<REPO-NAME>] <SUMMARY>" \
+  --type '<TYPE>' \
+  --priority '<PRIORITY>' \
+  --label '<LABEL>' \
+  --summary '[<REPO-NAME>] <SUMMARY>' \
   --template issue-body.md
 ```
 
-Add `--assignee "<username>"` if user specified an assignee.
+Add `--assignee '<username>'` if user specified an assignee.
 
 ### Step 2c: Delete the temp file
 
@@ -318,7 +319,8 @@ Detailed explanation of what should have happened.
   - Do NOT specify a project (`-p` or `--project`) - use default from user's config
   - Set 15 second timeout - if it hangs, the command is malformed
 - **Both:**
-  - Never interpolate user-supplied text into a shell command string. Prefer the MCP tool, whose arguments are passed structurally; with the CLI, write every user-supplied value to a file and pass it by path (`--body-file`, `--template`), or pass it as a single-quoted literal with embedded single quotes escaped
+  - Every value this skill does not control — anything taken from the user's request, from git or tracker output, or from a file — reaches a shell command only by file path (`--body-file`, `--template`), as a single-quoted literal with embedded single quotes escaped, or as a structured MCP argument. Never place such a value inside double quotes, where `$`, backticks and `\` stay live; the command blocks above show the single-quoted form
+  - Any command that fails, hangs, or returns output matching no expected branch stops that step: report the raw output and stop — never continue on a guessed or fabricated value (tracker, project, username, or otherwise)
   - Use Markdown format
   - Use `##` for main headings, `-` for bullet points
   - Use backticks for inline code
