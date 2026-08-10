@@ -13,7 +13,16 @@ globs:
   - "!**/dist/**"
   - "!**/build/**"
   - "!**/target/**"
+  # Skill-generated review artifacts under docs/: rewritten wholesale on every run and
+  # gitignored, so lint failures there are noise. Living docs a skill creates once and then
+  # maintains (README.md, docs/architecture.md, docs/user-guide.md, docs/db.md,
+  # docs/ownership-map.md, docs/threat-model.md) stay linted. Root-level run reports
+  # (WEEKLY_REPORT.md, SPRINT.md, issue-body.md, ...) are self-deleted by their skills.
   - "!docs/code-review.md"
+  - "!docs/copy-review.md"
+  - "!docs/migration/**"
+  - "!docs/prompt-review.md"
+  - "!docs/seo-audit.md"
 config:
   default: true
   first-line-heading: false
