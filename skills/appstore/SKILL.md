@@ -36,7 +36,7 @@ If these are not set, the MCP server will fail to start.
 ## Usage
 
 1. **Understand the request** — What does the user want? (check builds, manage TestFlight, read reviews)
-2. **Identify the app** — Which app? Use `mcp__appstore__list_apps` if needed.
+2. **Identify the app** — Which app? Use `mcp__appstore__listApps` if needed.
 3. **Execute** — Use MCP tools
 4. **Present results** — Format app info clearly with version numbers, build states, and dates
 

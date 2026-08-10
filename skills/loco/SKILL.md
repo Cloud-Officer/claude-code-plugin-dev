@@ -46,7 +46,11 @@ curl -s -f -H "Authorization: Loco $LOCO_API_KEY" https://localise.biz/api/asset
 ### Get Single Asset
 
 ```bash
-curl -s -f -H "Authorization: Loco $LOCO_API_KEY" "https://localise.biz/api/assets/$ASSET_ID"
+curl -s -f -H "Authorization: Loco $LOCO_API_KEY" \
+  "https://localise.biz/api/assets/$(jq -sRr 'rtrimstr("\n")|@uri' <<'LOCO_KEY_EOF'
+$ASSET_ID
+LOCO_KEY_EOF
+)"
 ```
 
 ### Create Asset
@@ -76,7 +80,10 @@ The heredocs and the curl run in the same command — later commands run in a fr
 
 ```bash
 curl -s -f -X DELETE -H "Authorization: Loco $LOCO_API_KEY" \
-  "https://localise.biz/api/assets/$ASSET_ID"
+  "https://localise.biz/api/assets/$(jq -sRr 'rtrimstr("\n")|@uri' <<'LOCO_KEY_EOF'
+$ASSET_ID
+LOCO_KEY_EOF
+)"
 ```
 
 ### Set Translation for a Locale

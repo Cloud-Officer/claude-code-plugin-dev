@@ -10,6 +10,8 @@ Produce an **application-security-grade, repo-specific threat model** — not a 
 
 The mid-2026 pattern this skill follows: **LLM-assisted generation with a human reviewer who signs off** — the model drafts a credible first pass, prunes false positives, and rates risk, but a human owns the accept/mitigate decision. State that explicitly in the output.
 
+When another skill invokes this one with a review-only instruction (e.g. code-review-deep's opt-in deep security pass), analyze and report findings only — do not create, write, or edit any file.
+
 ## When to Use
 
 - Before building or reviewing a service, feature, or internet-exposed interface (design-phase threat modeling — ISO 27001 A.8.25 / A.8.27).

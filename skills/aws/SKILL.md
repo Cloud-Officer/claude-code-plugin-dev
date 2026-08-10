@@ -40,7 +40,7 @@ aws cloudwatch get-metric-statistics --namespace AWS/EC2 --metric-name CPUUtiliz
 aws rds describe-db-instances --query 'DBInstances[].{ID:DBInstanceIdentifier,Status:DBInstanceStatus,Engine:Engine}'
 ```
 
-**Note:** The `aws` CLI requires credentials via `aws configure` or env vars (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`). Set `AWS_PROFILE` to select a specific named profile (e.g., `export AWS_PROFILE=production`). Both the MCP server and CLI respect this variable. If neither the MCP nor CLI is available, inform the user and stop.
+**Note:** The `aws` CLI requires credentials via `aws configure` or env vars (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`). Set `AWS_PROFILE` to select a specific named profile (e.g., `export AWS_PROFILE=production`). Both the MCP server and CLI respect this variable. If any MCP call or CLI command fails, exits non-zero, or returns output that does not parse, stop, report the exact error text to the user, and never present an empty or partial result as an answer — do not retry or substitute another region, profile or command.
 
 ## Usage
 

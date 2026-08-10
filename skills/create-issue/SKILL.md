@@ -47,7 +47,7 @@ This skill uses MCP tools when available and falls back gracefully if they are u
 
 ## Step 1: Detect Issue Tracker
 
-1. **Get repository name**: `basename $(git rev-parse --show-toplevel)`
+1. **Get repository name**: `basename "$(git rev-parse --show-toplevel)"`
 2. **Check if GitHub issues are enabled**:
 
    ```bash

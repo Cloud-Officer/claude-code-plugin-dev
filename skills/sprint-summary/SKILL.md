@@ -37,11 +37,11 @@ This skill uses MCP tools when available and falls back gracefully if they are u
 
 | Operation | MCP Tool | CLI Fallback |
 | --- | --- | --- |
-| Search sprint issues | `mcp__atlassian__searchJiraIssuesUsingJql` with `sprint = <ID>` | `jira sprint list <ID> --raw` |
+| Search sprint issues | `mcp__atlassian__searchJiraIssuesUsingJql` with `sprint = '<ID>'` | `jira sprint list '<ID>' --raw` |
 | Get issue details | `mcp__atlassian__getJiraIssue` | `jira issue view <KEY> --raw` |
 | Update estimate | `mcp__atlassian__editJiraIssue` | `jira issue edit <KEY> --no-input -o "Original Estimate=<HOURS>h"` |
 
-**Note:** When using MCP tools, use JQL queries to filter sprint issues: `sprint = <SPRINT_ID> AND issuetype in (Task, Bug) AND status not in (Done, Closed, Resolved, "Ready to Test", "In QA", Testing)`.
+**Note:** When using MCP tools, use JQL queries to filter sprint issues: `sprint = '<SPRINT_ID>' AND issuetype in (Task, Bug) AND status not in (Done, Closed, Resolved, "Ready to Test", "In QA", Testing)`.
 
 ## Step 1: Identify Sprint
 
@@ -52,6 +52,8 @@ This skill uses MCP tools when available and falls back gracefully if they are u
    ```
 
    If multiple active sprints exist, ask the user which one to use.
+
+   The sprint identifier used in every later command must match `^[0-9]+$`: when the user provides a name or anything non-numeric, resolve it to the numeric ID from the matching `jira sprint list` row and use that; if it still does not match, stop and ask. Always interpolate it single-quoted — `jira sprint list '<SPRINT_ID>'` — including inside the JQL string.
 
 2. **Record the sprint's start and end dates.** Step 7 derives capacity from them, so never assume a sprint length. When the user named a specific sprint, drop `--state active` from the command above and take the row whose ID matches.
 
@@ -72,7 +74,7 @@ This skill uses MCP tools when available and falls back gracefully if they are u
 Fetch all issues in the sprint as raw JSON, filtering to only tasks and bugs:
 
 ```bash
-jira sprint list <SPRINT_ID> --raw | jq '[.[] | select(.fields.issuetype.name != "Story" and .fields.issuetype.name != "Epic" and .fields.issuetype.name != "Sub-task") | select(.fields.status.name | test("(?i)qa|ready.to.test|ready.for.test|testing|done|closed|resolved") | not)]'
+jira sprint list '<SPRINT_ID>' --raw | jq '[.[] | select(.fields.issuetype.name != "Story" and .fields.issuetype.name != "Epic" and .fields.issuetype.name != "Sub-task") | select(.fields.status.name | test("(?i)qa|ready.to.test|ready.for.test|testing|done|closed|resolved") | not)]'
 ```
 
 **Excluded statuses**: Items in QA, testing, done, or similar states are already completed and must not appear in the report. Exclude any status matching: QA, Ready to Test, Ready for Test, Testing, In QA, Done, Closed, Resolved.
@@ -80,7 +82,7 @@ jira sprint list <SPRINT_ID> --raw | jq '[.[] | select(.fields.issuetype.name !=
 If the above doesn't return the right structure, try:
 
 ```bash
-jira sprint list <SPRINT_ID> --plain --no-headers --no-truncate --columns TYPE,KEY,SUMMARY,STATUS,ASSIGNEE,PRIORITY
+jira sprint list '<SPRINT_ID>' --plain --no-headers --no-truncate --columns TYPE,KEY,SUMMARY,STATUS,ASSIGNEE,PRIORITY
 ```
 
 Then for each issue that is a Task or Bug, fetch full details:
