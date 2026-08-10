@@ -103,7 +103,7 @@ Boards are the lens (the monday analog of a Jira sprint). Resolve the set in thi
    - If the dynamic API is **not** available, the skill cannot list boards — ask the user to type the board IDs or names directly (and suggest setting `MONDAY_WEEKLY_REPORT_BOARDS` so future runs don't re-ask).
    - Cache the chosen set to `boards.json`.
 
-Resolve each name to a numeric board ID (via the `boards` query when available, else `get_board_schema`/`get_board_items_by_name` confirmation). Before interpolating any board argument into any query — the activity-log query, `items_page`, and every future query built from a board argument — reject it unless it matches `^[0-9]+$`: resolve names to a numeric id first and splice only that id. If a name is ambiguous (multiple matches), ask the user to disambiguate by ID. Support **multiple boards** — every section is computed per board and rolled up across boards in the at-a-glance view.
+Resolve each name to a numeric board ID (via the `boards` query when available, else `get_board_schema`/`get_board_items_by_name` confirmation). Before interpolating **any** value into **any** query — board ids, column ids, cursors, dates, and every future value — reject it unless it matches `^[A-Za-z0-9_-]+$` (board ids additionally `^[0-9]+$`: resolve names to a numeric id first and splice only that id), and re-resolve the value rather than splice it. If a name is ambiguous (multiple matches), ask the user to disambiguate by ID. Support **multiple boards** — every section is computed per board and rolled up across boards in the at-a-glance view.
 
 For a non-interactive `--send` run with no `--board`, no cache, and no `MONDAY_WEEKLY_REPORT_BOARDS`, abort with a message asking the user to set `MONDAY_WEEKLY_REPORT_BOARDS` or pass `--board`.
 
@@ -429,16 +429,17 @@ If run **with** `--send`:
 1. Build the recipient list: primary = `$MONDAY_WEEKLY_REPORT_TO` (abort if unset); append each address from `MONDAY_WEEKLY_REPORT_CC` (comma-separated, ignore empties, dedupe).
 2. Subject: `Weekly Project Report — <board names> — <week_start> to <week_end>`.
 3. Body: the rendered Markdown (render to simple HTML if the transport supports it; otherwise plain text with Markdown preserved).
-4. Try delivery in this order: any available Google Workspace MCP tool matching `mcp__*gmail*send*` or `mcp__google*workspace*gmail*` (discover at runtime, do not hardcode); then a `gmail` CLI if installed; then a configured SMTP relay.
+4. Deliver via the email sender the user confirmed once, cached in `email.json` under `~/.config/monday-weekly-report/` — the exact MCP tool name, the `gmail` CLI, or a configured SMTP relay. A `--send` run never prompts: with no cached sender it skips the send with a printed note (the report is still written) telling the user to confirm a sender in a preview. In a preview/interactive run with no cached sender, list the candidate senders present in the session with AskUserQuestion, confirm one, and cache it. Never pick a sender by glob over whatever tools happen to be registered in the session.
 5. On success, print `Sent to: <list>`. On failure, leave `PROJECT_REPORT.md` in place, print the error, and tell the user to send manually.
 
 ## Caches
 
-All caches live under `~/.config/monday-weekly-report/` (override paths via the env vars below). Create the directory with `mkdir -p` before writing. Read with the Read tool, treating a missing file as empty. Every cache path read from an env var is used double-quoted in shell and is rejected — falling back to the default path with a printed note — unless it matches `^[A-Za-z0-9._/-]+$`; this one rule covers `roles.json`, `statuses.json`, and `boards.json`.
+All caches live under `~/.config/monday-weekly-report/` (override paths via the env vars below). Create the directory with `mkdir -p` before writing. Read with the Read tool, treating a missing file as empty. Every value read from an env var is double-quoted at every shell or tool sink and rejected unless it matches its declared shape — cache paths `^[A-Za-z0-9._/-]+$`, email recipients (per address) `^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$`, board ids `^[0-9]+$` (board names are resolved to numeric ids in Step 2 before reaching any sink) — falling back to the default (or aborting the send) with a printed note.
 
 - `roles.json` — `user_id → { name, role, confirmedAt, auto? }` (Step 4). Set `auto: true` on entries written from an auto-default (a `--send` run) so a later preview knows they were never human-confirmed and re-proposes them; drop the flag once the human confirms.
 - `statuses.json` — `board_id → { <label>: <bucket> }` (Step 3.5)
 - `boards.json` — last interactively-selected board set (Step 2), so reruns don't re-prompt
+- `email.json` — the confirmed email sender for `--send` (Step 8): the exact MCP tool name, `gmail` CLI, or SMTP relay
 
 ## Important rules
 

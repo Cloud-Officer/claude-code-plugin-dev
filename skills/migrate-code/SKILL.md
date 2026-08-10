@@ -112,6 +112,17 @@ Workflow({
 })
 ```
 
+The engine also accepts optional tuning knobs in `args` (omit them to take the defaults):
+
+| Knob               | Default  | Effect                                            |
+| ------------------ | -------- | ------------------------------------------------- |
+| `maxCompileRounds` | `4`      | Build-and-fix rounds before Compile gives up      |
+| `maxTestRounds`    | `3`      | Test-and-fix rounds before Test gives up          |
+| `maxVerifyFiles`   | `24`     | Cap on high-risk files sent to adversarial Verify |
+| `translateModel`   | `sonnet` | Model for the per-file port agents                |
+| `reviewModel`      | `opus`   | Model for the per-file review agents              |
+| `fixModel`         | `sonnet` | Model for the compile/test fixer agents           |
+
 **What the engine does** (you do not orchestrate these — the script does, deterministically):
 
 | Phase | Agents | Purpose |

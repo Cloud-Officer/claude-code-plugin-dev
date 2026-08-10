@@ -472,7 +472,8 @@ const translated = await pipeline(
       // signal Verify ranks on, and both agents may report rule gaps.
       todo_count: Math.max(port.todo_count || 0, rev.todo_count || 0),
       rule_gaps: [...(port.rule_gaps || []), ...(rev.rule_gaps || [])],
-    } : port)
+      // A file is never "done" until reviewed once — a silent reviewer must not pass it as reviewed.
+    } : { ...port, review_verdict: 'needs-human', notes: 'reviewer returned nothing — port is unreviewed' })
   },
 )
 

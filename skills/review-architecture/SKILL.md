@@ -8,6 +8,8 @@ allowed-tools: Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:
 
 Review or create `docs/architecture.md` to match organizational standards. Works for all repository types and languages.
 
+When another skill invokes this one with a review-only instruction (e.g. code-review-deep's opt-in deep documentation pass), analyze and report findings only — do not create, write, or edit any file.
+
 ## Phase Tracking
 
 Use `TodoWrite` to track each phase below. Mark `in_progress` on entry, `completed` when results are recorded. Do NOT include the task list in the final output.

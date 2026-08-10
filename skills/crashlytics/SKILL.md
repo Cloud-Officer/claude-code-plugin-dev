@@ -24,19 +24,21 @@ Query Firebase Crashlytics crash data exported to BigQuery. List top crashes, in
 
 ## Environment Variables
 
-This skill requires the following environment variables:
+This skill uses the following environment variables:
 
-- `BQ_PROJECT` — GCP project ID
-- `BQ_CRASHLYTICS_DATASET` — BigQuery dataset name (e.g., `firebase_crashlytics`)
-- `BQ_CRASHLYTICS_ANDROID_TABLE` — Android REALTIME table name
-- `BQ_CRASHLYTICS_IOS_TABLE` — iOS REALTIME table name
-- `BQ_CRASHLYTICS_TVOS_TABLE` — tvOS REALTIME table name
+- `BQ_PROJECT` — GCP project ID (always required)
+- `BQ_CRASHLYTICS_DATASET` — BigQuery dataset name (e.g., `firebase_crashlytics`) (always required)
+- `BQ_CRASHLYTICS_ANDROID_TABLE` — Android REALTIME table name (required only when querying Android)
+- `BQ_CRASHLYTICS_IOS_TABLE` — iOS REALTIME table name (required only when querying iOS)
+- `BQ_CRASHLYTICS_TVOS_TABLE` — tvOS REALTIME table name (required only when querying tvOS)
+
+A per-platform table variable is required exactly when step 3 resolves it for the request: an app with no export for a platform leaves that variable unset, and **all platforms** means every platform whose table variable is set.
 
 ## Steps
 
 ### 1. Validate environment
 
-Check that required environment variables are set:
+Check which environment variables are set:
 
 ```bash
 echo "BQ_PROJECT=$BQ_PROJECT"
@@ -46,7 +48,7 @@ echo "BQ_CRASHLYTICS_IOS_TABLE=$BQ_CRASHLYTICS_IOS_TABLE"
 echo "BQ_CRASHLYTICS_TVOS_TABLE=$BQ_CRASHLYTICS_TVOS_TABLE"
 ```
 
-If any required variable is missing, tell the user which variables need to be set and stop.
+`BQ_PROJECT` and `BQ_CRASHLYTICS_DATASET` are always required — if either is missing, tell the user which one and stop. A table variable is required only when its platform is part of the request (step 3): if a requested platform's table variable is unset, or all three are unset, tell the user which variable(s) to set and stop.
 
 ### 2. Verify BigQuery connectivity
 
@@ -60,7 +62,7 @@ If this fails, tell the user to run `gcloud auth application-default login` and 
 
 Parse the user's request to determine:
 
-- **Platform**: Android, iOS, tvOS, or all. Default to **all** if not specified.
+- **Platform**: Android, iOS, tvOS, or all. Default to **all** if not specified — meaning every platform whose table variable is set; name any platform skipped because its variable is unset.
 - **Time range**: Default to last **7 days** if not specified.
 - **Query type**: Top crashes, specific issue details, stack trace, trend, etc.
 
@@ -220,7 +222,7 @@ LIMIT 20
 - **No concatenation**: no user-supplied value is ever concatenated into SQL or into a double-quoted shell argument — bind it with `--parameter` and pass the SQL single-quoted.
 - **Always show query first**: Display every query before executing it.
 - **Default to 7 days**: Use a 7-day window unless the user specifies otherwise.
-- **Default to all platforms**: Query all platforms unless the user specifies one.
+- **Default to all platforms**: Unless the user specifies one, query every platform whose table variable is set, naming any platform skipped because its variable is unset.
 - **Limit results**: Always use LIMIT (default 20) to prevent excessive output.
 - **Label platforms**: When querying multiple platforms, clearly label which results belong to which platform.
 - **Suggest next steps**: After showing crashes, suggest investigating specific issues, creating Jira tickets (`/co-dev:create-issue`), or attempting a fix if the code is in the current repo.

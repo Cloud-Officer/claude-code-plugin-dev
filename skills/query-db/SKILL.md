@@ -254,7 +254,7 @@ For PostgreSQL, MySQL, MongoDB, and Redis, check whether MCP tools are available
 | MySQL | `mcp__mysql__mysql_query` | `mysql -h ...` (stdin heredoc) |
 | MongoDB | `mcp__mongodb__find`, `mcp__mongodb__aggregate` | `mongosh --file -` (stdin heredoc) |
 | Redis | `mcp__redis__get`, `mcp__redis__hgetall`, `mcp__redis__lrange`, `mcp__redis__zrange`, `mcp__redis__json_get`, etc. | `redis-cli -u ... COMMAND` |
-| BigQuery | `mcp__bigquery__query` | `bq query --use_legacy_sql=false "SQL"` |
+| BigQuery | `mcp__bigquery__query` | `bq query --use_legacy_sql=false --project_id="$BQ_PROJECT" <<'SQL'` (stdin heredoc) |
 
 **If MCP tools are not available (tool not found errors), fall back to the CLI** approach described in Step 6. The Safety Guardrails (Automatic LIMIT Injection, showing the query first) still apply regardless of method.
 
@@ -465,7 +465,7 @@ Run the appropriate CLI command with the generated query.
 
 - Format the output clearly (tables for SQL, formatted JSON for document stores)
 - Add context to help interpret the numbers
-- **Translate enum values**: Look up the "Field Mappings & Enums" section in `docs/db.md` to convert raw values to human-readable meanings. This is especially important for numeric enums (e.g., `order.state`: `0` = `NEW`, `1` = `COMPLETED`). Never show raw numeric enum values without translation.
+- **Translate enum values**: Look up whichever field/value-mapping section `docs/db.md` carries for this engine ("Field Mappings & Enums" for SQL, MongoDB and BigQuery; Elasticsearch's "Field Mappings" documents types only; Redis has none) to convert raw values to human-readable meanings. This is especially important for numeric enums (e.g., `order.state`: `0` = `NEW`, `1` = `COMPLETED`). If there is no such section, or it carries no meaning for a value, say so and ask the user what the coded values mean rather than guessing — never show raw numeric enum values without translation.
 - **Use business definitions**: Check the "Business Definitions" section in `docs/db.md` for terms like "Buyer", "CHP User", "Revenue" to ensure correct interpretation. If that section is absent (an older `docs/db.md` predates it) and the question turns on such a term, say the section is missing and ask the user what the term means — never guess a definition, and suggest re-running `/co-dev:analyze-db` to add it
 - Suggest follow-up queries if relevant
 

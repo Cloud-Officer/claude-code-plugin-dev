@@ -45,7 +45,7 @@ The README.md must have **exactly** these H2 sections in this exact order — no
 
 This skill uses MCP tools when available and falls back gracefully if they are unavailable or return errors.
 
-**Failure policy (applies to every command and tool call in this skill):** a command that fails or returns nothing stops that step — report what failed and ask how to proceed. Falling back to a documented alternative (MCP → CLI) is allowed; silently substituting fabricated or assumed values for the stored metadata is not.
+**Failure policy (applies to every command and tool call in this skill):** a command that fails for an environmental reason (tool missing, auth, network, malformed output) stops that step — report what failed and ask how to proceed; a probe that simply finds nothing (a missing README on the create path, an absent `bin`/entry-point entry) is a valid negative result — record it and continue. Falling back to a documented alternative (MCP → CLI) is allowed; silently substituting fabricated or assumed values for the stored metadata is not.
 
 ### GitHub Access
 

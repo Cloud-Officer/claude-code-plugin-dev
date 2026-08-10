@@ -10,6 +10,8 @@ Build a **people ↔ files** picture from git history and turn it into a **knowl
 
 Frame everything as **risk, not blame**. The bus factor is a conversation starter and a diagnostic — the cure is cultural (pairing, reviewer rotation, documentation, test coverage), not a performance verdict on any individual.
 
+When another skill invokes this one with a review-only instruction (e.g. code-review-deep's opt-in deep security pass), analyze and report findings only — do not create, write, or edit any file.
+
 ## When to Use
 
 - Auditing knowledge concentration / single points of failure across a repo or fleet.
@@ -68,7 +70,7 @@ For each file/module of interest:
 
 ## Step 3: Identify sensitive files (wide, stack-agnostic)
 
-Bus-factor-1 matters most on security-critical code. Locate these across any stack (grep/glob by path and content):
+Bus-factor-1 matters most on security-critical code. Locate these across any stack by matching path and content against **tracked files only** — enumerate candidates from `git ls-files` piped through the category patterns below, so the Step 1 failure policy's stop-on-empty rule only ever sees paths git can answer for. A path that matches a sensitive pattern but is untracked (a local `.env`, an unstaged file, a generated artifact) is skipped with a note — list skipped untracked paths under Caveats — while the hard stop stays in force for tracked paths:
 
 | Category | Where it typically lives |
 | --- | --- |

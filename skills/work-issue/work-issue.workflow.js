@@ -122,12 +122,17 @@ function buildImplementPrompt(issue) {
     '     config/docs, generated files. "Hard to test" is NOT an exception — if you cannot test it, set',
     '     `success:false` and explain in `block_reason` rather than shipping untested code.',
     '',
-    '5. Commit on your branch — single-line message, NO footers, NO co-authors, NO "Generated with Claude Code":',
+    '5. Commit on your branch — single-line message, NO footers, NO co-authors, NO "Generated with Claude Code".',
+    '   The message arrives on stdin through `git commit -F -` and a quoted heredoc, never as a double-quoted',
+    '   `-m` argument — the quoted delimiter suppresses all expansion, so the message needs no escaping'
+      + (isJira ? ':' : ' (PREFIX: Bug→Fix, Feature→Feat, Task→none):'),
     '   ```bash',
     '   git add -A',
+    "   git commit -F - <<'COMMIT_MSG_EOF'",
     isJira
-      ? '   git commit -m "' + ref + ': <brief description>"'
-      : '   git commit -m "<PREFIX> #' + ref + ': <brief description>"   # PREFIX: Bug→Fix, Feature→Feat, Task→(none)',
+      ? '   ' + ref + ': <brief description>'
+      : '   <PREFIX> #' + ref + ': <brief description>',
+    '   COMMIT_MSG_EOF',
     '   ```',
     '   Do NOT push and do NOT open a PR — the command handles PRs after all agents finish.',
     '',
@@ -195,7 +200,8 @@ const results = await pipeline(
       isolation: 'worktree',
     }).then(r => {
       if (!r) return { ref: issue.ref, tracker: issue.tracker, branch: branchName(issue), success: false, summary: '', block_reason: 'agent did not return a result (skipped or errored)' }
-      return { ...r, ref: r.ref ?? issue.ref, tracker: r.tracker || issue.tracker, branch: r.branch || branchName(issue) }
+      // Caller-validated identity fields always win — an agent return never overwrites them.
+      return { ...r, ref: issue.ref, tracker: issue.tracker, branch: branchName(issue) }
     })
   }
 )

@@ -33,6 +33,8 @@ Use `TodoWrite` to track each phase. Mark `in_progress` on entry, `completed` wh
 
 **Evidence rule:** every finding records (a) the exact current string, (b) its source (`file:line` or i18n key), and (c) the concrete suggested rewrite. A finding without the quoted string and a proposed rewrite is invalid.
 
+**Failure policy (every phase):** if any command, file read, or skill hand-off fails, exits non-zero, returns nothing, or returns output that does not parse, stop and report the failing step and its raw output in the report — never treat an empty or failed return as a clean result. If the diff scope produces no changed files, ask: "the diff scope produced no changed files — audit the whole repo instead, or stop?"; the safe default is stop and report.
+
 ## Phase 1: Scope & Inputs
 
 Ask (via `AskUserQuestion`) unless already specified:
