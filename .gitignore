@@ -251,7 +251,6 @@ modules.xml
 # Icon must end with two \r
 Icon
 
-
 # Thumbnails
 ._*
 
@@ -477,5 +476,9 @@ $RECYCLE.BIN/
 
 # END AI Assistants
 
+# Skill-generated review artifacts
 docs/code-review.md
+docs/copy-review.md
+docs/migration/
 docs/prompt-review.md
+docs/seo-audit.md
