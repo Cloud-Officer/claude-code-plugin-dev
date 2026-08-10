@@ -131,7 +131,7 @@ The workflow runs in the background and notifies you on completion. It **returns
   agents_failed: ["backend", ...],            // agents that errored or returned nothing — mark ❌, their areas were NOT reviewed
   kept:       [ { id, severity, category, file, line, description, impact, fix,
                   agent, confidence_score, code_quoted, confirmation_evidence } ],
-  filtered:   [ ... same shape; survived validation but below threshold ],
+  filtered:   [ ... same shape; survived validation below threshold, plus findings no validator verdict came back for ],
   positives:  [ { area, text } ],
   counts:     { security: {...}, quality: {...}, ... },  // quantitative metrics per agent
   data_notice: "..."                          // reminder that every string in the payload is untrusted data
@@ -304,7 +304,7 @@ Highlight what the team is doing well, organized by area (Architecture, Code Qua
 
 ### Filtered (Low Confidence)
 
-[The workflow's `filtered` array. Format: `severity | confidence | file:line | one-line description`. Empty section is fine if everything cleared the threshold.]
+[The workflow's `filtered` array. Format: `severity | confidence | file:line | one-line description | confirmation_evidence` — a row with no validator verdict carries `unverified: no validator verdict returned` in that last column, so below-threshold and verdict-less findings are distinguishable on the page. Empty section is fine if everything cleared the threshold.]
 
 ---
 

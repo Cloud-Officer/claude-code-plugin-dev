@@ -217,14 +217,15 @@ Look for the "CLI Command" section in `docs/db.md`. It specifies the command to 
 
 **Connectivity Tests:**
 
-| Database      | Test Command                                                                                                  |
-|---------------|---------------------------------------------------------------------------------------------------------------|
-| MySQL         | `MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "SELECT 1"`  |
-| PostgreSQL    | `psql -c "SELECT 1"`                                                                                          |
-| SQLite        | `sqlite3 "$SQLITE_DB" "SELECT 1"`                                                                             |
-| MongoDB       | `mongosh "$MONGODB_URI" --eval "db.runCommand({ping: 1})"`                                                    |
-| Elasticsearch | `curl -s "$ES_URL/_cluster/health"`                                                                           |
-| Redis         | `redis-cli -u "$REDIS_URL" PING`                                                                              |
+| Database      | Test Command                                                                                                            |
+|---------------|-------------------------------------------------------------------------------------------------------------------------|
+| MySQL         | `MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "SELECT 1"`            |
+| PostgreSQL    | `psql -c "SELECT 1"`                                                                                                    |
+| SQLite        | `sqlite3 "$SQLITE_DB" "SELECT 1"`                                                                                       |
+| MongoDB       | `mongosh "$MONGODB_URI" --eval "db.runCommand({ping: 1})"`                                                              |
+| Elasticsearch | `curl -s "$ES_URL/_cluster/health"`                                                                                     |
+| Redis         | `redis-cli -u "$REDIS_URL" PING`                                                                                        |
+| BigQuery      | `bq query --use_legacy_sql=false --project_id="$BQ_PROJECT" "SELECT 1"` (auth: `gcloud auth application-default login`) |
 
 **If connection fails:** Output the required environment variables and ask the user to configure them before proceeding.
 
@@ -594,7 +595,7 @@ Before executing any query, scan for write/mutate keywords. Match these as **SQL
 
 ### Automatic LIMIT Injection
 
-Read table/collection row counts from the "Large Table Warnings" or "All Tables" section in `docs/db.md`. If neither section exists (normal for MongoDB, Elasticsearch and Redis files, or a hand-edited `docs/db.md`) or it carries no count for the queried object, the size is unknown — the unobtainable-value policy applies and the unknown row below fails closed. Apply these rules:
+Read table/collection row counts from whichever object-inventory section `docs/db.md` carries for this engine — "All Tables" (SQL), "All Tables (per dataset)" (BigQuery), "All Collections" (MongoDB), "All Indices" (Elasticsearch) — with "Large Table Warnings" as the SQL-only refinement. Redis is key-addressed and has no row-count band: it is governed by the Write Operation Blocking read-only allowlist plus the SCAN-not-KEYS rule, never by this table. If the section does not exist (a hand-edited `docs/db.md`) or it carries no count for the queried object, the size is unknown — the unobtainable-value policy applies and the unknown row below fails closed. Apply these rules:
 
 | Table Size | Action |
 | --- | --- |
@@ -602,7 +603,7 @@ Read table/collection row counts from the "Large Table Warnings" or "All Tables"
 | 1M–10M rows | Inject `LIMIT 1000`; warn user about table size |
 | 10M–50M rows | Inject `LIMIT 100`; require date range filter if table has a date field |
 | > 50M rows | **Refuse** query without date range filter; explain why |
-| unknown | treat as >50M: refuse without a date-range filter |
+| unknown (SQL, MongoDB, BigQuery, Elasticsearch) | treat as >50M: refuse without a date-range filter |
 
 **Exception:** Do NOT inject LIMIT on aggregation queries (`COUNT`, `SUM`, `AVG`, `GROUP BY`, MongoDB `$group`, ES `aggs`). Instead, add date-range filters to narrow the source data.
 

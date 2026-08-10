@@ -16,7 +16,7 @@ Query Firebase Crashlytics crash data exported to BigQuery. List top crashes, in
 
 | Operation | MCP Tool | CLI Fallback |
 | --- | --- | --- |
-| Run SQL query | `mcp__bigquery__query` | `bq query --use_legacy_sql=false --format=prettyjson "SQL"` |
+| Run SQL query | `mcp__bigquery__query` | `bq query --use_legacy_sql=false --format=prettyjson --parameter='issue_id:STRING:VALUE' 'SQL'` |
 | List tables | `mcp__bigquery__list_tables` | `bq ls --format=json $BQ_PROJECT:$BQ_CRASHLYTICS_DATASET` |
 | Get table schema | `mcp__bigquery__get_table_schema` | `bq show --format=json $BQ_PROJECT:$BQ_CRASHLYTICS_DATASET.TABLE` |
 

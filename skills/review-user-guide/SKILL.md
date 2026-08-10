@@ -24,6 +24,7 @@ Use `TodoWrite` to track progress: one task per phase below. Mark `in_progress` 
 4. Existing user-guide validated (if present)
 5. Report generated
 6. User guide written/updated (if approved)
+7. Linters run
 
 **Evidence rule:** Every check must record (a) what the guide claims, (b) what the code shows, (c) MATCH / MISMATCH / MISSING. A bare "PASS" without code evidence is invalid.
 
