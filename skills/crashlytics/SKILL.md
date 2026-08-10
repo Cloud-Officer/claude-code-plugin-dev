@@ -84,7 +84,7 @@ The fully qualified table name is: `` `$BQ_PROJECT.$BQ_CRASHLYTICS_DATASET.$TABL
 
 Use `bq query` with `--use_legacy_sql=false` and `--project_id="$BQ_PROJECT"`.
 
-Pass the SQL as a single-quoted shell argument and bind user-supplied values as query parameters, e.g. `bq query --use_legacy_sql=false --parameter=issue_id:STRING:"$ISSUE_ID" '... WHERE issue_id = @issue_id'`.
+Pass the SQL as a single-quoted shell argument and bind every value not literally written in this skill or read from the environment variables above (an issue id from the user's request, or one lifted from earlier query output) as a query parameter whose whole argument is single-quoted, e.g. `bq query --use_legacy_sql=false --parameter='issue_id:STRING:<value, with each embedded single quote written '\''>' '... WHERE issue_id = @issue_id'`.
 
 Always add `--max_rows=100` to prevent huge outputs unless the user asks for more.
 
@@ -219,7 +219,7 @@ LIMIT 20
 
 - **Read-only**: BigQuery Crashlytics tables are read-only. No write operations.
 - **Failure policy**: if any command, query or file read fails or returns no rows, show the exact command and its output verbatim, state what is unknown, and stop. An empty result is presented together with the query that produced it — never as "no crashes found" on its own — and SQL is never rewritten and re-run without showing the new query first (step 4).
-- **No concatenation**: no user-supplied value is ever concatenated into SQL or into a double-quoted shell argument — bind it with `--parameter` and pass the SQL single-quoted.
+- **No concatenation**: no value that is not literally written in this skill or read from the environment variables above is ever concatenated into SQL or placed in a double-quoted shell argument — bind it with a wholly single-quoted `--parameter` argument (each embedded single quote in the value written `'\''`) and pass the SQL single-quoted.
 - **Always show query first**: Display every query before executing it.
 - **Default to 7 days**: Use a 7-day window unless the user specifies otherwise.
 - **Default to all platforms**: Unless the user specifies one, query every platform whose table variable is set, naming any platform skipped because its variable is unset.

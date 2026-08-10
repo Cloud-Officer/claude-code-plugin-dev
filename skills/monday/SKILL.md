@@ -57,9 +57,21 @@ point them at the `claude mcp add` command above, then stop.
 | **Get form** | `mcp__monday__get_form` |
 
 **Dynamic API tools** (`mcp__monday__all_monday_api`, `get_graphql_schema`,
-`get_type_details`) expose the full GraphQL API but are **disabled by default**.
-They require launching the server with `--enable-dynamic-api-tools true` and are
-not compatible with read-only mode.
+`get_type_details`) expose the full GraphQL API but are **disabled by default**,
+and the hosted endpoint registered above provides **no way to turn them on** —
+an HTTP URL has no server process to pass launch flags to. The only path that
+exposes them is registering the **local** stdio server instead, launched with
+the flag:
+
+```bash
+claude mcp add monday -- npx -y @mondaydotcomorg/monday-api-mcp -t "$MONDAY_TOKEN" --enable-dynamic-api-tools true
+```
+
+This is subject to the Node caveat above (the local server's `isolated-vm`
+dependency fails to build on Node 22+); on a Node version where it cannot
+build, the dynamic tools are unavailable and skills that want them must run in
+their documented degraded modes. The dynamic tools are not compatible with
+read-only mode.
 
 ## Usage
 

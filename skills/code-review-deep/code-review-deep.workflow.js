@@ -97,9 +97,13 @@ const GOVERNANCE = [
 ].join('\n')
 
 const SHARED_RULES = [
+  '## Read-only review',
+  'This review is read-only: never create, modify or delete a file, never commit, push or run a',
+  'command that writes; report the change you would make as the finding\'s fix instead.',
+  '',
   '## Output requirements',
   'Return BOTH issues[] and positives[]. Acknowledge what the team is doing well, not just defects.',
-  'Each finding needs: id (use the ID prefix stated at the end of this prompt), severity',
+  'Each finding needs: id (following the ID-prefix rules stated at the end of this prompt), severity',
   '(Critical|High|Medium|Low|Info), category, file, line (when applicable), description, impact, fix.',
   'Include exact quantitative counts where the prompt asks for them (never "some"/"a few").',
   '',
@@ -147,7 +151,7 @@ function buildAnalysisPrompt(a) {
     '',
     SHARED_RULES,
     '',
-    'Your finding ID prefix is ' + a.idPrefix + ' (e.g. ' + a.idPrefix + '-001), except where your instructions above name a different prefix for a sub-area (e.g. A11Y, ML, PLUGIN, PROMPT).',
+    'Your finding ID prefix is ' + a.idPrefix + ' (e.g. ' + a.idPrefix + '-001)' + (a.subPrefixes ? ', except use the prefix matching each finding\'s sub-area: ' + a.subPrefixes + '.' : '.'),
     'Review the scope given in <repo_context>. Return structured output: issues[], positives[], and counts where required.',
   ].join('\n')
 }
@@ -302,6 +306,7 @@ const A_TESTING = {
 
 const A_DEPS = {
   key: 'deps', idPrefix: 'DEP',
+  subPrefixes: 'DEP (dependency health), COMPAT (backwards compatibility)',
   prompt: [
     'Dependency health AND breaking-change risk.',
     'Dependencies:',
@@ -320,6 +325,7 @@ const A_DEPS = {
 
 const A_REPO_CI = {
   key: 'repo-ci', idPrefix: 'CI',
+  subPrefixes: 'CI (CI/CD pipeline), GIT (git & repository hygiene)',
   prompt: [
     'Git/repo hygiene AND CI/CD pipeline.',
     'Git & Repo:',
@@ -353,6 +359,7 @@ const A_REPO_CI = {
 
 const A_DOCS = {
   key: 'docs', idPrefix: 'DOC',
+  subPrefixes: 'DOC (documentation), CFG (configuration management)',
   prompt: [
     'Project documentation AND configuration management.',
     'SCOPE NOTE: deep content-accuracy review of README.md, docs/architecture.md, and docs/user-guide.md is an OPTIONAL, opt-in pass',
@@ -417,6 +424,7 @@ const A_CONSISTENCY = {
 // --- Phase 2 conditional agents -------------------------------------------
 const A_BACKEND = {
   key: 'backend', idPrefix: 'PERF',
+  subPrefixes: 'PERF (performance), OBS (observability), API (API design), CONC (concurrency), MIG (DB migrations), MEM (memory/resources)',
   prompt: [
     'Backend concerns (only because a backend/API was detected): performance, observability, API design, concurrency, DB migrations.',
     'Performance - DB: N+1 queries, missing indexes on FKs/filtered columns, unbounded queries without LIMIT, large OFFSET pagination',
@@ -446,6 +454,7 @@ const A_BACKEND = {
 
 const A_INFRA = {
   key: 'infra-compliance', idPrefix: 'IAC',
+  subPrefixes: 'IAC (infrastructure-as-code), COMP (compliance/privacy)',
   prompt: [
     'Infrastructure-as-Code review AND compliance/privacy (only because IaC or regulated data was detected).',
     'IaC (CloudFormation, SAM, Terraform, CDK, Kubernetes):',
@@ -469,6 +478,7 @@ const A_INFRA = {
 
 const A_LOCALE_ML = {
   key: 'i18n-ml', idPrefix: 'I18N',
+  subPrefixes: 'I18N (localization), A11Y (accessibility), ML (AI/ML)',
   prompt: [
     'Localization, ACCESSIBILITY, AND AI/ML practices (only because user-facing UI or ML was detected). Run only the relevant sub-sections.',
     'i18n uniformity (if user-facing UI) - the guiding question is "does EVERY user-facing string go through the project\'s',
@@ -499,6 +509,7 @@ const A_LOCALE_ML = {
 
 const A_PROMPTS = {
   key: 'prompt-artifacts', idPrefix: 'PROMPT',
+  subPrefixes: 'PLUGIN (Claude Code plugin artifacts), PROMPT (embedded LLM prompts)',
   prompt: [
     'Review AI prompt-engineering quality (only because Claude Code plugin artifacts and/or embedded LLM prompts were detected). Run ONLY the relevant sub-section(s).',
     'Treat prompts and instruction files as load-bearing source: vague, conflicting, or stale instructions are real defects, not style nits.',
@@ -549,6 +560,8 @@ function buildVerifyPrompt(findings) {
     'your job is to hunt for the mitigating factor that kills each one. REJECT only when you',
     'found a specific disproof and can name it. When you found none, CONFIRM and let the',
     'confidence score carry your uncertainty. Inconclusive is not a rejection.',
+    'This review is read-only: never create, modify or delete a file, never commit, push or run a',
+    'command that writes; report the change you would make as the finding\'s fix instead.',
     '',
     repoBlock,
     '',

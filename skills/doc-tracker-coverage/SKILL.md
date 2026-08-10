@@ -95,6 +95,8 @@ If the parse is ambiguous (e.g. it's unclear whether a level is a team, an item,
 
 Record per item: `team`, `title` (original), `norm_title`, `subtasks[]` (each with original + norm). De-duplicate identical items within a team.
 
+If `--team` was passed, drop every parsed team whose name does not match one of its values (case-insensitive) before Step 3 — no confirmation prompts, tracker pulls, or report rows for dropped teams — and name the restriction in the report header.
+
 ## Step 3: Resolve each team → tracker(s) (cached, confirm once)
 
 Every team maps to a **tracker set**: zero or more monday boards and zero or more Jira projects. Confirm once per team, cache, reuse.
@@ -156,7 +158,7 @@ Write `COVERAGE_REPORT.md` to the current directory and print the same content. 
 
 **Source doc:** <doc_title> (id <doc_id>) — section "<section_heading>" <br>
 **Doc source:** <Workspace Docs MCP | claude.ai Drive | WebFetch (published) | manual paste> <br>
-**Teams:** <team A>, <team B> (<N> tracked, <M> skipped) <br>
+**Teams:** <team A>, <team B> (<N> tracked, <M> skipped<; restricted to --team <names>, when passed>) <br>
 **Trackers:** monday <available|unavailable>, Jira <available|unavailable> <br>
 **Match threshold:** <0.82> (ambiguous band 0.60–0.82) <br>
 **Generated:** <YYYY-MM-DD>

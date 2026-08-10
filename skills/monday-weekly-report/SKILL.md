@@ -45,7 +45,7 @@ This skill calls **read tools only**. The write-capable monday tools (`create_*`
 | Get board schema (columns + groups) | `mcp__monday__get_board_schema` | Discover status / people / date column IDs — never guess them. Available in every setup. |
 | Targeted item lookup by name | `mcp__monday__get_board_items_by_name` | Returns matching items with column values. Used for narrow lookups; **not** a full-board dump. |
 | List users and teams | `mcp__monday__list_users_and_teams` | Resolve `user_id` → owner display names. |
-| Full GraphQL — board list, bulk items, activity logs | `mcp__monday__all_monday_api` (+ `get_graphql_schema`, `get_type_details`) | **Dynamic API — may be disabled.** Present only if the server was started with `--enable-dynamic-api-tools true`. This is the backbone for enumerating boards, paging all items on a board, and reading activity logs. |
+| Full GraphQL — board list, bulk items, activity logs | `mcp__monday__all_monday_api` (+ `get_graphql_schema`, `get_type_details`) | **Dynamic API — may be unavailable.** Exposed only by the **local** stdio monday server launched with `--enable-dynamic-api-tools true`; the hosted HTTP endpoint registered above cannot expose them (see the `monday` skill). This is the backbone for enumerating boards, paging all items on a board, and reading activity logs. |
 
 **Read paths (which tool supplies what):**
 
@@ -68,7 +68,7 @@ This skill calls **read tools only**. The write-capable monday tools (`create_*`
 
 - **Snapshot mode (fallback)** — when the dynamic API (and thus `activity_logs`) is unavailable, derive weekly movement from each item's `updated_at` and its latest updates/comments: an item counts as "touched this week" if `updated_at` falls in the window. Coarser — you know it changed, not exactly what or by whom (attribute to the current owner).
 
-**State the active attribution mode in the report header** (e.g. `Attribution: snapshot (updated_at) — board activity log unavailable`). Always try activity-log mode first, fall back silently to snapshot mode, and disclose it. For the richest report, recommend the user enable the dynamic API tools. Never block the report because the dynamic API is off — degrade and disclose.
+**State the active attribution mode in the report header** (e.g. `Attribution: snapshot (updated_at) — board activity log unavailable`). Always try activity-log mode first, fall back silently to snapshot mode, and disclose it. For the richest report, recommend the user register the **local** stdio monday server with `--enable-dynamic-api-tools true` (the hosted endpoint cannot expose the dynamic tools; see the `monday` skill, including its Node build caveat). Never block the report because the dynamic API is off — degrade and disclose.
 
 ## Step 1: Resolve the weekly window
 
@@ -103,7 +103,7 @@ Boards are the lens (the monday analog of a Jira sprint). Resolve the set in thi
    - If the dynamic API is **not** available, the skill cannot list boards — ask the user to type the board IDs or names directly (and suggest setting `MONDAY_WEEKLY_REPORT_BOARDS` so future runs don't re-ask).
    - Cache the chosen set to `boards.json`.
 
-Resolve each name to a numeric board ID (via the `boards` query when available, else `get_board_schema`/`get_board_items_by_name` confirmation). Before interpolating **any** value into **any** query — board ids, column ids, cursors, dates, and every future value — reject it unless it matches `^[A-Za-z0-9_-]+$` (board ids additionally `^[0-9]+$`: resolve names to a numeric id first and splice only that id), and re-resolve the value rather than splice it. If a name is ambiguous (multiple matches), ask the user to disambiguate by ID. Support **multiple boards** — every section is computed per board and rolled up across boards in the at-a-glance view.
+Resolve each name to a numeric board ID (via the `boards` query when available, else `get_board_schema`/`get_board_items_by_name` confirmation). Before interpolating **any** value into **any** query, match it against the shape for its kind and reject it on mismatch — board ids `^[0-9]+$` (resolve names to a numeric id first and splice only that id; subitem-board ids are board ids), column ids `^[A-Za-z0-9_-]+$`, dates and ISO timestamps `^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})?)?$` (the `week_start`/`week_end` activity-log bounds), pagination cursors `^[A-Za-z0-9+/=_.-]+$` (the opaque `items_page` cursor) — re-resolving a rejected value rather than splicing it. A value that fits none of these kinds is never spliced into a query; re-derive it as one of these kinds first. If a name is ambiguous (multiple matches), ask the user to disambiguate by ID. Support **multiple boards** — every section is computed per board and rolled up across boards in the at-a-glance view.
 
 For a non-interactive `--send` run with no `--board`, no cache, and no `MONDAY_WEEKLY_REPORT_BOARDS`, abort with a message asking the user to set `MONDAY_WEEKLY_REPORT_BOARDS` or pass `--board`.
 
@@ -434,7 +434,7 @@ If run **with** `--send`:
 
 ## Caches
 
-All caches live under `~/.config/monday-weekly-report/` (override paths via the env vars below). Create the directory with `mkdir -p` before writing. Read with the Read tool, treating a missing file as empty. Every value read from an env var is double-quoted at every shell or tool sink and rejected unless it matches its declared shape — cache paths `^[A-Za-z0-9._/-]+$`, email recipients (per address) `^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$`, board ids `^[0-9]+$` (board names are resolved to numeric ids in Step 2 before reaching any sink) — falling back to the default (or aborting the send) with a printed note.
+All caches live under `~/.config/monday-weekly-report/` (override paths via the env vars below). Create the directory with `mkdir -p` before writing. Read with the Read tool, treating a missing file as empty. Every value reaching a shell or tool sink — env vars, board and item names, dates, the email subject and the report body — is passed as a single double-quoted argument or over stdin, never string-concatenated into a shell line. An env-var value is additionally rejected unless it matches its declared shape — cache paths `^[A-Za-z0-9._/-]+$`, email recipients (per address) `^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$`, board ids `^[0-9]+$` (board names are resolved to numeric ids in Step 2 before reaching any sink) — falling back to the default (or aborting the send) with a printed note.
 
 - `roles.json` — `user_id → { name, role, confirmedAt, auto? }` (Step 4). Set `auto: true` on entries written from an auto-default (a `--send` run) so a later preview knows they were never human-confirmed and re-proposes them; drop the flag once the human confirms.
 - `statuses.json` — `board_id → { <label>: <bucket> }` (Step 3.5)
