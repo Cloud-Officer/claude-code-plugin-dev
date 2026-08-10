@@ -158,7 +158,7 @@ For each, pass an explicit review-only instruction as the skill's args, e.g.:
 
 > Review-only mode for a larger code audit: analyze and report findings, but DO NOT create, write, or edit README.md / docs/architecture.md / docs/user-guide.md or any other file. Return your findings only — the deep code review will fold them into `docs/code-review.md`.
 
-Each skill self-exempts when its document doesn't apply (e.g. no end-user product → the user-guide skill skips). Treat a skip as **N/A**, not a failure.
+Only `review-architecture` self-exempts on its own (its Phase 2 exemption check); `review-readme` and `review-user-guide` have no skip path and would classify any repository — or stop on an interactive product-type question. Create the escape in the args: append to the review-only instruction above the sentence "If the document does not apply to this repository, return exactly `N/A — <reason>` and stop — do not ask questions and do not review." Treat that return as **N/A**, not a failure.
 
 **Fold the results in:** translate each skill's reported issues into the standard finding format under the report's Documentation area, using `DOC-*` IDs, with severity per the skill's own assessment and the file references it cites. Deduplicate against the workflow's `docs` findings (same file + root cause). In the report, note that deep documentation review was performed by the review-readme / review-architecture / review-user-guide skills. Do not let these skills write their own doc files or a separate report.
 
@@ -169,7 +169,7 @@ Under the **same** deep-review opt-in, also invoke these two via the **Skill** t
 - `co-dev:review-threat-model` — trust boundaries and STRIDE abuse paths. Fold each threat in as a `THREAT-*` finding (label `security`), severity from its likelihood × impact. Cross-link to any `SEC-*` code finding on the same sink and deduplicate (same root cause).
 - `co-dev:review-ownership-map` — bus factor and knowledge risk. Fold single-point-of-failure findings on **sensitive** code (auth/crypto/payment/IaC) as `OWN-*` findings (label `knowledge-risk`), severity by how critical the file is. This complements the workflow's governance / `team_profile` reasoning with file-level detail.
 
-Pass each the same review-only instruction (analyze and report findings; do NOT create, write, or edit any file). Each self-exempts when it doesn't apply (e.g. no security-relevant surface); treat a skip as **N/A**. In the report, note that a threat model / ownership map was performed.
+Pass each the same review-only instruction (analyze and report findings; do NOT create, write, or edit any file), with the same appended escape sentence — "If the document does not apply to this repository, return exactly `N/A — <reason>` and stop — do not ask questions and do not review." — and treat that return as **N/A**, not a failure. In the report, note that a threat model / ownership map was performed.
 
 ---
 
@@ -241,7 +241,7 @@ Output to `docs/code-review.md`. Use Unicode emojis: 🔴 🟠 🟡 🔵 ⚪ ✅
 **Repository:** [name]
 **Date:** [ISO-8601]
 **Reviewer:** AI Code Review
-**Health Score:** [A|B|C|D|F]
+**Health Score:** [computed from the kept findings, never judged: F if any Critical, D if 3+ High, C if 1-2 High, B if no High but any Medium, A otherwise]
 
 ---
 
