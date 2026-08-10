@@ -30,12 +30,11 @@ Run the `cd` as a **separate** call — never chain it as `cd … && gh …`. di
 
 ```bash
 DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
-DEFAULT_BRANCH=${DEFAULT_BRANCH:-master}
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 echo "Default: $DEFAULT_BRANCH | Current: $CURRENT_BRANCH"
 ```
 
-The fallback is the `${DEFAULT_BRANCH:-master}` expansion on its own line, never `|| echo "master"` inside the substitution: a pipeline's exit status is its last command's, `sed` exits 0 on empty input, so that `||` can never fire and `DEFAULT_BRANCH` would be silently empty on any clone lacking `refs/remotes/origin/HEAD` — exactly the empty-expansion breakage the next paragraph warns about. The `:-` form tests emptiness, which is the condition that actually occurs.
+There is deliberately no `master` fallback: if `DEFAULT_BRANCH` expands empty, `refs/remotes/origin/HEAD` is not set in this clone, so stop and ask the user which branch is the PR base — never substitute a branch name, because `gh pr create --base` opens the PR against whatever this variable says and a guessed base is a mis-targeted PR. (`git remote set-head origin -a` repairs the clone.) Test emptiness rather than exit status: a pipeline's exit status is its last command's, `sed` exits 0 on empty input, so an `|| echo` fallback can never fire — the empty expansion is the condition that actually occurs. This is the same no-guess rule `work-issue` states for the identical expansion.
 
 **Every Bash call runs in a fresh shell, so these two values do not persist.** In every later snippet that references `$DEFAULT_BRANCH` or `$CURRENT_BRANCH`, prepend the assignments above so they are re-derived in that same call. Without that they expand empty — `git push -u origin ""` and `git checkout ""` fail, and `git diff ...HEAD` silently reports no changes.
 

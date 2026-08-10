@@ -14,7 +14,7 @@ Parse arguments from the user's invocation:
 
 - `--dry-run` (default) — write `WEEKLY_REPORT.md` and print to stdout. Do not send email.
 - `--send` — after generating, email the report. Primary recipient comes from env var `WEEKLY_DEV_REPORT_TO` (required when `--send` is used); additional recipients from env var `WEEKLY_DEV_REPORT_CC` (comma-separated, may be empty/unset). If `WEEKLY_DEV_REPORT_TO` is unset, abort with a message asking the user to set it.
-- `--week-offset N` — run the report for N weeks ago (0 = this week, 1 = last week, default 0).
+- `--week-offset N` — run the report for N weeks before the window chosen by `--window` (0 = that window, 1 = the week before it, default 0).
 - `--window <past|current>` — choose the weekly window. `past` (default) = the **previous completed** Mon→Sun (a fixed 7-day week; stable for scheduled emails). `current` = **week-to-date**: this week's Monday through today (a partial week, fewer than 7 days unless run on Sunday) so the report can be run any day. When omitted in an interactive preview, the skill asks (Step 1). A `--send` / non-interactive run defaults to `past`.
 - `--sprint <ID|name>` — override sprint detection (rare; usually the active sprint is correct).
 - `--reconfirm-roles` — force the interactive role prompt for **every** roster member, ignoring the cache (Step 2.5). Use after team changes. Without it, only members missing from the role cache are prompted.
