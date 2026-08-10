@@ -72,7 +72,9 @@ This skill assumes database connection environment variables are already set:
 
 Use these exact command formats.
 
-**Universal quoting rule — every engine, every path:** no query, command, filter, key, or identifier text that this skill generates — or takes from the user, `docs/db.md`, or any tool return — ever appears inside a shell-quoted argument. Every engine receives that text on stdin via a quoted heredoc (`<<'SQL'`, `<<'JS'`, `<<'JSON'`, `<<'CMD'`), so the shell never parses it. Never `-e "query"` (mysql), `-c "query"` (psql), `--eval "code"` (mongosh), a `"QUERY"` positional argument (sqlite3, bq), or an inline `-d 'JSON'` (curl). This rule covers query execution (Steps 6 and 8), CSV export (Step 10), and every follow-up query. Only fixed literal text written verbatim in this file (e.g. the `SELECT 1` connectivity tests in Step 3) may be passed as an argument.
+**Universal quoting rule — every engine, every path:** no query, command, filter, key, or identifier text that this skill generates — or takes from the user, `docs/db.md`, or any tool return — ever appears inside a shell-quoted argument. Every engine receives that text on stdin via a quoted heredoc (`<<'SQL'`, `<<'JS'`, `<<'JSON'`, `<<'CMD'`), so the shell never parses it. Never `-e "query"` (mysql), `-c "query"` (psql), `--eval "code"` (mongosh), a `"QUERY"` positional argument (sqlite3, bq), or an inline `-d 'JSON'` (curl). This rule covers query execution (Steps 6 and 8), CSV export (Step 10), and every follow-up query. Only fixed literal text written verbatim in this file (e.g. the `SELECT 1` connectivity tests in Step 3) may be passed as an argument. The heredoc fences the shell only, not the query body: any identifier taken from the environment, `docs/db.md`, a tool return or the user that does not match `^[A-Za-z0-9_]+$` is reported and skipped, never written into a query body — a backtick inside a BigQuery identifier is invisible to a quoted heredoc.
+
+**Unobtainable-value policy — every step, every engine:** any value this skill needs but cannot obtain — an unset or empty environment variable, an absent `docs/db.md` section, a command or tool return that yields nothing — is never guessed, invented, or silently skipped: stop before generating or running the query, say exactly which value is missing, and ask the user for it. The one defined default: a row count that cannot be read is treated as unknown and fails closed to the >50M band in Automatic LIMIT Injection (refuse without a date-range filter).
 
 ### MySQL
 
@@ -279,6 +281,7 @@ SELECT * FROM `project.archive_2025.orders`
 **Important:**
 
 - Always use backtick-quoted fully-qualified table names: `` `project.dataset.table` ``
+- Every dataset entry parsed from `$BQ_DATASETS` is an identifier under the universal quoting rule — any entry not matching `^[A-Za-z0-9_]+$` is reported and skipped, never written into the query body
 - Only include datasets relevant to the requested time range — do not query all datasets if the user asks about a single year
 - If the user doesn't specify a time range, ask which years to include before running a cross-dataset query
 
@@ -392,7 +395,7 @@ CMD
 
 #### For BigQuery
 
-The heredoc is quoted, so `$BQ_PROJECT` is **not** expanded inside it — read the project id once with `echo "$BQ_PROJECT"` and write it literally into the fully-qualified table names (`myproject` below):
+The heredoc is quoted, so `$BQ_PROJECT` is **not** expanded inside it — read the project id once with `echo "$BQ_PROJECT"` and write it literally into the fully-qualified table names (`myproject` below). The value is an identifier under the universal quoting rule (skipped and reported if it fails `^[A-Za-z0-9_]+$`), and an empty `echo` output is an unobtainable value — stop and ask, never guess a project id:
 
 ```bash
 bq query --use_legacy_sql=false --format=pretty --project_id="$BQ_PROJECT" <<'SQL'
@@ -466,7 +469,7 @@ Run the appropriate CLI command with the generated query.
 - Format the output clearly (tables for SQL, formatted JSON for document stores)
 - Add context to help interpret the numbers
 - **Translate enum values**: Look up whichever field/value-mapping section `docs/db.md` carries for this engine ("Field Mappings & Enums" for SQL, MongoDB and BigQuery; Elasticsearch's "Field Mappings" documents types only; Redis has none) to convert raw values to human-readable meanings. This is especially important for numeric enums (e.g., `order.state`: `0` = `NEW`, `1` = `COMPLETED`). If there is no such section, or it carries no meaning for a value, say so and ask the user what the coded values mean rather than guessing — never show raw numeric enum values without translation.
-- **Use business definitions**: Check the "Business Definitions" section in `docs/db.md` for terms like "Buyer", "CHP User", "Revenue" to ensure correct interpretation. If that section is absent (an older `docs/db.md` predates it) and the question turns on such a term, say the section is missing and ask the user what the term means — never guess a definition, and suggest re-running `/co-dev:analyze-db` to add it
+- **Use business definitions**: Check the "Business Definitions" section in `docs/db.md` for terms like "Buyer", "CHP User", "Revenue" to ensure correct interpretation. If that section is absent (Elasticsearch and Redis `docs/db.md` files carry no Business Definitions section at all; for other engines an older file may predate it) and the question turns on such a term, say the section is missing and ask the user what the term means — never guess a definition. Only when the engine is one whose template carries the section (SQL, MongoDB, BigQuery) suggest re-running `/co-dev:analyze-db` to add it; for Elasticsearch and Redis a re-run cannot add it
 - Suggest follow-up queries if relevant
 
 ### 10. Export results (when requested)
@@ -568,7 +571,7 @@ When the user wants chart data, structure the output as:
 - Partitioned tables: always filter on the partition column (usually `_PARTITIONTIME` or a date column) to reduce bytes scanned
 - BigQuery charges by bytes scanned — use `--dry_run` before running expensive queries
 - `LIMIT` does NOT reduce bytes scanned — only `WHERE` filters on partitioned/clustered columns do
-- Backticks in table names need no shell escaping — the query arrives via a quoted heredoc (universal quoting rule), never a double-quoted shell string; write the project id literally, since the quoted heredoc does not expand `$BQ_PROJECT`
+- Backticks in table names need no shell escaping — the query arrives via a quoted heredoc (universal quoting rule), never a double-quoted shell string; write the project id literally, since the quoted heredoc does not expand `$BQ_PROJECT`, and only after it passes the universal quoting rule's `^[A-Za-z0-9_]+$` identifier check
 
 ## Safety Guardrails
 
@@ -591,7 +594,7 @@ Before executing any query, scan for write/mutate keywords. Match these as **SQL
 
 ### Automatic LIMIT Injection
 
-Read table/collection row counts from the "Large Table Warnings" or "All Tables" section in `docs/db.md`. Apply these rules:
+Read table/collection row counts from the "Large Table Warnings" or "All Tables" section in `docs/db.md`. If neither section exists (normal for MongoDB, Elasticsearch and Redis files, or a hand-edited `docs/db.md`) or it carries no count for the queried object, the size is unknown — the unobtainable-value policy applies and the unknown row below fails closed. Apply these rules:
 
 | Table Size | Action |
 | --- | --- |
@@ -599,6 +602,7 @@ Read table/collection row counts from the "Large Table Warnings" or "All Tables"
 | 1M–10M rows | Inject `LIMIT 1000`; warn user about table size |
 | 10M–50M rows | Inject `LIMIT 100`; require date range filter if table has a date field |
 | > 50M rows | **Refuse** query without date range filter; explain why |
+| unknown | treat as >50M: refuse without a date-range filter |
 
 **Exception:** Do NOT inject LIMIT on aggregation queries (`COUNT`, `SUM`, `AVG`, `GROUP BY`, MongoDB `$group`, ES `aggs`). Instead, add date-range filters to narrow the source data.
 

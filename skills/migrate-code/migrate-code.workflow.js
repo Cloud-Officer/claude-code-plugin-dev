@@ -380,8 +380,10 @@ if (!rawFiles.length) {
   return { mode, ok: false, reason: 'no-files' }
 }
 
-// dependency_order paths are agent-derived: normalize each one and reject any
-// that escapes the repo root or carries a newline (fail closed to 'blocked').
+// Agent-derived paths — dependency_order entries, build error_groups[].files,
+// test failures[].file — all pass through here: normalize each one and reject
+// any that escapes the repo root or carries a newline (dependency_order fails
+// closed to 'blocked'; fixer file lists drop the path and say so in the prompt).
 function safeRepoPath(p) {
   const s = String(p == null ? '' : p)
   if (!s || /[\r\n]/.test(s) || s.startsWith('/') || /^[A-Za-z]:/.test(s)) return null
@@ -522,18 +524,23 @@ if (!buildCmd) {
     }
     if (!groups.length) break
 
-    const fixes = (await parallel(groups.map(g => () => agent([
+    const fixes = (await parallel(groups.map(g => () => {
+      // g.files rides the same rail as dependency_order: out-of-repo paths are dropped.
+      const safeFiles = (g.files || []).map(safeRepoPath).filter(Boolean)
+      const droppedNote = safeFiles.length < (g.files || []).length ? ' (paths outside the repo root were dropped; discover from the build output)' : ''
+      return agent([
       'You are a FIXER. Resolve ONE class of build error across the files it affects — batched, not one-off.',
       CONTEXT,
       '',
       'Error signature: ' + fence('error_signature', g.signature),
-      'Affected files: ' + ((g.files || []).length ? fence('affected_files', g.files.join(', ')) : '(discover from the build output)'),
+      'Affected files: ' + (safeFiles.length ? fence('affected_files', safeFiles.join(', ')) + droppedNote : '(discover from the build output' + (droppedNote ? '; paths outside the repo root were dropped' : '') + ')'),
       '',
       'Fix the underlying cause consistently across all affected files, following the rulebook. If this error',
       'class reveals a RULEBOOK GAP (the same mistranslation happened many times), fix the files AND return a',
       '`rule_gap` so the rulebook can be amended — do not just paper over each site. Do NOT run the full build',
       'yourself (the daemon owns that). Report which files you touched and whether you fixed it.',
-    ].join('\n'), { label: 'fix:' + String(g.signature).slice(0, 32), phase: 'Compile', schema: FIX_SCHEMA, model: FIX_MODEL, effort: 'medium' }))))
+      ].join('\n'), { label: 'fix:' + String(g.signature).slice(0, 32), phase: 'Compile', schema: FIX_SCHEMA, model: FIX_MODEL, effort: 'medium' })
+    })))
       .filter(Boolean)
 
     compileRuleGaps.push(...fixes.filter(x => x.rule_gap).map(x => x.rule_gap))
@@ -576,18 +583,22 @@ if (!testCmd) {
     }
     if (!fails.length) break
 
-    const fixes = (await parallel(fails.map(fl => () => agent([
+    const fixes = (await parallel(fails.map(fl => () => {
+      // fl.file rides the same rail as dependency_order: an out-of-repo path is dropped.
+      const safeFile = safeRepoPath(fl.file)
+      return agent([
       'You are a FIXER chasing a behavioral test failure in the ported code.',
       CONTEXT,
       '',
-      'Failing test: ' + fence('test', fl.test) + (fl.file ? '  (file: ' + fence('file', fl.file) + ')' : ''),
+      'Failing test: ' + fence('test', fl.test) + (safeFile ? '  (file: ' + fence('file', safeFile) + ')' : (fl.file ? '  (its reported file path was outside the repo root and was dropped; discover from the test output)' : '')),
       'Reported cause: ' + (fl.why ? fence('why', fl.why) : '(investigate)'),
       '',
       'The test suite is the referee — it must pass against the PORT the same way it passed against the original.',
       'Fix the ported CODE (not the test) so behavior matches the source, following the rulebook. If the failure',
       'reflects a systemic mistranslation, return a `rule_gap` too. Do NOT run the whole suite (the runner owns',
       'that). Report the files you touched and whether you believe it is fixed.',
-    ].join('\n'), { label: 'testfix:' + String(fl.test).slice(0, 32), phase: 'Test', schema: FIX_SCHEMA, model: FIX_MODEL, effort: 'medium' }))))
+      ].join('\n'), { label: 'testfix:' + String(fl.test).slice(0, 32), phase: 'Test', schema: FIX_SCHEMA, model: FIX_MODEL, effort: 'medium' })
+    })))
       .filter(Boolean)
 
     compileRuleGaps.push(...fixes.filter(x => x.rule_gap).map(x => x.rule_gap))
