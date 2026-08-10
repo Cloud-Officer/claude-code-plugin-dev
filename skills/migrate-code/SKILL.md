@@ -46,7 +46,7 @@ git switch -c migrate/<source-slug>-to-<target-slug> 2>/dev/null || git switch m
 
 If the working tree is dirty, **stop and tell the user** — do not migrate over uncommitted work. Get a rough size so expectations are set (`cloc`/`tokei` if available, else `find … | wc -l`). If the scope is very large (thousands of files), say so and suggest scoping to a subsystem for the first pass.
 
-Check for an existing plan: if `docs/migration/rulebook.md` already exists, ask via `AskUserQuestion` whether to **reuse** it (keep the existing rulebook, but still run Step 2 in plan mode to regenerate `dependency_order` — Step 4 refuses an empty `files` array — and do not overwrite `docs/migration/rulebook.md` with the returned draft) or **regenerate** it (delete and continue).
+Check for an existing plan: if `docs/migration/rulebook.md` already exists, ask via `AskUserQuestion` whether to **reuse** it (keep the existing rulebook, but still run Step 2 in plan mode to regenerate `dependency_order` — Step 4 refuses an empty `files` array. On this branch pass `rulebookPath: "docs/migration/rulebook.draft.md"` in the Step 2 args: the workflow's foundation agent always writes its fresh draft to `rulebookPath`, so pointing it at the draft file is what keeps the approved rulebook untouched — the plan-mode stress test therefore exercises that draft — and skip the `rulebook.md` write-back below) or **regenerate** it (delete and continue).
 
 ---
 
@@ -73,7 +73,7 @@ It returns `{ rulebook_markdown, dependency_order, gap_inventory, sample_files, 
 
 Write the three artifacts to disk:
 
-- `docs/migration/rulebook.md` ← `rulebook_markdown`
+- `docs/migration/rulebook.md` ← `rulebook_markdown` (skip on the reuse branch: the approved rulebook stays as it is, and the workflow already wrote its draft to `docs/migration/rulebook.draft.md`)
 - `docs/migration/dependency-map.md` ← render `dependency_order` as a readable table (source → target, deps, complexity)
 - `docs/migration/gap-inventory.md` ← render `gap_inventory` (area, detail, handling, risk)
 

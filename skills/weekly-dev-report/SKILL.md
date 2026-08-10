@@ -1,7 +1,7 @@
 ---
 name: weekly-dev-report
 description: Generate a weekly team activity report from the active Jira sprint and linked GitHub repos, with per-member achievability ratings, stuck-ticket flags, stalled-member flags, and worklog audit. The roster mixes engineers, QA, content, and consultants; titles and language stay generic so non-engineering members aren't mislabelled. Flags sprint-goal delivery risk with a concrete, prioritized catch-up plan, and confirms each member's role (developer full-time / consultant part-time / manager-cto-ciso / tester / other) once interactively then caches it so later runs reuse it. Use when the user wants a weekly activity report, per-member Jira sprint progress audit, Jira sprint delivery-risk assessment, contributor status report, time-logged audit, or team check-in. Pulls roster from the active sprint, auto-discovers repos from Jira ticket dev-info, emails the report on --send, otherwise writes WEEKLY_REPORT.md and prints to stdout.
-allowed-tools: Bash(jira:*), Bash(gh:*), Bash(git:*), Bash(curl:*), Bash(gmail:*), Bash(gcloud:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(echo:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(printenv:*), Bash(printf:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, AskUserQuestion, mcp__atlassian__searchJiraIssuesUsingJql, mcp__atlassian__getJiraIssue, mcp__github__list_pull_requests, mcp__github__list_commits, mcp__github__get_pull_request_reviews, mcp__github__search_issues, mcp__github__get_pull_request
+allowed-tools: Bash(jira:*), Bash(gh:*), Bash(git:*), Bash(curl:*), Bash(gmail:*), Bash(gcloud:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(echo:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(printenv:*), Bash(printf:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, AskUserQuestion, mcp__atlassian__searchJiraIssuesUsingJql, mcp__atlassian__getJiraIssue, mcp__github__list_pull_requests, mcp__github__get_pull_request_reviews, mcp__github__search_issues, mcp__github__get_pull_request
 ---
 
 # Weekly Activity Report
@@ -19,7 +19,7 @@ Parse arguments from the user's invocation:
 - `--sprint <ID|name>` — override sprint detection (rare; usually the active sprint is correct).
 - `--reconfirm-roles` — force the interactive role prompt for **every** roster member, ignoring the cache (Step 2.5). Use after team changes. Without it, only members missing from the role cache are prompted.
 
-**Interpolation boundary (applies to every value this skill does not control, in every step).** Every value that reaches a command string, JQL query, or URL — whatever its source: user argument, env value, or any Jira/GitHub/config/file return (emails, display names, GitHub logins, issue keys, repo names, server URLs) — must match an explicit pattern before it is interpolated, and a failing value is **rejected, never sanitised**. The sink patterns, stated once: Jira identities `^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$`, GitHub logins `^[A-Za-z0-9-]+$`, issue keys `^[A-Z][A-Z0-9]+-[0-9]+$`, repos `^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$`, `--sprint` `^[0-9]+$` (or a name resolved to an ID by exact match against `jira sprint list` output), `GITHUB_USERNAME_MAP` entries `^[^,=]+=[A-Za-z0-9-]+$`, email recipients the Jira-identity pattern above, Jira base URL (`$JIRA_URL` / `$JIRA_SERVER`) `^https://[A-Za-z0-9.-]+/?$`, Jira API token (`$JIRA_API_TOKEN` — never echoed, per the Secrets rule) `^[A-Za-z0-9._~+/=-]+$`, project keys / key prefixes `^[A-Z][A-Z0-9]+$`, numeric ids (`issueId`, `boardId`, `sprintId`) `^[0-9]+$`, Jira account ids `^[A-Za-z0-9:-]+$`, window dates and ISO timestamps `^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?)?$`. Status names and other literals this skill supplies from its own tables are not subject to the boundary (they are controlled values). On failure: a user argument or env value aborts with a message; a tracker-sourced value (a member's email, a login, a key, a repo) is skipped with a caveat row in the report rather than interpolated. A value whose class has no pattern listed above is never interpolated — a user argument, env value, or config value (e.g. a display name) aborts with a message; a tracker-sourced value is skipped with a caveat row.
+**Interpolation boundary (applies to every value this skill does not control, in every step).** Every value that reaches a command string, JQL query, or URL — whatever its source: user argument, env value, or any Jira/GitHub/config/file return (emails, display names, GitHub logins, issue keys, repo names, server URLs) — must match an explicit pattern before it is interpolated, and a failing value is **rejected, never sanitised**. The sink patterns, stated once: Jira identities `^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$`, GitHub logins `^[A-Za-z0-9-]+$`, issue keys `^[A-Z][A-Z0-9]+-[0-9]+$`, repos `^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$`, `--sprint` `^[0-9]+$` (or a name resolved to an ID by exact match against `jira sprint list` output), `GITHUB_USERNAME_MAP` entries `^[^,=]+=[A-Za-z0-9-]+$`, filesystem paths (every path-valued input this skill opens or writes, `WEEKLY_DEV_REPORT_ROLES` today and any added later) `^[A-Za-z0-9._/-]+$` with the expanded path additionally required to resolve under `$HOME` and end in `.json`, email recipients the Jira-identity pattern above, Jira base URL (`$JIRA_URL` / `$JIRA_SERVER`) `^https://[A-Za-z0-9.-]+/?$`, Jira API token (`$JIRA_API_TOKEN` — never echoed, per the Secrets rule) `^[A-Za-z0-9._~+/=-]+$`, project keys / key prefixes `^[A-Z][A-Z0-9]+$`, numeric ids (`issueId`, `boardId`, `sprintId`) `^[0-9]+$`, Jira account ids `^[A-Za-z0-9:-]+$`, window dates and ISO timestamps `^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?)?$`. Status names and other literals this skill supplies from its own tables are not subject to the boundary (they are controlled values). On failure: a user argument or env value aborts with a message; a tracker-sourced value (a member's email, a login, a key, a repo) is skipped with a caveat row in the report rather than interpolated. A value whose class has no pattern listed above is never interpolated — a user argument, env value, or config value (e.g. a display name) aborts with a message; a tracker-sourced value is skipped with a caveat row.
 
 If the user did not pass `--send`, treat the run as a preview. Never send email unless `--send` is present. Role prompting (Step 2.5) only happens in a preview/interactive run — a `--send` run never prompts and instead falls back to the cached roles plus auto-detected defaults.
 
@@ -44,7 +44,6 @@ Run the `cd` as a **separate** Bash call — never chain it as `cd … && gh …
 | Get worklogs for issue | n/a via MCP | `curl -s -u "$JIRA_EMAIL:$JIRA_API_TOKEN" "$JIRA_URL/rest/api/3/issue/<KEY>/worklog"` |
 | Get dev-info (linked PRs) | n/a via MCP | `curl -s -u "$JIRA_EMAIL:$JIRA_API_TOKEN" "$JIRA_URL/rest/dev-status/latest/issue/detail?issueId=<ID>&applicationType=GitHub&dataType=pullrequest"` |
 | List PRs in a repo | `mcp__github__list_pull_requests` | `gh pr list --repo <owner>/<repo> --state all --search '...' --json ...` |
-| List commits | `mcp__github__list_commits` | `gh api repos/<owner>/<repo>/commits?author=<user>&since=...&until=...` |
 | Reviews given by user | `mcp__github__search_issues` (q: `is:pr reviewed-by:<user> updated:...`) | `gh search prs --reviewed-by <user> --updated <from>..<to> --json ...` |
 
 **Always prefer MCP first.** On tool-not-found or repeated error, fall back to CLI. If `$JIRA_URL`, `$JIRA_EMAIL`, `$JIRA_API_TOKEN` are needed for curl and missing, try the `jira` CLI instead. If that also fails, ask the user to check credentials.
@@ -389,9 +388,6 @@ For each repo in `REPOS` and each resolved GitHub user, collect within `[week_st
 # PRs opened, merged, closed
 gh pr list --repo <owner>/<repo> --state all --search "author:<user> created:<from>..<to>" --json number,title,state,createdAt,mergedAt,closedAt,url
 
-# Commits authored
-gh api "repos/<owner>/<repo>/commits?author=<user>&since=<from>T00:00:00Z&until=<to>T23:59:59Z" --paginate | jq '[.[] | {sha, message: .commit.message, date: .commit.author.date}]'
-
 # Reviews given (across all in-scope repos — query once per user, not per repo)
 gh search prs --reviewed-by <user> --updated "<from>..<to>" --json repository,number,title,url | jq --arg repos "<comma-joined-repos>" '[.[] | select((.repository.nameWithOwner) as $r | ($repos | split(",") | index($r) != null))]'
 
@@ -404,9 +400,7 @@ gh pr list --repo <owner>/<repo> --author <user> --state open --json number,titl
 Compute per member:
 
 - `prs_opened`, `prs_merged`, `prs_closed_unmerged`
-- `commits_count`
-- `reviews_given` — unique PRs they reviewed (authored by others)
-- `median_cycle_time_hours` — median of `mergedAt - createdAt` for PRs merged in window
+- `reviews_given` — unique PRs they reviewed (authored by others), plus PRs authored by others that they merged; feeds the `Reviews` column
 - `stale_prs` — list (rendered in a team-wide section, grouped by author)
 
 ## Step 6: Compute flags
@@ -429,7 +423,9 @@ Leaf issues are unaffected by this subsection — their own movement is the sign
 Find candidate stuck tickets via JQL, paginating past the 100-result API cap using key cursor:
 
 ```bash
-last="<ISSUE_PREFIX>-99999999"
+# re-derive KEY_PREFIX here (every Bash call is a fresh shell)
+KEY_PREFIX=$(head -1 /tmp/sprint.tsv | awk -F'\t' '{print $2}' | cut -d- -f1)
+last="${KEY_PREFIX}-99999999"
 while :; do
   jira issue list -q "sprint = <SPRINT_ID> AND sprint in closedSprints() AND updated < -14d AND key < '$last'" \
     --plain --no-headers --no-truncate --columns KEY,ASSIGNEE,SUMMARY,UPDATED > /tmp/stuck_page.tsv
@@ -441,7 +437,7 @@ while :; do
 done
 ```
 
-**Never** report a truncated stuck-ticket list. If pagination was needed, the report must show every stuck ticket, not just the first 100.
+**Never** report a truncated stuck-ticket list. If pagination was needed, the report must show every stuck ticket, not just the first 100. If `KEY_PREFIX` derives empty, do not run the loop: emit a caveat row saying stuck-ticket detection did not run, rather than letting an empty prefix match nothing and rendering the sprint as clean.
 
 For each candidate, confirm the stricter rule — all of:
 
@@ -524,6 +520,8 @@ One-line "why" per rating: state the worst driver. Examples:
 - `"Yellow — 6 PRs but Wed = 4h logged (< 7h)"`
 - `"Yellow — 7 PRs but every worklog entry is 09:00 / 8h exactly"`
 - `"Green — 8 PRs / 5 working days = 1.6/day"`
+
+**Team rating (the header's `**Team rating:**` token).** Aggregate the per-member ratings and the sprint-goal status, first match wins: 🔴 if any rated member is 🔴 or the sprint goal is 🔴 Off track; 🟡 if any rated member is 🟡 or the sprint goal is 🟡 At risk; 🟢 otherwise. Members with a `—` rating cell do not participate.
 
 **Carve-outs.**
 
@@ -632,18 +630,19 @@ The header should state how many roster members were dropped under this filter s
 
 **Role handling in this table:** the `Role` column shows the confirmed/auto-defaulted role from Step 2.5 (Developer / Consultant / Manager / Tester / Other), with the QA tester suffixed `(QA)`. Members with role `other` are **not** listed here (they are not tracked for throughput) — but if they hold a sprint ticket that hasn't moved, they appear in the 🎯 Delivery risk & recommended actions → At-risk items list instead. `manager` rows are shown when they have activity but always carry a `—` rating.
 
-| Team member | Role | Rating | → Code Review | → in QA | → Done | → REJECTED | PRs authored & merged | PRs/day | Tickets/day | Avg cycle (IP→CR) | Why |
-| --- | --- | --- | ---:| ---:| ---:| ---:| ---:| ---:| ---:| ---:| --- |
-| Alice | Developer | 🟢 | 4 | 3 | 0 | 0 | 6 | 1.2 | 1.4 | 18h | Green — 6 PRs / 5 working days = 1.2/day |
-| Bob | Developer | 🔴 | 0 | 0 | 0 | 0 | 1 | 0.2 | 0.2 | — | Red — 1 PR / 5 working days = 0.2/day |
-| Priya | Consultant | 🟡 | 1 | 1 | 0 | 0 | 2 | 0.4 | 0.6 | 30h | Yellow — consultant (part-time): 2 PRs = 0.4/day |
-| Sam | Manager | — | — | 1 | 3 | — | — | — | 0.8 | n/a | Leadership/escalation role — not rated on PR throughput |
-| Jamie | Tester (QA) | — | — | 2 | 20 | — | — | — | 4.4 | n/a | QA validations |
+| Team member | Role | Rating | → Code Review | → in QA | → Done | → REJECTED | PRs authored & merged | Reviews | PRs/day | Tickets/day | Avg cycle (IP→CR) | Why |
+| --- | --- | --- | ---:| ---:| ---:| ---:| ---:| ---:| ---:| ---:| ---:| --- |
+| Alice | Developer | 🟢 | 4 | 3 | 0 | 0 | 6 | 3 | 1.2 | 1.4 | 18h | Green — 6 PRs / 5 working days = 1.2/day |
+| Bob | Developer | 🔴 | 0 | 0 | 0 | 0 | 1 | 0 | 0.2 | 0.2 | — | Red — 1 PR / 5 working days = 0.2/day |
+| Priya | Consultant | 🟡 | 1 | 1 | 0 | 0 | 2 | 1 | 0.4 | 0.6 | 30h | Yellow — consultant (part-time): 2 PRs = 0.4/day |
+| Sam | Manager | — | — | 1 | 3 | — | — | 4 | — | 0.8 | n/a | Leadership/escalation role — not rated on PR throughput |
+| Jamie | Tester (QA) | — | — | 2 | 20 | — | — | — | — | 4.4 | n/a | QA validations |
 
 Rows sorted: 🔴 first, 🟡 next, 🟢 next, then the non-rated `—` rows (`manager`, then `tester`/`qa_user`) last. Break ties by `PRs authored & merged` descending, then `→ in QA` descending.
 
 Column rules:
 
+- `Reviews` = `reviews_given` from Step 5: unique PRs authored by others that the member reviewed or merged in the window. This is where merge-button credit lands (it never counts in `PRs authored & merged`). Not rated — informational.
 - `Tickets/day` = (count of distinct tickets touched by transitions in the week) ÷ working days. Reflects how many *different* pieces of work the member moved, complementing `PRs/day` which only counts merges.
 - `Avg cycle (IP→CR)` = average of `(Code Review timestamp − last In Progress timestamp)` for tickets the member transitioned to Code Review (or to in QA when they skipped CR) during the window. Shown in hours when < 48h, in days otherwise. `—` when the member moved no tickets through that gate this week.
 
