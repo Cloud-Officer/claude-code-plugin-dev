@@ -8,6 +8,10 @@ allowed-tools: Bash(linters:*), Bash(awk:*), Bash(basename:*), Bash(bundle:*), B
 
 Execute linters after code changes are complete to ensure code quality and consistency.
 
+## Arguments
+
+An optional path or glob may be passed to scope the run. When present, both the linting and the fix loop are restricted to files under it, passed to each linter's own path argument (`npx eslint <path>`, `rubocop <path>`, `ruff check <path>`, `golangci-lint run <path>/...`, and likewise per tool); the `linters` wrapper, which takes no path, is skipped in favour of the per-tool commands when a scope is given. When absent, the whole repository is linted as before.
+
 ## When to Use
 
 - After completing a set of code changes (not after each small edit)

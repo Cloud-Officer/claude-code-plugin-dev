@@ -46,7 +46,7 @@ git switch -c migrate/<source-slug>-to-<target-slug> 2>/dev/null || git switch m
 
 If the working tree is dirty, **stop and tell the user** — do not migrate over uncommitted work. Get a rough size so expectations are set (`cloc`/`tokei` if available, else `find … | wc -l`). If the scope is very large (thousands of files), say so and suggest scoping to a subsystem for the first pass.
 
-Check for an existing plan: if `docs/migration/rulebook.md` already exists, ask via `AskUserQuestion` whether to **reuse** it (skip to Step 4) or **regenerate** it (delete and continue).
+Check for an existing plan: if `docs/migration/rulebook.md` already exists, ask via `AskUserQuestion` whether to **reuse** it (keep the existing rulebook, but still run Step 2 in plan mode to regenerate `dependency_order` — Step 4 refuses an empty `files` array — and do not overwrite `docs/migration/rulebook.md` with the returned draft) or **regenerate** it (delete and continue).
 
 ---
 
@@ -157,7 +157,7 @@ Once the engine reports the build clean and the suite green, hand off to the plu
 
 Ported code compiles but may not match the *target* language's idioms and style. Invoke the **`run-linters`** skill via the **Skill** tool to run the repo's configured linters on the migrated files and auto-fix what it can:
 
-> Run the project's linters against the migrated target files under `<scope/target paths>` and fix the issues found. This is post-migration cleanup — focus on the newly ported files, not pre-existing code elsewhere.
+> Run the project's linters scoped to the migrated target paths by passing `<scope/target paths>` as the `run-linters` scope argument (its `## Arguments` section documents it), and fix the issues found. This is post-migration cleanup — the scope argument is what keeps pre-existing code elsewhere untouched.
 
 Linters change style, not behavior — but if a linter's autofix touches logic, **re-run the portable test command** (`testCmd`) once afterward to confirm the suite is still green, and note the result in the report. Fold the linter outcome (clean / issues fixed / issues remaining) into Step 5.
 

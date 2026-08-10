@@ -74,11 +74,11 @@ If the user chooses to re-run, delete the file and continue to Step 2.
 Gather repository context so the workflow's agents can reason about **what's deliberate vs. what's an oversight**. Run these once; you will pass the result into the workflow as `args.repoContext`.
 
 ```bash
-OWNER_REPO=$(gh repo view --json owner,name --jq '"\(.owner.login)/\(.name)"' 2>/dev/null)
+OWNER_REPO=$(gh repo view --json owner,name --jq '"\(.owner.login)/\(.name)"')
 COLLAB_COUNT=$(gh api "repos/${OWNER_REPO}/collaborators" --jq 'length')
 ACTIVE_AUTHORS=$(git log --since="6 months ago" --format='%ae' | sort -u | wc -l | tr -d ' ')
 REPO_AGE_DAYS=$(( ($(date +%s) - $(git log --reverse --format=%ct | head -1)) / 86400 ))
-IS_PRIVATE=$(gh repo view --json isPrivate --jq '.isPrivate' 2>/dev/null)
+IS_PRIVATE=$(gh repo view --json isPrivate --jq '.isPrivate')
 ```
 
 Compute `team_profile` from the higher of `ACTIVE_AUTHORS` and `COLLAB_COUNT`:
