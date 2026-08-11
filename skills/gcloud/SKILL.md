@@ -10,7 +10,7 @@ Manage Google Cloud Platform infrastructure and services.
 
 ## MCP Tools with Fallbacks
 
-**Prefer MCP tools** (`mcp__gcloud__*`) when available. If MCP tools are not available (tool not found errors), **fall back to the `gcloud` CLI**.
+**Prefer MCP tools.** MCP is available exactly when the session's tool list contains a tool named `mcp__gcloud__run_gcloud_command`. If that name is absent from the tool list, or a call to it is rejected by the tool harness before any gcloud output is produced, **fall back to the `gcloud` CLI**.
 
 The `gcloud` MCP server wraps the `gcloud` CLI and provides access to all GCP services through a single entry point.
 

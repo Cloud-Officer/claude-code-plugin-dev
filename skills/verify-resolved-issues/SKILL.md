@@ -134,7 +134,7 @@ Pass **every** discovered candidate in one call — the workflow parallelises ac
 }
 ```
 
-`outcome` is one of `VERIFIED` | `NOT_VERIFIED` | `SKIP_NEEDS_MANUAL` | `SKIP_INSUFFICIENT`. `comment_markdown` is the fully-filled, correctly-languaged comment to post verbatim (empty for the two `SKIP_*` outcomes — those are report-only and you must do nothing to the ticket).
+`outcome` is one of `VERIFIED` | `NOT_VERIFIED` | `SKIP_NEEDS_MANUAL` | `SKIP_INSUFFICIENT`. `comment_markdown` is the fully-filled, correctly-languaged comment to post verbatim (empty for the two `SKIP_*` outcomes — those are report-only and you must do nothing to the ticket). `resolver` is the tracker's account identifier exactly as the tracker returned it — the GitHub `login`, or the Jira `accountId` — never a display name; it is the empty string when the tracker supplied neither.
 
 **Render the dry-run report** (the "Output (dry-run)" section) from `results` + `counts`. Reconcile the two: any candidate you passed in that is missing from `results`, or that only shows up in `counts.errored`, is listed by id under "Errored — not audited" (see Important Rules) — never silently dropped. **On `--apply`**, after the single confirmation gate, perform the writes per `outcome` using the steps below: post `comment_markdown` first, then close/transition, then reassign on kick-backs. Do not re-verify — trust the workflow's verdict.
 
@@ -146,7 +146,7 @@ The per-flow steps below remain the source of truth for **discovery and the writ
 
 ### Step 2-G: Find candidate issues
 
-GitHub doesn't have a true "Resolved" lane, so the candidates are open issues whose fix landed but never got the issue closed. Use the union of these queries:
+GitHub doesn't have a true "Resolved" lane, so the candidates are open issues whose fix landed but never got the issue closed. Use the union of these queries — merge the four result sets, dedup by issue number, then sort by issue number ascending; that sorted list is the candidate order everywhere downstream:
 
 ```bash
 # Open issues whose linked PRs are merged (the most reliable signal)

@@ -58,7 +58,7 @@ One row per Phase 2 product type:
 | `library` | Installation, Quick Start, API Reference, Examples |
 | `mobile_app` | Screens, Navigation, Features, Offline Mode |
 | `desktop_app` | Windows & Views, Menus & Toolbars, Keyboard Shortcuts, Features |
-| `hybrid` | The union of the rows for each matched type |
+| `hybrid` | The union of the rows for each matched type, emitted in this table's row order (`web_app` first, `desktop_app` last), dropping duplicate sections after their first occurrence |
 
 ## MCP Tools with Fallbacks
 
@@ -205,8 +205,8 @@ Pre-report verification: every applicable phase task is marked complete; cross-r
 - Section structure matches UI: {PASS / FAIL}
 
 ### Coverage
-- Documented features: {n}
-- Features in code: {n}
+- Documented features: {n} (unit: one row of the guide's Feature Overview table)
+- Features in code: {n} (unit: one Phase 3 item for the detected type — route/page, command, endpoint, public export, or screen)
 - Undocumented features: {list with file:line}
 - Documented but removed: {list}
 - Conditional fields documented: {n} of {total}

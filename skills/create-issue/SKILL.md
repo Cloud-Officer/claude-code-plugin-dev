@@ -60,7 +60,10 @@ This skill uses MCP tools when available and falls back gracefully if they are u
 
 3. **Determine issue type**: Task, Bug, or Story
 4. **Check for assignee** in user's request
-5. **Determine priority/labels** based on severity
+5. **Determine severity, priority, and label**:
+   - **Severity** is exactly one row of the Priority Mapping table's left column: `Critical`, `High`, `Medium`, `Low`, or `Info` — no other value exists. Pick the row the user's request names (or the closest of those five to the impact it describes); if the request carries no severity signal at all, use `Medium`.
+   - **Priority** (Jira only) is the value the Priority Mapping table maps that severity row to.
+   - **Label** (`<LABEL>` in every command and MCP call below) is the lowercased issue type from item 3: `task`, `bug`, or `story` — never any other value. If the target GitHub repo does not define that label and the create call rejects it, retry the same create without the label and mention the missing label when reporting the created issue; Jira creates unknown labels on first use, so no retry rule is needed there.
 
 ---
 
@@ -199,7 +202,7 @@ Detailed explanation of what should have happened.
 ## Impact & Severity
 
 - **Impact:** Describe the impact on users or business operations
-- **Severity:** (Critical, Major, Minor)
+- **Severity:** (the Step 1 item 5 value: Critical, High, Medium, Low, or Info)
 
 ## Troubleshooting & Workaround
 
@@ -299,6 +302,8 @@ Detailed explanation of what should have happened.
 
 ## Priority Mapping (Jira only)
 
+The Severity column below is the closed set of severity values (Step 1 item 5) — every severity is exactly one of these five rows.
+
 | Severity | Jira Priority |
 | -------- | ------------- |
 | Critical | Blocker |
@@ -312,7 +317,7 @@ Detailed explanation of what should have happened.
 - **GitHub Issues:**
   - Prefer `mcp__github__create_issue`; with the CLI fallback, use `gh issue create` with `--body-file`
   - No repo name prefix needed (issues are scoped to repo)
-  - Labels are simple strings (e.g., `bug`, `enhancement`, `documentation`)
+  - The label comes only from the type-derived closed set in Step 1 item 5 (`task`, `bug`, or `story`); if the repo rejects it as undefined, retry without the label and report it
 - **Jira Issues:**
   - Always prefix summary with repo name: `[repo-name] Brief description`
   - Always use `--no-input` flag to prevent interactive prompts

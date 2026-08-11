@@ -129,7 +129,7 @@ For each team (skipping `Skip` teams), fetch the candidate item set from its con
 
 Fence every value this skill does not control — doc text, team-cache entries, user-typed ids, tracker returns — before it reaches **any** query, command, or tool argument (JQL, GraphQL, shell, or MCP parameter): strip everything outside `[A-Za-z0-9 _-]` from `<terms>` before quoting, require `<KEY>` to match `^[A-Z][A-Z0-9]+$` (skip the project otherwise), require every monday board id interpolated into a GraphQL query to match `^[0-9]+$` (skip the board otherwise), and pass search text through the MCP tool's argument rather than a shell-composed `-q'...'` whenever the MCP path is available.
 
-Build, per team, a flat candidate list of `{ tracker, id, name, norm_name, subtasks:[{id,name,norm}] }`.
+Build, per team, a flat candidate list of `{ tracker, id, name, norm_name, subtasks:[{id,name,norm}] }`, sorted by `tracker` bytewise ascending (`jira` before `monday`), then by `id` as a string bytewise ascending — a total order, so Step 5 scans candidates in the same sequence every run.
 
 ## Step 5: Match doc items to tracker items
 
@@ -137,7 +137,7 @@ For each doc item in a team, score it against that team's candidate tracker item
 
 - **Normalized exact match** (norm_title == norm_name) → score `1.0`.
 - **Containment** (one normalized string contains the other) → `0.9`.
-- **Token overlap** — Jaccard / Dice over the normalized word sets, ignoring stopwords and list noise → the overlap ratio. (A short, generic title like "Testing" needs a higher bar — require ≥ 2 shared significant tokens, not just one, before trusting a token-overlap match.)
+- **Token overlap** — Jaccard over the significant-token sets: `score = |A ∩ B| / |A ∪ B|`, where A and B are the significant tokens of the two normalized strings. A **significant token** is any whitespace-separated token that survives two rules: (a) strip **list noise** — the leading list markers already named in Step 2 (`-`, `*`, `[ ]`, `[x]`, `1.`) plus every character outside `[a-z0-9]` within the token, dropping tokens that become empty; (b) drop the **stopwords**, exactly this list: `a, an, and, at, be, by, for, in, is, of, on, or, the, to, with`. (A short, generic title like "Testing" needs a higher bar — require ≥ 2 shared significant tokens, not just one, before trusting a token-overlap match.)
 
 Classify each item by its best score against `--threshold` (default `0.82`):
 

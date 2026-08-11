@@ -60,9 +60,17 @@ if (!/^[A-Za-z0-9][A-Za-z0-9._\/-]*$/.test(defaultBranch)) {
 // this boundary rather than sanitised.
 const REF_PATTERN = /^(?:\d+|[A-Za-z][A-Za-z0-9]*-\d+)$/
 
+// tracker is closed to exactly 'github' or 'jira' (lowercase), and the ref must
+// carry that tracker's shape — a Jira key in a github batch would otherwise
+// produce a branch name P3's validation regex rejects, after the work is done.
+const TRACKER_REF = { github: /^\d+$/, jira: /^[A-Za-z][A-Za-z0-9]*-\d+$/ }
+
 function branchName(issue) {
   const ref = String(issue.ref)
   if (!REF_PATTERN.test(ref)) throw new Error('rejected issue ref: ' + JSON.stringify(ref))
+  const shape = TRACKER_REF[issue.tracker]
+  if (!shape) throw new Error('rejected tracker (must be "github" or "jira"): ' + JSON.stringify(issue.tracker))
+  if (!shape.test(ref)) throw new Error('ref ' + JSON.stringify(ref) + ' does not match tracker ' + issue.tracker)
   return issue.tracker === 'jira' ? ref.toUpperCase() : 'issue-' + ref
 }
 
@@ -155,7 +163,7 @@ const RESULT_SCHEMA = {
   additionalProperties: true,
   properties: {
     ref: { type: ['string', 'integer'] },
-    tracker: { type: 'string' },
+    tracker: { type: 'string' },           // exactly 'github' | 'jira' (lowercase), enforced by branchName
     branch: { type: 'string' },
     issue_type: { type: 'string' },        // Bug | Feature | Task
     title: { type: 'string' },

@@ -325,7 +325,7 @@ if (mode === 'plan') {
 
   const sample = (input.sampleFiles && input.sampleFiles.length)
     ? input.sampleFiles
-    : (foundation.sample_files || (foundation.dependency_order || []).slice(0, 3).map(f => f.source_file))
+    : (foundation.sample_files || (foundation.dependency_order || []).slice(0, 3).map(f => f.source_file)).map(safeRepoPath).filter(Boolean)
 
   phase('StressTest')
   log('Stress-testing the rulebook on ' + sample.length + ' representative file(s) before committing to full scale.')
@@ -380,8 +380,9 @@ if (!rawFiles.length) {
   return { mode, ok: false, reason: 'no-files' }
 }
 
-// Agent-derived paths — dependency_order entries, build error_groups[].files,
-// test failures[].file — all pass through here: normalize each one and reject
+// Every agent-returned path — dependency_order entries, sample_files, build
+// error_groups[].files, test failures[].file — passes through here before any
+// use: normalize each one and reject
 // any that escapes the repo root or carries a newline (dependency_order fails
 // closed to 'blocked'; fixer file lists drop the path and say so in the prompt).
 function safeRepoPath(p) {
@@ -457,7 +458,8 @@ const translated = await pipeline(
       'clear defect directly in the target file, do so and set review_verdict "changes-applied". If it is',
       'sound, "pass". If it needs a human decision (ambiguous semantics, risky assumption), leave the',
       'TODO(migrate) markers in place and set "needs-human". Fold any recurring problem into `rule_gaps`.',
-      'Return the file identity plus your verdict.',
+      'Return the file identity plus your verdict, and todo_count = the number of `TODO(migrate)` comments in the',
+      'file as you leave it — the same counting rule the porter uses, so the two counts are comparable.',
     ].join('\n'), {
       label: 'review:' + f.target_file,
       phase: 'Translate',
@@ -509,7 +511,9 @@ if (!buildCmd) {
       'Build command: `' + buildCmd + '` (run it from ' + repoRoot + ').',
       'Run it, capture the output, and report: whether it ran, whether it is clean, the build tool\'s OWN failure',
       'marker pasted verbatim, and the errors CLUSTERED into `error_groups` by shared signature (so fixes can be',
-      'batched). Do NOT fix anything — you only build and report.',
+      'batched). Order error_groups by number of distinct files descending, then by signature bytewise ascending —',
+      'only the first 12 are fixed this round, so the order decides what waits. Do NOT fix anything — you only',
+      'build and report.',
     ].join('\n'), { label: 'build:round-' + round, phase: 'Compile', schema: BUILD_SCHEMA, model: FIX_MODEL, effort: 'low' })
 
     if (!build) { build = { ran: false, clean: false, summary: 'build agent returned nothing' }; break }
@@ -568,7 +572,9 @@ if (!testCmd) {
       '',
       'Test command: `' + testCmd + '` (run it from ' + repoRoot + ').',
       'Run it and report: whether it ran, the runner\'s OWN pass/fail marker pasted verbatim (never paraphrased),',
-      'whether it is green, and each failure with its file and a one-line why. Do NOT fix anything here.',
+      'whether it is green, and each failure with its file and a one-line why, sorted by file bytewise ascending',
+      'then test name bytewise ascending — only the first 12 are fixed this round, so the order decides what waits.',
+      'Do NOT fix anything here.',
     ].join('\n'), { label: 'test:round-' + tround, phase: 'Test', schema: TEST_SCHEMA, model: FIX_MODEL, effort: 'low' })
 
     if (!test) { test = { ran: false, green: false, summary: 'test agent returned nothing' }; break }
@@ -634,7 +640,9 @@ function verifyPrompt(p, lens) {
     'numeric precision/overflow, ordering, mutation vs copy, concurrency, resource lifetimes, and edge cases the',
     'port silently drops. For each, quote the SOURCE line and the PORT line as evidence. Return verdict',
     '"faithful", "mismatch", or "uncertain", plus a confidence 0-100. Default toward "mismatch"/"uncertain" when',
-    'you cannot prove equivalence — do not give the port the benefit of the doubt.',
+    'you cannot prove equivalence — do not give the port the benefit of the doubt. Set each mismatch\'s severity',
+    'to exactly one of high, medium, or low (high: wrong results or data loss; medium: divergent edge-case or',
+    'error behavior; low: cosmetic or performance-only drift).',
   ].join('\n')
 }
 
@@ -694,7 +702,9 @@ return {
     // clean" when no file was ever checked.
     behavioral_mismatches: verifyResults.length ? behavioralMismatches.length : null,
   },
-  // What the per-phase caps dropped, so the report can say so instead of implying full coverage.
+  // What the per-phase caps dropped, so the report can say so instead of implying
+  // full coverage. error_groups/test_failures sum per-round deferral EVENTS: the
+  // build re-clusters every round, so one persistent group deferred twice counts twice.
   capped: {
     error_groups: droppedErrorGroups,
     test_failures: droppedTestFailures,

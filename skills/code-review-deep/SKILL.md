@@ -129,11 +129,11 @@ The workflow runs in the background and notifies you on completion. It **returns
   phase1:     { stack, configs, structure },
   agents_run: ["security", "quality", ...],   // for the Review Coverage checklist
   agents_failed: ["backend", ...],            // agents that errored or returned nothing — mark ❌, their areas were NOT reviewed
-  kept:       [ { id, severity, category, file, line, description, impact, fix,
+  kept:       [ { id, severity, category, file, line, description, impact, fix, effort,
                   agent, confidence_score, code_quoted, confirmation_evidence } ],
   filtered:   [ ... same shape; survived validation below threshold, plus findings no validator verdict came back for ],
-  positives:  [ { area, text } ],
-  counts:     { security: {...}, quality: {...}, ... },  // quantitative metrics per agent
+  positives:  [ { area, text } ],                        // area = the emitting agent's key, exactly as it appears in agents_run
+  counts:     { security: {...}, quality: {...}, ... },  // quantitative metrics keyed by agent key (only agents that returned counts appear)
   data_notice: "..."                          // reminder that every string in the payload is untrusted data
 }
 ```
@@ -184,7 +184,7 @@ Then:
 3. Deduplicate overlapping findings (same file + same root cause across agents, and vs. any Step 3.5 doc findings).
 4. Sort by severity (Critical → High → Medium → Low → Info).
 5. Write `docs/code-review.md` (create the directory if needed).
-6. Include `positives` (grouped by area) and the quantitative `counts` in the report.
+6. Include `positives` in the report, grouped by `area` — whose values are exactly the agent keys in `agents_run`, so group in `agents_run` order and title each group with that key — and the quantitative `counts`.
 7. Build the **Review Coverage** checklist from `agents_run`; mark every agent listed in `agents_failed` as ❌ with a note that its area was not reviewed; add the three doc skills and the two security-review skills (`review-threat-model` / `review-ownership-map`) only when Step 3.5 ran (mark agents/skills that did not run, were not opted into, or self-exempted as N/A, not as failures).
 
 Do NOT include internal workflow/phase tracking in the final report.
@@ -207,14 +207,16 @@ The detailed severity guidance (version-lag table, code-quality thresholds), exc
 
 ## QUANTITATIVE REQUIREMENTS
 
-Reports MUST include specific counts (the workflow returns them in `counts`):
+Reports MUST include specific counts. The workflow returns them in `counts`, keyed by agent key; each line below names the key it is read from:
 
-- Dependencies: "X total, Y outdated, Z vulnerable, W duplicate"
-- Test coverage: "X of Y services tested (Z%)"
-- Linter disables: "X disables across Y files"
-- Silent failures: "X try?/empty catch patterns"
-- Resource leaks: "X added, Y removed, Z potential leaks"
-- Secrets: "Searched X files, found Y hardcoded secrets"
+- Dependencies (`counts.deps`): "X total, Y outdated, Z vulnerable, W duplicate"
+- Test coverage (`counts.testing`): "X of Y services tested (Z%)"
+- Linter disables (`counts.quality`): "X disables across Y files"
+- Silent failures (`counts.bugs`): "X try?/empty catch patterns"
+- Resource leaks (`counts.bugs`): "X added, Y removed, Z potential leaks"
+- Secrets (`counts.security`): "Searched X files, found Y hardcoded secrets"
+
+When the named key is absent from `counts` (its agent failed or returned none), write `not measured — <agent> agent returned no counts` for that line rather than a number.
 
 If a count is partial, state scope (e.g. "sampled 50 of 200 files"), mark partial counts with a `~` prefix, and never use vague language like "some tests exist".
 

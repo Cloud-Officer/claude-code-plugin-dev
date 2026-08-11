@@ -245,7 +245,7 @@ From `docs/db.md`, determine which CLI command to use:
 
 ### 4b. Prefer Database MCP tools over CLI (when available)
 
-For PostgreSQL, MySQL, MongoDB, and Redis, check whether MCP tools are available. **If MCP tools are available — use them instead of the CLI.** Benefits:
+For PostgreSQL, MySQL, MongoDB, Redis, and BigQuery, check whether MCP tools are available (for BigQuery the CLI fallback is `bq`, as in the table below). **If MCP tools are available — use them instead of the CLI.** Benefits:
 
 - **Structured output** — cleaner results without CLI formatting quirks
 - **Connection management** — handled by the MCP server

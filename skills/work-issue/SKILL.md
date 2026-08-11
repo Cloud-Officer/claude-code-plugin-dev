@@ -79,6 +79,8 @@ Parse `<issue>` into a list of issue refs (split on whitespace and/or commas; e.
 
 Refs are spliced into the `git`, `gh`, and `jira` commands run further down (branch names, `gh issue view <issue>`, commit messages) — this is the interpolation boundary from `## Arguments` applied to refs: a ref that does not match is **rejected, never sanitised**. Tell the user which ref was skipped and why, and carry on with the ones that matched. If nothing matches, stop and ask the user to restate the issues.
 
+**Then check each surviving ref against the detected tracker's shape** — `^\d+$` when the tracker is `github`, `^[A-Za-z][A-Za-z0-9]*-\d+$` when it is `jira` — and skip a non-conforming ref with a message naming the mismatch, exactly as an invalid ref is skipped. A batch is one tracker, so a Jira-shaped ref in a GitHub batch (`123 124 DEV-5`) can only fail later: the workflow derives the branch name from the tracker, and a mismatched ref produces a branch its own validation regex rejects. Skipping at this gate means no agent is dispatched on work that P3 must throw away.
+
 Then count the surviving refs:
 
 - **One ref → sequential mode (default).** Run the full interactive workflow below (Steps 0–12) exactly as written. The clarifying-questions gate (Step 5) and architecture-choice gate (Step 6) need a human in the loop, so a single issue keeps the rich back-and-forth.
@@ -114,7 +116,7 @@ Workflow({
   args: {
     defaultBranch: "<DEFAULT_BRANCH>",
     repoRoot: "<REPO_ROOT>",
-    issues: [ { ref: "123", tracker: "github" }, { ref: "124", tracker: "github" } ]
+    issues: [ { ref: "123", tracker: "github" }, { ref: "124", tracker: "github" } ]   // tracker: exactly "github" or "jira", lowercase — the workflow tests it with === 'jira'
   }
 })
 ```
@@ -307,7 +309,7 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 
 6. **Architecture design** (Feature: required · Task: skip · Bug: skip)
 
-   Launch 2–3 architect agents in parallel via the `Agent` tool. Each agent designs an implementation approach with a different bias:
+   Launch three architect agents in parallel via the `Agent` tool — one per bias below, so "present all three" always has three to present. Each agent designs an implementation approach with a different bias:
 
    - **Minimal changes:** smallest diff, maximum reuse of existing patterns
    - **Clean architecture:** maintainability, elegant abstractions, low future cost

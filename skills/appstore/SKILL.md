@@ -76,7 +76,10 @@ H="Authorization: Bearer $JWT"
 # 1. Get the build actions (build / test / archive / analyze) for a ciBuildRun
 curl -s -H "$H" "$API/ciBuildRuns/$RUN_ID/actions" | jq
 
-# 2. For a failing action, fetch its issues (compile errors, test failures)
+# 2. Fetch the failing action's issues (compile errors, test failures).
+#    ACTION_ID = .id of the first entry, in returned order, of step 1's .data
+#    whose .attributes.completionStatus is "FAILED" or "ERRORED";
+#    if no entry matches, report that no action failed and stop.
 curl -s -H "$H" "$API/ciBuildActions/$ACTION_ID/issues" | jq
 
 # 3. Fetch the plain-text log bundle URL, then download it
@@ -85,7 +88,9 @@ curl -L -o build.log.zip "$LOG_URL"
 
 # 4. For test failures, grab the .xcresult artifact and inspect locally
 curl -s -H "$H" "$API/ciBuildActions/$ACTION_ID/artifacts" | jq
-# pick the .xcresult bundle's downloadUrl, then:
+# ARTIFACT_URL = .attributes.downloadUrl of the first entry, in returned
+# order, of .data whose .attributes.fileName contains ".xcresult";
+# if no entry matches, report that no .xcresult artifact exists and stop.
 curl -L -o UnitTests.xcresult.zip "$ARTIFACT_URL"
 unzip UnitTests.xcresult.zip
 xcrun xcresulttool get --path UnitTests.xcresult --format json | jq '.issues'

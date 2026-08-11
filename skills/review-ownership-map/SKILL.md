@@ -124,7 +124,7 @@ Lead with the **risk matrix** (change frequency × ownership concentration) — 
 - 50%/75% thresholds are defaults; identities folded via .mailmap where possible
 ```
 
-Optionally, when the user asks, also emit a **CSV** (`file,top_owner,top_owner_pct,bus_factor,sensitive,last_changed`) for import into a dashboard or graph tool.
+Optionally, when the user asks, also emit a **CSV** (`file,top_owner,top_owner_pct,bus_factor,sensitive,last_changed`) for import into a dashboard or graph tool. The `sensitive` field is exactly `yes` or `no` — `yes` iff the file matched a Step 3 category — and the risk matrix's `Sensitive?` column uses the same two values.
 
 Pass `markdownlint-cli2` defaults (blank lines around lists/tables/fences, fenced-block languages, single trailing newline).
 
