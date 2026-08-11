@@ -249,8 +249,7 @@ modules.xml
 .LSOverride
 
 # Icon must end with two \r
-Icon
-
+Icon
 
 # Thumbnails
 ._*
@@ -466,6 +465,13 @@ $RECYCLE.BIN/
 # Claude Code
 .claude/
 
+# Claude Code skill review artifacts
+docs/code-review.md
+docs/copy-review.md
+docs/migration/
+docs/prompt-review.md
+docs/seo-audit.md
+
 # Cursor
 .cursor/
 
@@ -477,5 +483,3 @@ $RECYCLE.BIN/
 
 # END AI Assistants
 
-docs/code-review.md
-docs/prompt-review.md
