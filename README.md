@@ -5,6 +5,7 @@ Claude Code plugin for development workflow automation.
 ## Table of Contents
 
 * [Introduction](#introduction)
+  * [Features](#features)
 * [Installation](#installation)
   * [Quick Start](#quick-start)
   * [Configure Remote MCPs (optional)](#configure-remote-mcps-optional)
@@ -21,7 +22,14 @@ Claude Code plugin for development workflow automation.
 
 ## Introduction
 
-This plugin provides development workflow automation for Claude Code.
+`claude-code-plugin-dev` is the source repository for **`co-dev`**, a Claude Code plugin that automates day-to-day
+development workflows. It bundles 32 skills — issue tracking, PR creation, deep code review, test generation, linting,
+documentation reviews, cloud and app-store operations, and reporting — alongside 13 language servers and 13 MCP servers
+that Claude Code loads automatically once the plugin is installed.
+
+It is aimed at engineering teams that want these workflows available in every repository without wiring up each
+integration by hand. Credentials are always read from environment variables, never stored in the plugin, so the same
+install works across multiple accounts and tenants.
 
 ### Features
 
