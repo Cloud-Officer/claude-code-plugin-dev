@@ -164,11 +164,13 @@ gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'
 
 After fetching the issue details, determine the issue type:
 
-**GitHub:** Check the issue labels for type indicators:
+**GitHub:** Map the issue's labels into the closed enum {Bug, Feature, Task} by **exact** label name, first-match-wins. Take the first rule that matches any label exactly, in this order:
 
-- Labels containing `bug`, `fix`, `defect` → **Bug**
-- Labels containing `feature`, `enhancement`, `story` → **Feature**
+- `bug` / `defect` / `fix` → **Bug**
+- `feature` / `enhancement` / `story` → **Feature**
 - Otherwise → **Task**
+
+Exact names only — never substring containment (`non-bug` must not match `bug`), and the fixed rule order means an issue labelled both `bug` and `enhancement` is always **Bug**, mirroring the ordered Jira mapping below.
 
 **Jira:** Use the issue type field directly:
 

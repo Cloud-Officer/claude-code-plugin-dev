@@ -27,7 +27,7 @@ Use `TodoWrite` to track each phase. Mark `in_progress` on entry, `completed` wh
 9. Fixes applied (if approved)
 10. Linters run (if files changed)
 
-**Evidence rule:** every check must record (a) what was expected, (b) what was found with a source reference (`file:line`, or `URL` + the exact tag/line), and (c) PASS / FAIL / MISSING / N/A. A bare "PASS" without a quoted source is invalid.
+**Evidence rule:** every check must record (a) what was expected, (b) what was found — the source reference (`file:line`, or `URL`) stays inline, and the exact quoted tag/line goes on its own lines in a fenced code block whose fence run is one backtick longer than the longest backtick run inside the quote — and (c) PASS / FAIL / MISSING / N/A. The quote is verbatim site-controlled text: never place it in an inline code span (a backtick in a meta description breaks the span, multi-line JSON-LD cannot fit, and a hostile value could inject a fabricated finding); the length-aware fence keeps it inert data. A bare "PASS" without a quoted source is invalid.
 
 ## Phase 1: Scan Scope & Inputs
 
@@ -254,7 +254,7 @@ Sort findings by severity (Critical → High → Medium → Low → Info), then 
 
 Write `docs/seo-audit.md` (`mkdir -p docs` first). Structure:
 
-```markdown
+````markdown
 # SEO & GEO Audit
 
 **Project:** [name]
@@ -275,7 +275,7 @@ Write `docs/seo-audit.md` (`mkdir -p docs` first). Structure:
 
 ## Technical SEO
 
-[Per-check: expected / found (with file:line or URL+tag) / PASS·FAIL·MISSING]
+[Per-check: expected / found (file:line or URL inline; the quoted tag/line in a fenced block per the Evidence rule) / PASS·FAIL·MISSING]
 
 ## GEO / AI Answer-Engine
 
@@ -294,7 +294,12 @@ Write `docs/seo-audit.md` (`mkdir -p docs` first). Structure:
 ### [SEO-001] SEVERITY: Title
 
 **Area:** Technical SEO | GEO | Content | Performance | CWV | Accessibility | Best Practices (closed set — assign by originating phase: 4 → Technical SEO, 5 → GEO, 6 → Content, 7 → the pillar of its sub-section)
-**Evidence:** `path/file.erb:42` or `https://…` → `<quoted tag/line>`
+**Evidence:** `path/file.erb:42` or `https://…`, then the quoted tag/line on its own lines in a fenced code block whose fence run is one backtick longer than the longest backtick run inside the quote:
+
+```text
+<quoted tag/line>
+```
+
 **Issue:** What's wrong.
 **Impact:** Why it matters (ranking / indexing / AI citation).
 **Fix:** Concrete change.
@@ -306,7 +311,7 @@ Write `docs/seo-audit.md` (`mkdir -p docs` first). Structure:
 ## Positive Observations
 
 [What's already done well.]
-```
+````
 
 Then ask before changing anything: "I found the issues above. Want me to apply the fixes?"
 

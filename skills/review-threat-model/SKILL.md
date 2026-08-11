@@ -129,14 +129,14 @@ Structure (adjust to the system; skip empty sections):
 - Modeled by: AI (draft)  ·  Reviewed & accepted by: __________ (human)
 ```
 
-Row order: sort the Assets table by Asset bytewise ascending; sort the Trust boundaries & entry points table by Boundary / entry point bytewise ascending, tie-broken by File / route bytewise ascending, and assign `#` sequentially in that order.
+Row order: sort the Assets table by Asset bytewise ascending; sort the Trust boundaries & entry points table by Boundary / entry point bytewise ascending, tie-broken by File / route bytewise ascending, and assign `#` sequentially in that order; and sort the Threats blocks by Risk (Critical, High, Medium, Low), tie-broken by the abuse path's `file:line` bytewise ascending, assigning `T-01…` sequentially in that order.
 
 Pass `markdownlint-cli2` defaults: blank lines around lists/tables/fences, a language on every fence, one trailing newline.
 
 ## Integration with co-dev
 
 - **`code-review-deep`** → the threat model tells its `A_SECURITY` agent where to look hardest; run this first for a design-level view, then `code-review-deep` for line-level findings.
-- **`create-issue`** → for each High/Critical threat with a missing control, offer to open issues (label `security`).
+- **`create-issue`** → for each High/Critical threat with a missing control, offer to open issues, passing `security` as an additional label per create-issue's label rule (type default plus caller labels), and keep the threat ID `T-NN` in the issue title so the trace survives either way.
 - **`review-architecture`** → trust boundaries here should match the architecture doc; flag divergence.
 - **`co-private:review-iso`** (if present) → this model is direct evidence for the A.8.25/8.27/8.28 procedures.
 

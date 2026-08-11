@@ -1,7 +1,7 @@
 ---
 name: monday-weekly-report
 description: Generate a weekly project-status report from one or more monday.com boards — general project tracking, not engineering throughput. Covers per-board health, owner activity (role-aware), items moved this week, overdue and due-soon work, stuck/blocked and stale items, upcoming milestones, and a date-driven delivery-risk assessment with a concrete catch-up plan. Role-aware (three roles — owner / external / other, confirmed once and cached) and runs against a past-full-week or week-to-date window so it can be run any day. Use when the user wants a weekly project report, project status report, monday board status, project health check, monday.com board delivery-risk assessment, or stakeholder update from monday.com. Writes PROJECT_REPORT.md and prints to stdout; emails on --send.
-allowed-tools: mcp__monday__get_board_schema, mcp__monday__get_board_items_by_name, mcp__monday__list_users_and_teams, mcp__monday__all_monday_api, mcp__monday__get_graphql_schema, mcp__monday__get_type_details, AskUserQuestion, Read, Write, Bash(jq:*), Bash(echo:*), Bash(mkdir:*), Bash(date:*), Bash(printf:*), Bash(ls:*), Bash(cat:*)
+allowed-tools: mcp__monday__get_board_schema, mcp__monday__get_board_items_by_name, mcp__monday__list_users_and_teams, mcp__monday__all_monday_api, mcp__monday__get_graphql_schema, mcp__monday__get_type_details, AskUserQuestion, Read, Write, Bash(jq:*), Bash(echo:*), Bash(mkdir:*), Bash(date:*), Bash(printf:*), Bash(ls:*), Bash(cat:*), Bash(gmail:*), Bash(gcloud:*)
 ---
 
 # Weekly Project Report (monday.com)
@@ -111,7 +111,7 @@ For a non-interactive `--send` run with no `--board`, no cache, and no `MONDAY_W
 
 For every selected board, call `get_board_schema` and locate, by **type** (not by guessing IDs):
 
-- **status column(s)** (`type: status`/`color`) — the primary progress signal. A board may have more than one; pick the one whose labels look like a workflow (contains a Done-like and an In-progress-like label). If two are equally plausible, ask the user once which is the tracking status (cache it with the status mapping, Step 3.5).
+- **status column(s)** (`type: status`/`color`) — the primary progress signal. If the board is already in the status cache (Step 3.5), reuse the cached `status_col_id` — do not re-decide. Otherwise, a board may have more than one; pick the one whose labels look like a workflow (contains a Done-like and an In-progress-like label). If two are equally plausible, ask the user once which is the tracking status. Either way the chosen column id is persisted as `status_col_id` in the board's status-cache entry (Step 3.5) so later runs reuse it.
 - **people / owner column** (`type: people`) — who owns the item.
 - **date / timeline column** (`type: date` or `type: timeline`) — the due-date signal that drives delivery risk. Prefer a timeline (start+end) if present; else the date column. A board may legitimately have none.
 - **groups** — top-level groupings (often phases / workstreams / priorities); used for the per-group health rollup.
@@ -136,11 +136,11 @@ monday status labels are board-specific ("Working on it", "Stuck", "Done", "Wait
 
 **Auto-detect defaults** from label text (lowercased, substring match) and monday's default green/orange/red/grey colors, applying the **first matching rule in this order**: contains "won't/cancel/duplicate/reject" → `cancelled`; green or contains "done/closed/complete/shipped/approved" → `done`; red or contains "stuck/blocked/waiting/on hold" → `stuck`; orange/yellow or contains "working/progress/review/doing" → `in_progress`; grey/empty or contains "not started/backlog/to do/new" → `not_started`. A label matching **no** rule maps to `in_progress` — the stated fallback bucket, never a guess at another — and always counts as ambiguous for the prompt below.
 
-**Load the status cache** (JSON, keyed by `board_id`): `${MONDAY_WEEKLY_REPORT_STATUSES:-$HOME/.config/monday-weekly-report/statuses.json}`. Read with the Read tool (treat a missing file as `{}`).
+**Load the status cache** (JSON, keyed by `board_id`; each entry is `{ "status_col_id": "<id>", "labels": { <label>: <bucket> } }`): `${MONDAY_WEEKLY_REPORT_STATUSES:-$HOME/.config/monday-weekly-report/statuses.json}`. Read with the Read tool (treat a missing file as `{}`).
 
 **Decide who to prompt:** a board needs confirmation if it is not in the cache, OR `--reconfirm-statuses` was passed. If interactive and confirmation is needed, use AskUserQuestion — one question per ambiguous label (batch ≤ 4 per call), `header` = the label (≤ 12 chars), options = the five buckets with the auto-detected default listed first and " (detected)" appended. Labels whose auto-detection is unambiguous (exact "Done"/"Stuck"/"Not Started") can be accepted without prompting; only prompt for the uncertain ones.
 
-**Persist** the confirmed mapping back to the status cache (`mkdir -p` the parent dir first). **Non-interactive / `--send` runs never prompt** — use the cache if present, else auto-detection, and note in the header how many boards used auto-detected mappings.
+**Persist** the board's entry — the chosen `status_col_id` (Step 3) plus the confirmed `labels` mapping — back to the status cache (`mkdir -p` the parent dir first). **Non-interactive / `--send` runs never prompt** — use the cache if present, else auto-detection, and note in the header how many boards used auto-detected mappings.
 
 ## Step 4: Confirm owner roles (cached)
 
@@ -437,7 +437,7 @@ If run **with** `--send`:
 All caches live under `~/.config/monday-weekly-report/` (override paths via the env vars below). Create the directory with `mkdir -p` before writing. Read with the Read tool, treating a missing file as empty. Every value reaching a shell or tool sink — env vars, board and item names, dates, the email subject and the report body — is passed over stdin, or as a single-quoted argument — never inside double quotes, which still expand `$(...)`, backticks and `$VAR` — and never string-concatenated into a shell line. An env-var value is additionally rejected unless it matches its declared shape — cache paths `^[A-Za-z0-9._/-]+$`, email recipients (per address) `^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$`, board ids `^[0-9]+$` (board names are resolved to numeric ids in Step 2 before reaching any sink) — falling back to the default (or aborting the send) with a printed note.
 
 - `roles.json` — `user_id → { name, role, confirmedAt, auto? }` (Step 4). Set `auto: true` on entries written from an auto-default (a `--send` run) so a later preview knows they were never human-confirmed and re-proposes them; drop the flag once the human confirms.
-- `statuses.json` — `board_id → { <label>: <bucket> }` (Step 3.5)
+- `statuses.json` — `board_id → { "status_col_id": "<id>", "labels": { <label>: <bucket> } }` (Steps 3 + 3.5)
 - `boards.json` — last interactively-selected board set (Step 2), so reruns don't re-prompt
 - `email.json` — the confirmed email sender for `--send` (Step 8): the exact MCP tool name, `gmail` CLI, or SMTP relay
 

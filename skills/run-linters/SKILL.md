@@ -55,6 +55,8 @@ linters
 
 ## Step 2: Analyze Results
 
+An **issue** is any diagnostic the linter emits at severity `error` or `warning`. Diagnostics at `note`, `info`, `style` or `convention` are listed to the user and not fixed. A non-zero exit with no diagnostic lines is a failed run, not an issue.
+
 - If no issues: Report success and proceed
 - If issues found: Continue to Step 3
 

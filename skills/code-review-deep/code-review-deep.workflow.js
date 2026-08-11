@@ -89,7 +89,8 @@ const repoBlock = [
 const GOVERNANCE = [
   '## Governance rules on solo / small teams',
   'Solo and small teams cannot realistically enforce multi-reviewer governance.',
-  'When team_profile is "solo" or "small", treat the following as DELIBERATE trade-offs',
+  'team_profile is exactly "solo", "small", "medium", "large" or "unknown", and "unknown" takes the',
+  'solo/small (suppressing) branch. When team_profile is "solo", "small" or "unknown", treat the following as DELIBERATE trade-offs',
   'and DO NOT generate findings (do not even surface as INFO):',
   '- Required reviewers < 2, or a CODEOWNERS pattern any team member can self-satisfy.',
   '- Auto-approve / auto-merge workflows that let a bot or maintainer satisfy review.',
@@ -322,6 +323,7 @@ const A_TESTING = {
     '4. Flaky indicators: current date/time use, random without seed, order-dependent tests.',
     '5. Behavioral gaps - rate each 1-10: missing negative tests, missing error-path tests, boundary edge cases, untested async/concurrency.',
     '6. Implementation-coupling smells: asserting on private methods, internal data structures, exact log strings; tests mirroring implementation 1:1.',
+    'Quantitative counts - REQUIRED, return exact numbers in counts: services_tested, services_total (never "some"/"a few").',
   ].join('\n'),
 }
 
@@ -341,6 +343,7 @@ const A_DEPS = {
     'types, breaking response-schema changes, removed fields or changed error codes, deprecated APIs without documented',
     'replacement or removal timeline, SemVer violations, DB schema changes that break old app versions, missing migration guide.',
     'Return a dep table (name, current, latest, severity, issues), the duplicates list, and soup_coverage "X of Y (Z%)".',
+    'Quantitative counts - REQUIRED, return exact numbers in counts: total, outdated, vulnerable, duplicate (never "some"/"a few").',
   ].join('\n'),
 }
 

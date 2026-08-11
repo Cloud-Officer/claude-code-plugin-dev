@@ -93,6 +93,7 @@ Classify as one of: `web_app`, `cli_tool`, `api`, `library`, `mobile_app`, `desk
 - **REST API** — route decorators (`@app.route`, `@router`, `@RestController`, `router.get`); `api/` or `routes/`; FastAPI/Flask/Express/Gin/Echo/Fiber
 - **Library / SDK** — `package.json` `main`/`exports`; `setup.py` / `pyproject.toml` with `name`/`packages`; no app entry point
 - **Mobile** — `android/`, `ios/`, `pubspec.yaml`, `lib/main.dart`; `package.json` with `react-native`/`expo`/`ionic`/`capacitor`
+- **Desktop** — `package.json` with `electron`; `src-tauri/` directory; `*.csproj` referencing WPF/WinForms (`UseWPF`, `UseWindowsForms`); `*.pro` or CMake files referencing Qt
 - **Hybrid** — multiple types match (e.g. CLI exposing both a binary and a library)
 
 ## Phase 3: Deep Analysis
@@ -151,6 +152,14 @@ Run only the sub-phases that match the detected product type. For each, record e
 
 **Navigation** — `Navigator`, `createNavigator`, route definitions.
 
+### 3.6 Desktop Apps
+
+**Windows / views** — Electron: `grep -rn "new BrowserWindow" --include="*.js" --include="*.ts"`, renderer entry HTML/pages. Tauri: `windows` array in `src-tauri/tauri.conf.json`, `WebviewWindow` usages. WPF/WinForms: `*.xaml` files with `<Window`, classes extending `Form`. Qt: subclasses of `QMainWindow`/`QDialog`, `*.ui` files.
+
+**Menus & toolbars** — Electron: `Menu.buildFromTemplate`, `Menu.setApplicationMenu`, `Tray`. Tauri: `Menu`/`Submenu` builders in `src-tauri/`. WPF/WinForms: `<Menu>`, `<ToolBar>`, `<ContextMenu>`, `MenuStrip`, `ToolStrip`. Qt: `QMenuBar`, `QMenu`, `QToolBar`, `addAction`.
+
+**Keyboard shortcuts** — Electron: `globalShortcut.register`, `accelerator:` entries in menu templates. Tauri: `global-shortcut` plugin, `accelerator` fields. WPF/WinForms: `InputBindings`, `KeyGesture`, `ShortcutKeys`. Qt: `QShortcut`, `QKeySequence`, `setShortcut`. For each shortcut, record the key combination and the action it triggers.
+
 ## Phase 4: Validate Existing User Guide
 
 If `docs/user-guide.md` exists:
@@ -173,7 +182,7 @@ If `docs/user-guide.md` exists:
    - **Conditional visibility** is explicitly documented (which fields appear/disappear and when).
    - **Form section structure** in the guide matches the UI layout.
 
-If `docs/manual.md` exists, plan to rename to `docs/user-guide.md` and replace the H1 title.
+If `docs/manual.md` also exists, keep `docs/user-guide.md` and report `docs/manual.md` as a stale duplicate to remove.
 
 ## Phase 5: Generate Report
 
@@ -206,7 +215,7 @@ Pre-report verification: every applicable phase task is marked complete; cross-r
 
 ### Coverage
 - Documented features: {n} (unit: one row of the guide's Feature Overview table)
-- Features in code: {n} (unit: one Phase 3 item for the detected type — route/page, command, endpoint, public export, or screen)
+- Features in code: {n} (unit: one Phase 3 item for the detected type — route/page, command, endpoint, public export, screen, or window/view)
 - Undocumented features: {list with file:line}
 - Documented but removed: {list}
 - Conditional fields documented: {n} of {total}
@@ -295,6 +304,12 @@ After the report is approved, write `docs/user-guide.md` using the structure bel
 **Libraries — API Reference.** For each public class/function: description from docstring, signature in a fenced block, parameters table, return type, one usage example.
 
 **Mobile Apps — Screens.** For each screen: name, navigation entry point, primary actions, what the user sees, screen-specific gestures or shortcuts.
+
+**Desktop Apps — Windows & Views.** For each window/view found in Phase 3.6: name, how it's opened, what the user sees, primary actions.
+
+**Desktop Apps — Menus & Toolbars.** For each menu, toolbar, and context menu found in Phase 3.6: list its items and what each does.
+
+**Desktop Apps — Keyboard Shortcuts.** Shortcuts table (Shortcut | Action) built from the Phase 3.6 recordings — document every recorded shortcut; invent none.
 
 ### Configuration, Troubleshooting, FAQ (all types)
 

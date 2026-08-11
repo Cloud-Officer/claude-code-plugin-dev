@@ -140,18 +140,18 @@ Extract per issue:
 
 - `key`, `id`, `fields.summary`, `fields.status.name`, `fields.issuetype.name`, `fields.issuetype.subtask` (boolean)
 - `fields.assignee.accountId`, `fields.assignee.displayName`, `fields.assignee.emailAddress`
-- `fields.timeoriginalestimate`, `fields.timeestimate`, `fields.customfield_*` for story points (try `fields.customfield_10016` and `fields.customfield_10002` — pick whichever is numeric)
-- `fields.customfield_*` for Sprint (array of sprint objects including historical sprints)
-- **Hierarchy / links** (needed for the container roll-up in Step 6): `fields.parent.key`, `fields.subtasks[].{key,fields.status.name}`, and `fields.issuelinks[]` — for each link capture the link type name (`type.name`, e.g. `Blocks`, `Relates`, `Parent/Child`), the direction, and the linked issue's `{key, fields.status.name}` from whichever of `inwardIssue` / `outwardIssue` is present.
+- `fields.timeoriginalestimate`, `fields.timeestimate`, plus the story-points and Sprint custom fields at the ids resolved below
+- **Custom-field id resolution (once per run, before either field is read):** call `GET /rest/api/3/field` and resolve both ids from it — the Sprint field is the entry whose `name` is exactly `Sprint` (its value is an array of sprint objects including historical sprints), and the story-points field is the entry whose `name` is exactly `Story Points` or `Story point estimate` (commonly `customfield_10016` or `customfield_10002`, but never assumed). If **zero or more than one** entry matches either name, do not guess between candidates: emit a caveat row in the report, fall back to plain issue count for scope (Step 6 delivery risk), and skip the sprint-bounce condition (the "≥ 3 distinct sprints" stuck-ticket check).
+- **Hierarchy / links** (needed for the container roll-up in Step 6): `fields.parent.key`, `fields.subtasks[].{key,fields.status.name}`, and `fields.issuelinks[]` — for each link capture the link type name (`type.name`), the direction, and the linked issue's `{key, fields.status.name}` from whichever of `inwardIssue` / `outwardIssue` is present. Capture every link type as data, but only the container-making types listed in the classification below feed `child_keys` — a captured `Relates` link, for example, never does.
 
 ### Classify each issue: container vs leaf
 
 Movement expectations differ by whether an issue does work itself or rolls up other work:
 
-- **Container** = a Story, or any issue that has `fields.subtasks` **or** has "blocking"/"parent" style links to other issues (`Blocks`, `is blocked by`, `Parent/Child`, `Epic-Story`, or a project-specific equivalent). A container is a tracking/ownership wrapper: it is *expected* to sit parked on its owner (often a product owner — a `manager` or `other` role) and **cannot** transition to Done until its children/blockers do. The parent not moving is therefore **not** a stall signal on its own.
+- **Container** = a Story, or any issue that has `fields.subtasks` **or** has container-making links to other issues. The container-making `type.name` values are exactly `Blocks` / `is blocked by` and `Parent/Child` / `Epic-Story`; **every other** link type — `Relates`, `Cloners`, `Duplicate`, and any project-defined type — is non-container, and its linked issues never enter the child set. A container is a tracking/ownership wrapper: it is *expected* to sit parked on its owner (often a product owner — a `manager` or `other` role) and **cannot** transition to Done until its children/blockers do. The parent not moving is therefore **not** a stall signal on its own.
 - **Leaf** = a Task, Bug, or any issue with no children and no blocking dependents — the actual unit of work whose movement (or lack of it) is the real signal.
 
-Record `is_container` per issue, plus its `child_keys` = the set of sub-task keys ∪ blocked/child linked-issue keys. Leaf issues have `child_keys = ∅`. This classification feeds every movement check in Step 6 (stuck-ticket, stalled-member, and the `other`-role non-moving rule) so a parked container is never flagged in place of its real blocker.
+Record `is_container` per issue, plus its `child_keys` = the set of sub-task keys ∪ container-making linked-issue keys (the closed set above — never `Relates` or other non-container links). Leaf issues have `child_keys = ∅`. This classification feeds every movement check in Step 6 (stuck-ticket, stalled-member, and the `other`-role non-moving rule) so a parked container is never flagged in place of its real blocker.
 
 Build the **roster** = unique assignees across all active-sprint issues. Skip unassigned issues for per-member sections (but include their totals in the team rollup). Do not assume roster members are engineers — many will be QA, content, or consultants. Use generic terms ("team member", "contributor") in all human-facing output.
 
@@ -409,7 +409,7 @@ Compute per member:
 
 A container issue (Story / parent / blocker — see Step 2 classification) is judged by its **children's** movement, never by its own status transitions. This stops the report from flagging a Story that is correctly parked on a product owner just because the wrapper hasn't moved, when the real situation is "child task X isn't done yet."
 
-For each container, resolve the movement of its `child_keys` (sub-tasks + blocked/child linked issues) over the relevant window using the same `status CHANGED ... DURING (...)` JQL already used for throughput:
+For each container, resolve the movement of its `child_keys` (sub-tasks + container-making linked issues, per the Step 2 closed set) over the relevant window using the same `status CHANGED ... DURING (...)` JQL already used for throughput:
 
 - **Status classes (used everywhere this skill says terminal, active, or To-Do):** terminal = `fields.status.statusCategory.key == "done"`, active = `"indeterminate"`, To-Do = `"new"`. Never classify by status name — a `REJECTED` or renamed status classifies by its category key, so two runs cannot disagree about whether it counts as done.
 - **`container_is_moving`** = at least one child had a status transition in the window, OR at least one child is in an active status (per the status classes above). → The container is healthy and **must not** be flagged as stalled/stuck. If you mention it at all, describe it as "parked, children in flight."
@@ -442,7 +442,7 @@ done
 
 For each candidate, confirm the stricter rule — all of:
 
-- Appeared in ≥ 3 distinct sprints (current + ≥ 2 prior) — derived from changelog Sprint field history
+- Appeared in ≥ 3 distinct sprints (current + ≥ 2 prior) — derived from the changelog history of the Sprint field resolved in Step 2; when that resolution failed (zero or multiple `Sprint`-named entries), this condition is skipped per Step 2's fallback and stuck detection rests on the remaining conditions, disclosed in the caveat row
 - No status transition in the last 7 days (from now, not the week window)
 - No worklog entry AND no comment in the last 7 days
 - **Container check:** if the candidate `is_container`, apply the roll-up above — skip it when `container_is_moving` (its children are active; the parent is just parked), and when `container_is_blocked` report the **blocking child leaf** in its place rather than the parent. A container is only listed as stuck in its own right when it has no movable child to attribute the stall to.
@@ -529,14 +529,14 @@ One-line "why" per rating: state the worst driver. Examples:
 - `qa_user` (role `tester`) is not rated on this scale — their row shows QA-specific metrics (validations done, regressions logged).
 - A member with role `consultant` (or excluded from the time table for the 28-day rule) is rated on PRs alone, on the relaxed part-time bands above — both worklog flags evaluate to false for them.
 - Members with role `manager` or `other` are not rated (cell `—`) per the role gating above.
-- Members flagged as **content team** or any other non-engineering role in the report's per-member caveats (e.g. via project memory) should still be rated, but the why-line must call out the role mismatch so the reader does not interpret a 🔴 as poor performance.
+- A non-engineering member (content, media, and the like) selects a rating path **only** through the five Step 2.5 role keys — there is no extra label that changes the path. They are carried under whichever key applies: `other` → not rated (cell `—`); `developer` or `consultant` → rated on that role's bands, with a why-line calling out the role mismatch so the reader does not interpret a 🔴 as poor performance.
 
 ### Delivery risk assessment (sprint-goal tracking)
 
 The point of this section is to tell the reader, in one glance, whether the sprint goal will be met — and if not, **exactly what to do to catch up**. Compute against the **active sprint** over the sprint-to-date window.
 
 1. **Scope & progress.**
-   - `total_work` = sum of story points across active-sprint issues **if ≥ 80% of issues carry points**; otherwise fall back to plain issue count.
+   - `total_work` = sum of story points (read from the story-points field id resolved in Step 2) across active-sprint issues **if ≥ 80% of issues carry points**; otherwise — or whenever the Step 2 field resolution failed — fall back to plain issue count.
    - `done_work` = same measure restricted to issues in a terminal status (per the Step 6 status classes: `statusCategory.key == "done"`).
    - `completion_pct = done_work / total_work`.
 2. **Time (working days only — exclude Sat/Sun, don't detect holidays).**
@@ -802,7 +802,7 @@ The Gmail MCP tools (path 1) are **discovered at runtime** and so cannot be pre-
 - **Timeout.** 20-second timeout on each `jira`, `curl`, and `gh` call. Network flakes happen; retry once, then log a warning and continue rather than aborting the whole run.
 - **Partial data is fine.** If one member's GitHub data fails to resolve, mark their row "GitHub data unavailable" and continue. The report is better incomplete than missing.
 - **Roster source is authoritative.** If someone has no active-sprint tickets but did GitHub work this week, they are NOT in the report. The sprint is the lens.
-- **Generic role language.** The roster mixes engineers, QA, content/media folks, and consultants. Never call the report or its rows "developers" or assume engineering as a default — use "team member", "member", "contributor", or the explicitly detected role (`QA`, content team, consultant). The rendered title is "Weekly Activity Report", not "Weekly Developer Report".
+- **Generic role language.** The roster mixes engineers, QA, content/media folks, and consultants. Never call the report or its rows "developers" or assume engineering as a default — use "team member", "member", "contributor", or the confirmed Step 2.5 role (`Tester (QA)`, `Consultant`, `Manager`, …). The rendered title is "Weekly Activity Report", not "Weekly Developer Report".
 - **Throughput via transitions, never assignee.** Current `fields.assignee` is a holdings signal, not a throughput signal, because the workflow auto-reassigns tickets at `in QA`. The Team-at-a-glance and per-member sections must derive throughput from `status CHANGED TO <X> BY <user> DURING (...)`.
 - **QA role auto-detected, not hardcoded.** Never hardcode a tester's name or email in the skill. Always detect via the majority-holder rule in Step 2 and label their row `(QA)`. Secondary "in QA" holders (e.g. a CTO receiving escalations) are contributors / leaders, not QA.
 - **Weekly window: `past` (default) or `current`.** By default the weekly window is the previous completed Mon → Sun (a fixed 7-day week) — stable for scheduled emails and never mid-flight. The user may opt into `current` (week-to-date: this Mon → today) via `--window current` or the Step 1 prompt, so the report can be run any day. In `current` mode the window is partial: exclude **today** from worklog short-day flags and from per-day rate denominators, and mark early-week results provisional (cap rate-only misses at 🟡) — see Step 1 partial-week handling. When the chosen window falls entirely outside the active sprint (the active sprint is brand-new), use the previous closed sprint as the **weekly-anchor sprint** instead of producing an empty report — see Step 1 item 4.
