@@ -64,10 +64,13 @@ Workflow({
     scope: "<scope>",
     outDir: "docs/migration",
     rulebookPath: "docs/migration/rulebook.md",
-    repoRoot: "<repo root>"
+    repoRoot: "<repo root>",
+    sampleFiles: ["<optional: source files to stress-test instead of the foundation agent's picks>"]
   }
 })
 ```
+
+`sampleFiles` is optional: when present, plan mode stress-tests the rulebook against exactly those source files (e.g. the files that failed a previous run) instead of the foundation agent's picks; omit it to let the agent choose.
 
 It returns `{ rulebook_markdown, dependency_order, gap_inventory, sample_files, stress_findings, readiness_confidence }`.
 

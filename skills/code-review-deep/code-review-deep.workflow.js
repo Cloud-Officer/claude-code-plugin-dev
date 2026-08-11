@@ -246,8 +246,8 @@ const A_SECURITY = {
     'When a framework is unfamiliar, pull its current security guidance via context7/WebSearch rather than guessing.',
     'Tag every finding with its OWASP Top 10 (2021) category (A01-A10), and OWASP API Security Top 10 (2023) for API endpoints,',
     'in the finding description (e.g. "OWASP A03: Injection") - this maps findings to a recognized taxonomy for ISO 27001 audits.',
-    'Quantitative counts - REQUIRED, return exact numbers in counts: files searched for secret patterns,',
-    'and hardcoded secrets found (never "some"/"a few").',
+    'Quantitative counts - REQUIRED, return exact numbers in counts under exactly these keys:',
+    'files_searched, hardcoded_secrets_found (never "some"/"a few").',
   ].join('\n'),
 }
 
@@ -262,12 +262,14 @@ const A_QUALITY = {
     'Pattern duplication: scan for byte-identical or near-identical 5+ line blocks across files. Report count and locations.',
     'Quantitative counts - REQUIRED, return exact numbers:',
     '- Linter disables: count swiftlint:disable, eslint-disable, rubocop:disable/todo, type: ignore, noqa, SuppressWarnings.',
-    '  Group by rule. Report total + by-rule breakdown as INFORMATIONAL (a positive signal of awareness). DO NOT generate a',
+    '  Group by rule. Report the counts in counts under exactly these keys: linter_disables_total, linter_disables_by_rule,',
+    '  as INFORMATIONAL (a positive signal of awareness). DO NOT generate a',
     '  finding for the mere existence of linter disables or a permissive policy. Escalate to a finding ONLY if: (a) the linter',
     '  config disables rules wholesale; (b) a critical correctness/security rule is silenced WITHOUT an inline reason comment',
     '  (no-eval, no-unsafe-*, react/no-danger, eslint-plugin-security, rubocop-security/brakeman, hadolint DL3002/DL3004,',
     '  SQL-injection or secret-detection rules); (c) a linter config exists but NO CI step actually invokes it.',
-    '- Memory observers: count addObserver vs removeObserver (Swift/Obj-C/Java). Report the delta.',
+    '- Memory observers: count addObserver vs removeObserver (Swift/Obj-C/Java). Report in counts under exactly these keys:',
+    '  observers_added, observers_removed.',
     '- Pattern duplication count: total duplicated blocks, with one example per group.',
     'Comment quality (in-code only - README/architecture is Agent G): factually inaccurate (signature mismatch),',
     'outdated references, stale TODOs without owner/ticket, restating obvious code, misleading phrasing, misplaced doc blocks,',
@@ -305,7 +307,7 @@ const A_BUGS = {
     '- Validators that silently return instead of raise on malformed input.',
     'Error propagation: lost stack/cause chain, sensitive data (PII, tokens, request bodies) in error messages,',
     'missing correlation/request IDs for distributed debugging.',
-    'Return exact silent-failure counts grouped by type and by file.',
+    'Return exact silent-failure counts in counts under exactly these keys: silent_failures_total, silent_failures_by_type.',
   ].join('\n'),
 }
 

@@ -14,7 +14,7 @@ Analyze the project and generate `docs/db.md` with **complete database schema do
 
 ## MCP Tools with Fallbacks
 
-Prefer MCP tools when available — they handle connection management. Fall back to CLI on errors.
+Prefer MCP tools when available — they handle connection management. On an MCP error, report it, then retry once via the CLI form (the Rules failure policy applies if that also fails).
 
 | Database | MCP Tools | CLI Fallback |
 | --- | --- | --- |
@@ -40,7 +40,7 @@ Prefer MCP tools when available — they handle connection management. Fall back
 
 ## CLI Command Reference
 
-**One interpolation rule for every command and query in this skill — the same rule `query-db` states.** No query or identifier text that this skill generates or derives — from the database, the repository, an existing `docs/db.md`, or the environment — ever appears inside a shell-quoted argument. Every engine receives query text on stdin via a quoted heredoc (`<<'SQL'`, `<<'JS'`, `<<'CMD'` for redis-cli), so the shell never parses it; never `-e "query"` (mysql), `-c "query"` (psql), `--eval "code"` (mongosh), a `"QUERY"` positional argument (sqlite3, bq), or a redis command in argument position. Redis key names and key patterns are never placed in argument position — they ride the stdin heredoc, where a hostile key named `$(...)` is inert; the `^[A-Za-z0-9_]+$` identifier check governs SQL and BigQuery identifiers, not Redis key text carried on stdin (real keys contain `:` and `*`). Only fixed literal text written verbatim in this file (the Step 6 connectivity pings) may be passed as an argument. The heredoc fences the shell only, not the query body: any identifier not matching `^[A-Za-z0-9_]+$` is reported and skipped, never written into a query body — engine identifier quoting is not an escape hatch, because a MySQL backtick inside a double-quoted argument is shell command substitution and even inside a heredoc a hostile name reaches the database. BigQuery dataset names come only from `$BQ_DATASETS`, must match that pattern, and are always bound as Step 7's loop variable `$ds` — never any other variable.
+**One interpolation rule for every command and query in this skill — the same rule `query-db` states.** No query or identifier text that this skill generates or derives — from the database, the repository, an existing `docs/db.md`, or the environment — ever appears inside a shell-quoted argument. Every engine receives query text on stdin via a quoted heredoc (`<<'SQL'`, `<<'JS'`, `<<'CMD'` for redis-cli), so the shell never parses it; never `-e "query"` (mysql), `-c "query"` (psql), `--eval "code"` (mongosh), a `"QUERY"` positional argument (sqlite3, bq), or a redis command in argument position. Redis key names and key patterns are never placed in argument position — they ride the stdin heredoc, where a hostile key named `$(...)` is inert; the `^[A-Za-z0-9_]+$` identifier check governs SQL and BigQuery identifiers, not Redis key text carried on stdin (real keys contain `:` and `*`). Only fixed literal text written verbatim in this file (the Step 6 connectivity pings) may be passed as an argument. The heredoc fences the shell only, not the query body, and it also expands nothing — a shell variable is never written inside a quoted heredoc; read the value first, check it, and write it literally into the body. Any identifier not matching `^[A-Za-z0-9_]+$` (`^[A-Za-z0-9-]+$` for the GCP project id, which legitimately carries hyphens) is reported and skipped, never written into a query body — engine identifier quoting is not an escape hatch, because a MySQL backtick inside a double-quoted argument is shell command substitution and even inside a heredoc a hostile name reaches the database. BigQuery dataset names come only from `$BQ_DATASETS`, must match that pattern, and are always bound as Step 7's loop variable `$ds` — never any other variable.
 
 | Database | Connect / Query | List schema |
 | -------- | --------------- | ----------- |
@@ -199,7 +199,7 @@ Use safe sampling depending on table size:
 | MySQL/PostgreSQL | `SELECT status, COUNT(*) FROM TABLE GROUP BY status ORDER BY count DESC;` | Add `WHERE created_at >= NOW() - INTERVAL 30 DAY` (PG: `INTERVAL '30 days'`) | `SELECT DISTINCT status FROM TABLE LIMIT 20;` |
 | MongoDB | `db.COLL.aggregate([{$group: {_id: "$status", count: {$sum: 1}}}, {$sort: {count: -1}}])` | Prepend `{$sample: {size: 10000}}` to the pipeline | (sampled) |
 | Elasticsearch | `terms` aggregation with `size: 0` (always safe — uses approximate counts) | same | same |
-| BigQuery | inside Step 7's `for ds` loop: `SELECT status, COUNT(*) FROM \`$BQ_PROJECT.$ds.TABLE\` GROUP BY status ORDER BY count DESC LIMIT 20;` | Use `APPROX_COUNT_DISTINCT(ID)` and always include partition filter | `--dry_run` first to estimate cost |
+| BigQuery | inside Step 7's `for ds` loop: read `$BQ_PROJECT` and the loop's `$ds` once, check them (`$ds` against `^[A-Za-z0-9_]+$`, the project id against `^[A-Za-z0-9-]+$` — real project ids carry hyphens), then write the three values literally into the quoted-heredoc body: `SELECT status, COUNT(*) FROM \`PROJECT.DATASET.TABLE\` GROUP BY status ORDER BY count DESC LIMIT 20;` (all three uppercase names replaced by the checked values) — a quoted heredoc expands nothing, so shell variables never appear inside one | Use `APPROX_COUNT_DISTINCT(ID)` and always include partition filter | `--dry_run` first to estimate cost |
 
 ### Step 9 — Update `docs/db.md` with verified data
 
@@ -315,7 +315,7 @@ Required sections:
 
 ### Multi-database projects
 
-If multiple DBs are used, the file has one H1 + a "Databases Used" list, then one H2 section per database following the appropriate template above. Example:
+If multiple DBs are used, the file has one H1 + a "Databases Used" list, then one H2 section per database following the appropriate template above. Order the Databases Used list and the per-database H2 sections in the Document Templates order above (SQL, MongoDB, Elasticsearch, Redis, BigQuery); the example's order is illustrative only. Example:
 
 ```markdown
 # Database Schema Documentation
@@ -338,7 +338,7 @@ If multiple DBs are used, the file has one H1 + a "Databases Used" list, then on
 
 ## Rules
 
-- **Failure policy** — any command or query that fails or returns nothing stops that step and is reported with the exact command and its output; never continue on a fabricated or assumed value. The one sanctioned deviation is Step 7's per-object rule: an object that errors is still listed as `not readable — <error>` and the "Last verified" line records the partial coverage.
+- **Failure policy** — any command or query that fails or returns nothing stops that step and is reported with the exact command and its output; never continue on a fabricated or assumed value. Sanctioned deviations, exactly three: the MCP-to-CLI fallback (report the MCP error, then retry once via the CLI form; the policy applies if that also fails), Step 6's declined-credentials code-only path, and Step 7's per-object rule — an object that errors is still listed as `not readable — <error>` and the "Last verified" line records the partial coverage.
 - **Read-only, always** — every tool call and command this skill issues is read-only; never issue one that writes, deletes, expires or otherwise modifies data in any database.
 - Keep descriptions concise and focused on querying needs.
 - Use actual values from the codebase, not placeholders.
