@@ -162,6 +162,8 @@ gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'
 
 ## Detect Issue Type
 
+The parallel path carries this same closed mapping inside `work-issue.workflow.js`'s implement prompt — edit the two together, or single and batch runs classify the same issue differently.
+
 After fetching the issue details, determine the issue type:
 
 **GitHub:** Map the issue's labels into the closed enum {Bug, Feature, Task} by **exact** label name, first-match-wins. Take the first rule that matches any label exactly, in this order:

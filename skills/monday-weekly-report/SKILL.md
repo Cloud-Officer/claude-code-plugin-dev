@@ -252,7 +252,7 @@ For each board (and each group within it):
 - `completion_pct = effective_done / (total − cancelled)` (effective-done applies the subtask rollup)
 - `overdue_count`, `due_soon_count` (see below; include parents made at-risk by an overdue subtask)
 - subtask coverage line (parents-with-subtasks, total subtasks, % subtasks done)
-- board health: 🔴 if `stuck_count > 0` and `overdue_count > 0` (or completion far behind, see risk); 🟡 if any overdue **or** any stuck (parent- or subtask-level); 🟢 otherwise.
+- board health: 🔴 if `stuck_count > 0` and `overdue_count > 0`, or if the board's project-goal status (Delivery risk below) is 🔴 Off track; 🟡 if any overdue **or** any stuck (parent- or subtask-level); 🟢 otherwise.
 
 ### Delivery risk (date-driven — the project-goal analog)
 
@@ -273,7 +273,7 @@ Items owned by an `other`-role owner are **excluded** from the at-risk list and 
 
 ### 🚩 Stuck / blocked items
 
-Items with `status_bucket == stuck`, OR items in `in_progress`/`not_started` with **no `updated_at` change and no update/comment in the last 14 days** (calendar days from today, independent of the window). Items owned **only** by an `other`-role owner are excluded from this section (that role is not tracked); `owner`- and `external`-owned items are both included.
+Items with `status_bucket == stuck`, OR items in `in_progress`/`not_started` with **no `updated_at` change and no update/comment in the last 14 days** (calendar days from today, independent of the window). Items owned **only** by an `other`-role owner appear here only as the `untracked owner — item not moving` rows the rendering rule below defines (leaf items or `parent_is_blocked` containers with no movement in 14 days) — they are never attributed or chased; `owner`- and `external`-owned items are both included normally.
 
 **Apply the parent movement roll-up first.** A parent with subtasks that is `parent_is_moving` is **not** stuck no matter how quiet its own row is — skip it. A `parent_is_blocked` parent is represented by its **blocking subtask(s)** here (`<parent> › <subtask>`, with the subtask's owner), not the parked parent. A parent is listed in its own right only when it has no subtasks (a leaf) or is genuinely `stuck` at the parent level.
 
@@ -439,7 +439,7 @@ All caches live under `~/.config/monday-weekly-report/` (override paths via the 
 - `roles.json` — `user_id → { name, role, confirmedAt, auto? }` (Step 4). Set `auto: true` on entries written from an auto-default (a `--send` run) so a later preview knows they were never human-confirmed and re-proposes them; drop the flag once the human confirms.
 - `statuses.json` — `board_id → { "status_col_id": "<id>", "labels": { <label>: <bucket> } }` (Steps 3 + 3.5)
 - `boards.json` — last interactively-selected board set (Step 2), so reruns don't re-prompt
-- `email.json` — the confirmed email sender for `--send` (Step 8): the exact MCP tool name, `gmail` CLI, or SMTP relay
+- `email.json` — the confirmed email sender for `--send` (Step 8), shaped `{ "kind": "mcp" | "gmail-cli" | "smtp", "id": "<exact MCP tool name | gmail | relay identifier>", "confirmedAt": "<date>" }`; `kind` is the closed three-value set the Step 8 ladder matches on
 
 ## Important rules
 
@@ -456,7 +456,7 @@ All caches live under `~/.config/monday-weekly-report/` (override paths via the 
 - **Role-aware tracking — exactly three roles.** `owner` (full-time) is rated on weekly movement + on-time delivery, flagged stalled on a quiet week, overdue surfaced. `external` (part-time/outside) is also rated and has overdue surfaced, but is **never** flagged stalled for low cadence. `other` is **not tracked** — not rated and excluded from overdue/at-risk attribution (its items still count in board totals). Default proposal is `owner`; the human picks `external`/`other`.
 - **Delivery risk is date-driven, actionable, and read-only.** The 🎯 section states project-goal status (🟢/🟡/🔴) from overdue / due-soon items, lists the specific at-risk items, and gives a prioritized catch-up plan whose every step names concrete items and people. Re-balancing, escalation, and descope are **recommendations only** — never write to monday.
 - **Attribution mode is disclosed.** State whether weekly movement came from the precise activity log or the coarser `updated_at` snapshot, so the reader knows the precision.
-- **Graceful degradation.** A board missing a date or status column does not abort the run — skip the part that needs it with an explicit note and report everything else.
+- **Graceful degradation — the failure policy for every read.** Any read, parse, or lookup that fails — a board or schema call (deleted board, revoked access), a cache file (a malformed cache is treated as empty and rebuilt, with a note), a user lookup, or a missing date/status column — skips that board or value with an explicit note in the report header and reports everything else; totals computed over a reduced set say so. Only a run left with zero readable boards aborts.
 - **No skill / process meta-commentary in the report.** The output is a status report — never include "how this was generated", TODOs, or implementation notes. The report ends after per-member detail and the trailing preview/send line.
 - **Env vars referenced** (document at the top of output if any are unset and affect the run):
   - `MONDAY_TOKEN` — required; personal access token for the hosted MCP server

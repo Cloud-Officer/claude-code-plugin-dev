@@ -87,10 +87,10 @@ If the above doesn't return the right structure, try:
 jira sprint list '<SPRINT_ID>' --plain --no-headers --no-truncate --columns TYPE,KEY,SUMMARY,STATUS,ASSIGNEE,PRIORITY
 ```
 
-Then for each issue that passes the sprint item filter above, fetch full details:
+Then for each issue that passes the sprint item filter above, fetch full details. Every issue key used in a later command is fenced here, at extraction: it must match `^[A-Z][A-Z0-9]*-[0-9]+$` (stop and report the item otherwise — keys come from Jira CLI/MCP returns, so a malformed value is rejected, never sanitised) and is always interpolated single-quoted. That one fence covers this command and Step 4.3's `jira issue edit`.
 
 ```bash
-jira issue view <ISSUE-KEY> --raw
+jira issue view '<ISSUE-KEY>' --raw
 ```
 
 For each item, extract:
@@ -143,7 +143,7 @@ For each item, check if a time estimate already exists in Jira:
 3. **Save estimates back to Jira — only with `--write-estimates`**: By default the computed estimate is used in the report and nothing is written to Jira. When the user passed `--write-estimates`, save each computed estimate as the original estimate in hours:
 
    ```bash
-   jira issue edit <ISSUE-KEY> --no-input -o "Original Estimate=<HOURS>h"
+   jira issue edit '<ISSUE-KEY>' --no-input -o "Original Estimate=<HOURS>h"
    ```
 
    Convert days to hours (multiply by 8). This makes subsequent runs use the saved estimate directly. Without the flag, skip this command entirely — the estimate stays local to the report and is recomputed next run.
