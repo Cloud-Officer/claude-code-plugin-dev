@@ -87,7 +87,7 @@ If the above doesn't return the right structure, try:
 jira sprint list '<SPRINT_ID>' --plain --no-headers --no-truncate --columns TYPE,KEY,SUMMARY,STATUS,ASSIGNEE,PRIORITY
 ```
 
-Then for each issue that is a Task or Bug, fetch full details:
+Then for each issue that passes the sprint item filter above, fetch full details:
 
 ```bash
 jira issue view <ISSUE-KEY> --raw
@@ -96,7 +96,7 @@ jira issue view <ISSUE-KEY> --raw
 For each item, extract:
 
 - **Key**: e.g., `DEV-1234`
-- **Type**: Task or Bug
+- **Type**: the issue type name as returned
 - **Summary**: the issue title
 - **Status**: current status
 - **Assignee**: the person assigned to the item

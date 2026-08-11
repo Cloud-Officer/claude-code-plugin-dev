@@ -134,7 +134,7 @@ Pass **every** discovered candidate in one call — the workflow parallelises ac
 }
 ```
 
-`outcome` is one of `VERIFIED` | `NOT_VERIFIED` | `SKIP_NEEDS_MANUAL` | `SKIP_INSUFFICIENT`. `comment_markdown` is the fully-filled, correctly-languaged comment to post verbatim (empty for the two `SKIP_*` outcomes — those are report-only and you must do nothing to the ticket). `resolver` is the tracker's account identifier exactly as the tracker returned it — the GitHub `login`, or the Jira `accountId` — never a display name; it is the empty string when the tracker supplied neither.
+`outcome` is one of `VERIFIED` | `NOT_VERIFIED` | `SKIP_NEEDS_MANUAL` | `SKIP_INSUFFICIENT`. `planned_action` is one of `close` | `reopen+reassign` | `none`. `comment_markdown` is the fully-filled, correctly-languaged comment to post verbatim (empty for the two `SKIP_*` outcomes — those are report-only and you must do nothing to the ticket). `resolver` is the tracker's account identifier exactly as the tracker returned it — the GitHub `login`, or the Jira `accountId` — never a display name; it is the empty string when the tracker supplied neither.
 
 **Render the dry-run report** (the "Output (dry-run)" section) from `results` + `counts`. Reconcile the two: any candidate you passed in that is missing from `results`, or that only shows up in `counts.errored`, is listed by id under "Errored — not audited" (see Important Rules) — never silently dropped. **On `--apply`**, after the single confirmation gate, perform the writes per `outcome` using the steps below: post `comment_markdown` first, then close/transition, then reassign on kick-backs. Do not re-verify — trust the workflow's verdict.
 
@@ -265,8 +265,8 @@ The Jira flow is **scoped to one project and one sprint**. Resolve them up front
 
    Classify the project's `done`-category statuses into two buckets:
 
-   - **Penultimate-resolved**: terminal statuses that mean "fix is in but not yet ratified" — typically named `Resolved`, `Fixed`, `Done`, or `Verified` when followed by a `Closed`. Heuristic: a `done`-category status is penultimate-resolved if at least one **other** `done`-category status exists in the same workflow that isn't `Won't Do` / `Cancelled` / `Rejected`.
-   - **Final-closed**: the truly terminal status. Heuristic: with multiple `done` statuses, the one named `Closed` (or the only one without an outbound transition, per the transitions API) is final. With a single `done` status, that status IS final-closed and there is no penultimate gap to audit — say so once and stop.
+   - **Final-closed** (resolve this one first): the truly terminal status. Heuristic: with multiple `done` statuses, the one named `Closed` (or the only one without an outbound transition, per the transitions API) is final. With a single `done` status, that status IS final-closed and there is no penultimate gap to audit — say so once and stop.
+   - **Penultimate-resolved**: terminal statuses that mean "fix is in but not yet ratified" — typically named `Resolved`, `Fixed`, `Done`, or `Verified` when followed by a `Closed`. Heuristic: a `done`-category status is penultimate-resolved if it is neither the final-closed status nor a `Won't Do` / `Cancelled` / `Rejected` style status.
 
 ### Step 3-J: Build candidate JQL
 

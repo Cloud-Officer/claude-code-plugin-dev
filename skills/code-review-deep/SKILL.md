@@ -48,7 +48,7 @@ Prefer MCP tools (`mcp__github__*`, `mcp__context7__*`) when available; fall bac
 
 ## Failure Policy
 
-A command or tool call that fails or returns nothing stops the step it belongs to and is reported to the user — never continue on a fabricated, empty, or defaulted value. In Step 2 specifically: if `gh repo view` fails (direnv did not load, token lacks scope, no GitHub remote) or the collaborators call fails (e.g. 403 — that endpoint requires push access), the corresponding variable (`OWNER_REPO`, `COLLAB_COUNT`, or `IS_PRIVATE`) is empty — stop and report the exact error instead of computing `team_profile` from made-up numbers. If the user wants a recoverable path, ask whether to compute `team_profile` from git history (`ACTIVE_AUTHORS`) alone; never substitute a defaulted value silently. If the workflow returns `ok: false`, stop and report its `reason` (e.g. `stack-scout-failed`); write no report.
+A command or tool call that fails, or that returns nothing where the step consumes its output as a value, stops the step it belongs to and is reported to the user — never continue on a fabricated, empty, or defaulted value. A verification command whose empty output is its pass condition (`git status --short` on a clean tree) proceeds; when the distinction is unclear at a site, treat empty as failure and stop. In Step 2 specifically: if `gh repo view` fails (direnv did not load, token lacks scope, no GitHub remote) or the collaborators call fails (e.g. 403 — that endpoint requires push access), the corresponding variable (`OWNER_REPO`, `COLLAB_COUNT`, or `IS_PRIVATE`) is empty — stop and report the exact error instead of computing `team_profile` from made-up numbers. If the user wants a recoverable path, ask whether to compute `team_profile` from git history (`ACTIVE_AUTHORS`) alone; never substitute a defaulted value silently. If the workflow returns `ok: false`, stop and report its `reason` (e.g. `stack-scout-failed`); write no report.
 
 ## Data Boundary
 
@@ -213,7 +213,7 @@ Reports MUST include specific counts. The workflow returns them in `counts`, key
 - Test coverage (`counts.testing`): "X of Y services tested (Z%)"
 - Linter disables (`counts.quality`): "X disables across Y files"
 - Silent failures (`counts.bugs`): "X try?/empty catch patterns"
-- Resource leaks (`counts.bugs`): "X added, Y removed, Z potential leaks"
+- Resource leaks (`counts.quality`): "X added, Y removed, Z potential leaks" (the observer add/remove tally is A_QUALITY's required count)
 - Secrets (`counts.security`): "Searched X files, found Y hardcoded secrets"
 
 When the named key is absent from `counts` (its agent failed or returned none), write `not measured — <agent> agent returned no counts` for that line rather than a number.
@@ -294,11 +294,11 @@ Highlight what the team is doing well, organized by area (Architecture, Code Qua
 
 ### Dependency Status
 
-[Table of packages with current/latest]
+[Built from the DEP-* findings and `counts.deps` — packages with current/latest]
 
 ### Duplicate Libraries
 
-[Table of overlapping libraries]
+[Built from the DEP-* findings — overlapping libraries]
 
 ### Files Reviewed
 
@@ -371,16 +371,16 @@ Highlight what the team is doing well, organized by area (Architecture, Code Qua
 
 NOT executed automatically. After the report is generated, if the user asks ("create issues", "create tickets", "log issues"), use the `create-issue` skill — it auto-detects GitHub Issues vs Jira.
 
-**Create issues for ALL severity levels including INFO (⚪).**
+**Create issues for ALL severity levels including INFO (⚪).** Pass the labels to `create-issue` as caller-supplied labels — its label rule applies them in addition to its type-derived default.
 
-**Summary format:** `[REPO-NAME][FINDING-ID] Brief description` (e.g., `[pnp-ios][SEC-001] Rotate hardcoded AWS credentials`).
+**Summary format:** `[FINDING-ID] Brief description` (e.g., `[SEC-001] Rotate hardcoded AWS credentials`). `create-issue` owns the repo prefix: it prepends `[repo-name]` itself on Jira and correctly omits it on GitHub, where issues are already repo-scoped — never add it here, or Jira summaries double the prefix.
 
 **Dedupe.** List the existing `code-review` issues once before creating and again after, using the tracker `create-issue` resolved to (`gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'`):
 
 - GitHub Issues: `gh issue list --label "code-review" --state all --limit 500 --json number,title,state`
 - Jira: `jira issue list --label "code-review" --plain --columns key,summary,status`
 
-Skip any matching by BOTH repo name AND finding ID.
+Skip any existing issue whose title carries the same finding ID — on GitHub the list is already repo-scoped, and on Jira the `[repo-name]` prefix `create-issue` added must also match, so a finding ID reused across repos never blocks creation.
 
 Report: "Created X new issues, Y already existed, Z total issues" — Y from the before-list, Z from the after-list.
 

@@ -67,10 +67,10 @@ echo "=== COMMITTED AHEAD OF BASE ===" && git diff ${DEFAULT_BRANCH}...HEAD -- '
 cat .github/pull_request_template.md 2>/dev/null || cat .github/PULL_REQUEST_TEMPLATE.md 2>/dev/null || echo "No PR template found"
 ```
 
-**Step 1.5:** Check for JIRA ticket:
+**Step 1.5:** Check for JIRA ticket. Accept the value only when it matches `^[A-Z]{2,10}-[0-9]{1,6}$`; any other value (a URL, `none`, multi-line text from a stale export) is treated as unset, which routes to the existing omit-the-section branch:
 
 ```bash
-echo $JIRA_TICKET
+echo "${JIRA_TICKET:-}"
 ```
 
 **CRITICAL:** The PR summary MUST mention ALL files shown in the Step 1.2 `--stat` output. Count the files and verify your summary accounts for all of them.

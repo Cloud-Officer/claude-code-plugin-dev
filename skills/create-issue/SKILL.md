@@ -63,7 +63,7 @@ This skill uses MCP tools when available and falls back gracefully if they are u
 5. **Determine severity, priority, and label**:
    - **Severity** is exactly one row of the Priority Mapping table's left column: `Critical`, `High`, `Medium`, `Low`, or `Info` — no other value exists. Pick the row the user's request names (or the closest of those five to the impact it describes); if the request carries no severity signal at all, use `Medium`.
    - **Priority** (Jira only) is the value the Priority Mapping table maps that severity row to.
-   - **Label** (`<LABEL>` in every command and MCP call below) is the lowercased issue type from item 3: `task`, `bug`, or `story` — never any other value. If the target GitHub repo does not define that label and the create call rejects it, retry the same create without the label and mention the missing label when reporting the created issue; Jira creates unknown labels on first use, so no retry rule is needed there.
+   - **Labels** (`<LABEL>` in every command and MCP call below): the lowercased issue type from item 3 (`task`, `bug`, or `story`) is the default label, and every label the invoking skill or user passes is applied **in addition to it** — added, never substituted, so a caller's `code-review`, `security` or `knowledge-risk` label survives to the created issue. If the target GitHub repo does not define one of the labels and the create call rejects it, retry the same create without that one label and mention it when reporting the created issue; Jira creates unknown labels on first use, so no retry rule is needed there.
 
 ---
 
@@ -317,7 +317,7 @@ The Severity column below is the closed set of severity values (Step 1 item 5) �
 - **GitHub Issues:**
   - Prefer `mcp__github__create_issue`; with the CLI fallback, use `gh issue create` with `--body-file`
   - No repo name prefix needed (issues are scoped to repo)
-  - The label comes only from the type-derived closed set in Step 1 item 5 (`task`, `bug`, or `story`); if the repo rejects it as undefined, retry without the label and report it
+  - The label set is the type-derived default from Step 1 item 5 (`task`, `bug`, or `story`) plus every caller-supplied label, applied together; a label the repo rejects as undefined is dropped on retry and reported
 - **Jira Issues:**
   - Always prefix summary with repo name: `[repo-name] Brief description`
   - Always use `--no-input` flag to prevent interactive prompts

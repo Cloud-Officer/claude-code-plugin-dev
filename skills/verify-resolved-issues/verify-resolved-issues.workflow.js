@@ -193,9 +193,9 @@ function buildVerifyPrompt(c) {
     TEMPLATE_NOT_VERIFIED,
     '',
     '## Planned action implied by each outcome (state it in your result, do NOT execute any write)',
-    '- VERIFIED → ' + plannedClose,
-    '- NOT_VERIFIED → ' + plannedReopen,
-    '- SKIP_* → no action; report only',
+    '- VERIFIED → planned_action "close" (' + plannedClose + ')',
+    '- NOT_VERIFIED → planned_action "reopen+reassign" (' + plannedReopen + ')',
+    '- SKIP_* → planned_action "none" (no action; report only)',
     '',
     'IMPORTANT: this is read-only verification. Do NOT post comments, close, transition, or reassign anything —',
     'the skill does that later behind a single confirmation gate. Your job is to decide and DRAFT.',
@@ -215,7 +215,7 @@ const RESULT_SCHEMA = {
     one_line: { type: 'string' },               // short report line (gap for NOT_VERIFIED, reason for SKIP)
     comment_markdown: { type: 'string' },        // fully-filled comment, '' for SKIP_*
     comment_language: { type: 'string' },        // detected language of the comment
-    planned_action: { type: 'string' },          // e.g. 'close', 'reopen+reassign', 'none'
+    planned_action: { type: 'string', enum: ['close', 'reopen+reassign', 'none'] },
     resolver: { type: 'string', description: 'Tracker account identifier exactly as the tracker returned it — GitHub login, or Jira accountId; never a display name. Empty string when the tracker supplied neither.' },
     files_reviewed: { type: 'array', items: { type: 'string' } },
     tests_run: { type: 'string' },               // command + pasted pass/fail marker, or 'none'

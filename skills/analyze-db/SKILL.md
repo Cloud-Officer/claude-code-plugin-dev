@@ -40,7 +40,7 @@ Prefer MCP tools when available — they handle connection management. Fall back
 
 ## CLI Command Reference
 
-**One interpolation rule for every command and query in this skill — the same rule `query-db` states.** No query or identifier text that this skill generates or derives — from the database, the repository, an existing `docs/db.md`, or the environment — ever appears inside a shell-quoted argument. Every engine receives query text on stdin via a quoted heredoc (`<<'SQL'`, `<<'JS'`), so the shell never parses it; never `-e "query"` (mysql), `-c "query"` (psql), `--eval "code"` (mongosh), or a `"QUERY"` positional argument (sqlite3, bq). Only fixed literal text written verbatim in this file (the Step 6 connectivity pings) may be passed as an argument. The heredoc fences the shell only, not the query body: any identifier not matching `^[A-Za-z0-9_]+$` is reported and skipped, never written into a query body — engine identifier quoting is not an escape hatch, because a MySQL backtick inside a double-quoted argument is shell command substitution and even inside a heredoc a hostile name reaches the database. BigQuery dataset names come only from `$BQ_DATASETS`, must match that pattern, and are always bound as Step 7's loop variable `$ds` — never any other variable.
+**One interpolation rule for every command and query in this skill — the same rule `query-db` states.** No query or identifier text that this skill generates or derives — from the database, the repository, an existing `docs/db.md`, or the environment — ever appears inside a shell-quoted argument. Every engine receives query text on stdin via a quoted heredoc (`<<'SQL'`, `<<'JS'`, `<<'CMD'` for redis-cli), so the shell never parses it; never `-e "query"` (mysql), `-c "query"` (psql), `--eval "code"` (mongosh), a `"QUERY"` positional argument (sqlite3, bq), or a redis command in argument position. Redis key names and key patterns are never placed in argument position — they ride the stdin heredoc, where a hostile key named `$(...)` is inert; the `^[A-Za-z0-9_]+$` identifier check governs SQL and BigQuery identifiers, not Redis key text carried on stdin (real keys contain `:` and `*`). Only fixed literal text written verbatim in this file (the Step 6 connectivity pings) may be passed as an argument. The heredoc fences the shell only, not the query body: any identifier not matching `^[A-Za-z0-9_]+$` is reported and skipped, never written into a query body — engine identifier quoting is not an escape hatch, because a MySQL backtick inside a double-quoted argument is shell command substitution and even inside a heredoc a hostile name reaches the database. BigQuery dataset names come only from `$BQ_DATASETS`, must match that pattern, and are always bound as Step 7's loop variable `$ds` — never any other variable.
 
 | Database | Connect / Query | List schema |
 | -------- | --------------- | ----------- |
@@ -49,7 +49,7 @@ Prefer MCP tools when available — they handle connection management. Fall back
 | SQLite | `sqlite3 "$SQLITE_DB" <<'SQL'` (query on stdin) | `SELECT name FROM sqlite_master WHERE type='table';` |
 | MongoDB | `mongosh "$MONGODB_URI" --file - <<'JS'` (script on stdin) | `db.getCollectionNames().forEach(c => print(c + ': ' + db[c].estimatedDocumentCount()))` |
 | Elasticsearch | `curl -s "$ES_URL/<endpoint>"` (add `-H "Authorization: ApiKey $ES_API_KEY"` if set) | `curl -s "$ES_URL/_cat/indices?v&h=index,docs.count,store.size"` |
-| Redis | `redis-cli -u "$REDIS_URL" <CMD>` | `DBSIZE`, `SCAN 0 MATCH <pattern> COUNT 100` |
+| Redis | `redis-cli -u "$REDIS_URL" <<'CMD'` (one command per line on stdin) | `DBSIZE`, `SCAN 0 MATCH <pattern> COUNT 100` (both on stdin) |
 | BigQuery | `bq query --use_legacy_sql=false --format=prettyjson --project_id="$BQ_PROJECT" <<'SQL'` (query on stdin) | inside Step 7's `for ds` loop: `bq ls --project_id="$BQ_PROJECT" "$ds"`; `bq show --schema --format=prettyjson --project_id="$BQ_PROJECT" "$ds.<table>"` |
 
 ## Steps
@@ -187,7 +187,7 @@ Use the schema commands from the "CLI Command Reference" table above, then for e
 
 - **Indexes** — MySQL: `SHOW INDEX FROM <table>;` sent via the stdin heredoc, with `<table>` already validated against `^[A-Za-z0-9_]+$` by the interpolation rule, so it needs no identifier quoting (a backtick-quoted name inside a double-quoted `-e` argument is shell command substitution — the form this rule exists to prevent). PostgreSQL: `psql -v tbl="<table>" -c "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = :'tbl';"`. MongoDB: `db.getCollection("<coll>").getIndexes()`. Elasticsearch: `curl -s "$ES_URL/<index>/_mapping" | jq` with `<index>` URL-encoded.
 - **Date ranges** — `SELECT MIN(created_at), MAX(created_at) FROM <table>;` (or MongoDB `$min`/`$max` aggregation).
-- **Sample document** — MongoDB `db.<coll>.findOne()`; Redis `HGETALL`/`TTL`.
+- **Sample document** — MongoDB `db.<coll>.findOne()`; Redis `HGETALL`/`TTL`, key names on the stdin heredoc per the interpolation rule.
 - **BigQuery** — iterate datasets: `for ds in $(echo "$BQ_DATASETS" | tr ',' ' '); do echo "=== $ds ==="; bq ls --project_id="$BQ_PROJECT" "$ds"; done`. For each table, inside the same `for ds` loop: `bq show --schema --format=prettyjson --project_id="$BQ_PROJECT" "$ds.<table>"` and `bq show --project_id="$BQ_PROJECT" "$ds.<table>"` (row count, partitioning).
 
 ### Step 8 — Sample enum / status field values
@@ -223,7 +223,7 @@ Use safe sampling depending on table size:
 
 `docs/db.md` always starts with H1 `# Database Schema Documentation` and the "Last verified" line. The body sections depend on the DB type. Below are the required sections per DB. Fill them with discovered content; do not paste placeholder rows.
 
-**Row order, every object-listing table in every template below** (All Tables, All Collections, All Indices, Field Mappings & Enums, Date/Time Fields, Money/Numeric Fields, Large Table Warnings, and any other table listing schema objects): sort rows by the first column's value, bytewise ascending under `LC_ALL=C`. Two runs over an unchanged schema must emit identical tables, and enumeration order from the engine is not stable.
+**Row order, every table in every template below** (All Tables, Field Mappings & Enums, Business Definitions, Common Business Questions, Date/Time Fields, and the rest — the examples are not the boundary): sort rows by the first column's value (for Common Business Questions, the Question column, assigning `#` after sorting), bytewise ascending under `LC_ALL=C`. Two runs over an unchanged schema must emit identical tables; neither engine enumeration order nor code-scan encounter order is stable.
 
 ### SQL (MySQL / PostgreSQL / SQLite)
 
