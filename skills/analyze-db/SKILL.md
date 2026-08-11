@@ -40,17 +40,17 @@ Prefer MCP tools when available — they handle connection management. Fall back
 
 ## CLI Command Reference
 
-**One interpolation rule for every command and query in this skill.** Never interpolate into a command any name, pattern or value that did not originate in this file — whether it came from the database, the repository, an existing `docs/db.md`, or the environment. Pass each one as a quoted shell variable; any identifier not matching `^[A-Za-z0-9_]+$` must go through the engine's identifier-quoting form or be reported and skipped. BigQuery dataset names come only from `$BQ_DATASETS`, must match that pattern, and are always bound as Step 7's loop variable `$ds` — never any other variable.
+**One interpolation rule for every command and query in this skill — the same rule `query-db` states.** No query or identifier text that this skill generates or derives — from the database, the repository, an existing `docs/db.md`, or the environment — ever appears inside a shell-quoted argument. Every engine receives query text on stdin via a quoted heredoc (`<<'SQL'`, `<<'JS'`), so the shell never parses it; never `-e "query"` (mysql), `-c "query"` (psql), `--eval "code"` (mongosh), or a `"QUERY"` positional argument (sqlite3, bq). Only fixed literal text written verbatim in this file (the Step 6 connectivity pings) may be passed as an argument. The heredoc fences the shell only, not the query body: any identifier not matching `^[A-Za-z0-9_]+$` is reported and skipped, never written into a query body — engine identifier quoting is not an escape hatch, because a MySQL backtick inside a double-quoted argument is shell command substitution and even inside a heredoc a hostile name reaches the database. BigQuery dataset names come only from `$BQ_DATASETS`, must match that pattern, and are always bound as Step 7's loop variable `$ds` — never any other variable.
 
 | Database | Connect / Query | List schema |
 | -------- | --------------- | ----------- |
-| MySQL | `MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "<SQL>"` | `SELECT table_name, table_rows FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY table_rows DESC;` (estimates, instant) |
-| PostgreSQL | `psql -c "<SQL>"` | `SELECT schemaname, relname, n_live_tup FROM pg_stat_user_tables ORDER BY n_live_tup DESC;` |
-| SQLite | `sqlite3 "$SQLITE_DB" "<SQL>"` | `SELECT name FROM sqlite_master WHERE type='table';` |
-| MongoDB | `mongosh "$MONGODB_URI" --eval "<JS>"` | `db.getCollectionNames().forEach(c => print(c + ': ' + db[c].estimatedDocumentCount()))` |
+| MySQL | `MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" <<'SQL'` (query on stdin) | `SELECT table_name, table_rows FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY table_rows DESC;` (estimates, instant) |
+| PostgreSQL | `psql -f - <<'SQL'` (query on stdin) | `SELECT schemaname, relname, n_live_tup FROM pg_stat_user_tables ORDER BY n_live_tup DESC;` |
+| SQLite | `sqlite3 "$SQLITE_DB" <<'SQL'` (query on stdin) | `SELECT name FROM sqlite_master WHERE type='table';` |
+| MongoDB | `mongosh "$MONGODB_URI" --file - <<'JS'` (script on stdin) | `db.getCollectionNames().forEach(c => print(c + ': ' + db[c].estimatedDocumentCount()))` |
 | Elasticsearch | `curl -s "$ES_URL/<endpoint>"` (add `-H "Authorization: ApiKey $ES_API_KEY"` if set) | `curl -s "$ES_URL/_cat/indices?v&h=index,docs.count,store.size"` |
 | Redis | `redis-cli -u "$REDIS_URL" <CMD>` | `DBSIZE`, `SCAN 0 MATCH <pattern> COUNT 100` |
-| BigQuery | `bq query --use_legacy_sql=false --format=prettyjson --project_id="$BQ_PROJECT" "<SQL>"` | inside Step 7's `for ds` loop: `bq ls --project_id="$BQ_PROJECT" "$ds"`; `bq show --schema --format=prettyjson --project_id="$BQ_PROJECT" "$ds.<table>"` |
+| BigQuery | `bq query --use_legacy_sql=false --format=prettyjson --project_id="$BQ_PROJECT" <<'SQL'` (query on stdin) | inside Step 7's `for ds` loop: `bq ls --project_id="$BQ_PROJECT" "$ds"`; `bq show --schema --format=prettyjson --project_id="$BQ_PROJECT" "$ds.<table>"` |
 
 ## Steps
 
@@ -185,7 +185,7 @@ If the user declines or can't provide credentials, **skip Steps 7-8** and procee
 
 Use the schema commands from the "CLI Command Reference" table above, then for each table/collection capture:
 
-- **Indexes** — MySQL: ``SHOW INDEX FROM `<table>`;``. PostgreSQL: `psql -v tbl="<table>" -c "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = :'tbl';"`. MongoDB: `db.getCollection("<coll>").getIndexes()`. Elasticsearch: `curl -s "$ES_URL/<index>/_mapping" | jq` with `<index>` URL-encoded.
+- **Indexes** — MySQL: `SHOW INDEX FROM <table>;` sent via the stdin heredoc, with `<table>` already validated against `^[A-Za-z0-9_]+$` by the interpolation rule, so it needs no identifier quoting (a backtick-quoted name inside a double-quoted `-e` argument is shell command substitution — the form this rule exists to prevent). PostgreSQL: `psql -v tbl="<table>" -c "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = :'tbl';"`. MongoDB: `db.getCollection("<coll>").getIndexes()`. Elasticsearch: `curl -s "$ES_URL/<index>/_mapping" | jq` with `<index>` URL-encoded.
 - **Date ranges** — `SELECT MIN(created_at), MAX(created_at) FROM <table>;` (or MongoDB `$min`/`$max` aggregation).
 - **Sample document** — MongoDB `db.<coll>.findOne()`; Redis `HGETALL`/`TTL`.
 - **BigQuery** — iterate datasets: `for ds in $(echo "$BQ_DATASETS" | tr ',' ' '); do echo "=== $ds ==="; bq ls --project_id="$BQ_PROJECT" "$ds"; done`. For each table, inside the same `for ds` loop: `bq show --schema --format=prettyjson --project_id="$BQ_PROJECT" "$ds.<table>"` and `bq show --project_id="$BQ_PROJECT" "$ds.<table>"` (row count, partitioning).
@@ -223,6 +223,8 @@ Use safe sampling depending on table size:
 
 `docs/db.md` always starts with H1 `# Database Schema Documentation` and the "Last verified" line. The body sections depend on the DB type. Below are the required sections per DB. Fill them with discovered content; do not paste placeholder rows.
 
+**Row order, every object-listing table in every template below** (All Tables, All Collections, All Indices, Field Mappings & Enums, Date/Time Fields, Money/Numeric Fields, Large Table Warnings, and any other table listing schema objects): sort rows by the first column's value, bytewise ascending under `LC_ALL=C`. Two runs over an unchanged schema must emit identical tables, and enumeration order from the engine is not stable.
+
 ### SQL (MySQL / PostgreSQL / SQLite)
 
 Required sections, in order:
@@ -232,7 +234,7 @@ Required sections, in order:
 3. **Framework** — detected framework name.
 4. **Database Overview** — one paragraph on what data this system holds.
 5. **All Tables** — single table listing **every** table: `Table | Purpose | Key Fields for Filtering/Grouping | Rows`.
-6. **Field Mappings & Enums** — `Table.Field | Value | Meaning | Count`.
+6. **Field Mappings & Enums** — `Table.Field | Value | Meaning | Count`. `Count` = exact per-value count from `SELECT <field>, COUNT(*) … GROUP BY <field>` when the table's estimated rows (from the Step 7 system-table estimate) are 1M or fewer; on a larger table write `—` rather than running an unbounded aggregate, per the Query Anti-Patterns rows this same file mandates.
 7. **Business Definitions** — `Term | Definition | How it is expressed in the schema` (e.g. "Buyer", "Active user", "Revenue"): the domain vocabulary a query author must get right, with the tables, columns and filters that actually express each term.
 8. **Relationships** — `parent.fk → child.pk` arrows.
 9. **Date/Time Fields** — `Table.Field | Purpose | Notes` (TZ, granularity).

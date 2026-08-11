@@ -250,7 +250,7 @@ Pre-report verification: every applicable phase task is complete and each findin
 | 🔵 Low | Alt-text gaps, non-descriptive link text, minor polish |
 | ⚪ Info | Observations, GEO opportunities, FYI |
 
-Sort findings by severity (Critical → High → Medium → Low → Info), then by Area, then by evidence path; assign the `SEO-001…` ids only after sorting.
+Sort findings by severity (Critical → High → Medium → Low → Info), then by Area in the order the finding template lists (Technical SEO, GEO, Content, Performance, CWV, Accessibility, Best Practices), then by evidence path bytewise ascending; assign the `SEO-001…` ids only after sorting.
 
 Write `docs/seo-audit.md` (`mkdir -p docs` first). Structure:
 
@@ -293,7 +293,7 @@ Write `docs/seo-audit.md` (`mkdir -p docs` first). Structure:
 
 ### [SEO-001] SEVERITY: Title
 
-**Area:** Technical SEO | GEO | Content | Performance | CWV | Accessibility
+**Area:** Technical SEO | GEO | Content | Performance | CWV | Accessibility | Best Practices (closed set — assign by originating phase: 4 → Technical SEO, 5 → GEO, 6 → Content, 7 → the pillar of its sub-section)
 **Evidence:** `path/file.erb:42` or `https://…` → `<quoted tag/line>`
 **Issue:** What's wrong.
 **Impact:** Why it matters (ranking / indexing / AI citation).

@@ -81,7 +81,7 @@ Run the `cd` as a **separate** Bash call — never chain it as `cd … && gh …
 
    Then compute the raw window for the chosen mode:
    - **`past` (previous completed week):**
-     - `week_end = most recent past Sunday 23:59 local` (if today is Sunday, use today − 7 days)
+     - `week_end = most recent Sunday 23:59 local` — **today** when today is Sunday (the week completing today, which is why the two windows coincide and the prompt is skipped), otherwise the last Sunday before today
      - `week_start = week_end − 6 days at 00:00 local` (the Monday of that same week)
    - **`current` (week-to-date):**
      - `week_start = this week's Monday 00:00 local`
@@ -220,7 +220,7 @@ Compute a sensible default so the human usually just accepts it:
 - a secondary "in QA" holder who is clearly a leader/escalation target (Step 2 item 3) → default `manager`.
 - everyone else → default `developer`.
 
-A cached role always takes precedence as the pre-selection over the auto-default (the human's last answer wins) unless `--reconfirm-roles` forces a fresh choice.
+The only prompts that have a cached role to offer are `--reconfirm-roles` runs, and there the cached role is the pre-selection (the human's last answer wins over the auto-default); an uncached member's prompt pre-selects the auto-default, and a cached member outside a `--reconfirm-roles` run is never prompted at all.
 
 ### Prompt (interactive runs only)
 
@@ -411,7 +411,8 @@ A container issue (Story / parent / blocker — see Step 2 classification) is ju
 
 For each container, resolve the movement of its `child_keys` (sub-tasks + blocked/child linked issues) over the relevant window using the same `status CHANGED ... DURING (...)` JQL already used for throughput:
 
-- **`container_is_moving`** = at least one child had a status transition in the window, OR at least one child is in an active (non-terminal, non–To-Do) status. → The container is healthy and **must not** be flagged as stalled/stuck. If you mention it at all, describe it as "parked, children in flight."
+- **Status classes (used everywhere this skill says terminal, active, or To-Do):** terminal = `fields.status.statusCategory.key == "done"`, active = `"indeterminate"`, To-Do = `"new"`. Never classify by status name — a `REJECTED` or renamed status classifies by its category key, so two runs cannot disagree about whether it counts as done.
+- **`container_is_moving`** = at least one child had a status transition in the window, OR at least one child is in an active status (per the status classes above). → The container is healthy and **must not** be flagged as stalled/stuck. If you mention it at all, describe it as "parked, children in flight."
 - **`container_is_blocked`** = the container cannot close **and every** child is itself stalled (no child transition in the trailing 14 days and none in progress) — typically because one or more **leaf** children are blocked or unstarted. → The real problem is those children, not the parent.
 
 When a container is blocked, surface **the blocking child leaf issue(s)** — each with its **own** assignee and role — as the at-risk/stuck item, with a note like `blocks [PARENT] — parent parked on <owner> (product owner), waiting on this task`. Never attribute the stall to the parent's owner when they are just the product owner holding the wrapper; attribute it to whoever owns the unfinished child. If a blocked container genuinely has no child owner to point at (orphaned children, or no children at all), then and only then flag the container itself, owner included.
@@ -483,7 +484,7 @@ The rating is anchored on **PR throughput per working day in the weekly window**
 
 Inputs (all over `[week_start, week_end]` against the **weekly-anchor sprint** chosen in Step 1):
 
-- `prs_merged_week` = number of PRs merged within the window where this member is the **author** (the opener), resolved via the GH→Jira map from Step 5; a PR counts iff `pr.author.login` maps to their Jira identity. The user who clicked merge does **not** get credit — that belongs to a separate `Reviews` / `merged-for-others` metric. Count merges only (not opens or closes-without-merge), and exclude bot/automation accounts.
+- `prs_merged_week` = number of PRs merged within the window where this member is the **author** (the opener), resolved via the GH→Jira map from Step 5; a PR counts iff `pr.author.login` maps to their Jira identity. The user who clicked merge does **not** get credit — that belongs to a separate `Reviews` / `merged-for-others` metric. Count merges only (not opens or closes-without-merge). Exclude a PR exactly when its `author.type` is `"Bot"` or its `author.login` ends in `[bot]`; every other login counts, service accounts included, unless `GITHUB_USERNAME_MAP` maps it to a member.
 - `working_days_in_week` = count of Mon–Fri inside `[week_start, week_end]` (typically 5; smaller if the window was clamped at a sprint boundary). **In `current` (week-to-date) mode, exclude today** (in progress) and count only completed working days; use `max(working_days_in_week, 1)` to avoid divide-by-zero on early-week runs, and treat per-day rates as **provisional** (cap rate-only misses at 🟡) when completed working days < 2.
 - `pr_per_day` = `prs_merged_week / working_days_in_week`.
 - `worklog_short_day` = true if any working day in the window has `daily_hours < 7.0` (from the worklog section). False (and irrelevant) if the member was dropped from the time table for the 28-day-no-entries rule.
@@ -504,11 +505,11 @@ The PR threshold is **per working day**. For a normal 5-working-day week:
 
 For a clamped 4-working-day week, the corresponding bands are ≥ 4 / 2–3 / ≤ 1, and so on.
 
-**Consultant (part-time) bands** — halve the per-working-day thresholds, since a part-timer is not expected to ship daily, and never apply worklog flags:
+**Consultant (part-time) bands** — halve the per-working-day thresholds, since a part-timer is not expected to ship daily, and never apply worklog flags. Apply in order, first match wins — 🔴 first, so `is_stalled` is checked before any rate can grant a better colour (the same order the full rules above use):
 
-- 🟢 **Green** if `pr_per_day ≥ 0.5` (about one PR every other working day).
+- 🔴 **Red** if `is_stalled`, OR `pr_per_day < 0.25`.
 - 🟡 **Yellow** if `0.25 ≤ pr_per_day < 0.5`.
-- 🔴 **Red** if `pr_per_day < 0.25`, OR `is_stalled`.
+- 🟢 **Green** otherwise (`pr_per_day ≥ 0.5` — about one PR every other working day).
 
 The why-line must say "consultant (part-time)" so a 🟡 isn't read as underperformance, e.g. `"Yellow — consultant (part-time): 2 PRs / 5 working days = 0.4/day"`.
 
@@ -536,7 +537,7 @@ The point of this section is to tell the reader, in one glance, whether the spri
 
 1. **Scope & progress.**
    - `total_work` = sum of story points across active-sprint issues **if ≥ 80% of issues carry points**; otherwise fall back to plain issue count.
-   - `done_work` = same measure restricted to issues in a terminal status (Done / Closed / equivalent).
+   - `done_work` = same measure restricted to issues in a terminal status (per the Step 6 status classes: `statusCategory.key == "done"`).
    - `completion_pct = done_work / total_work`.
 2. **Time (working days only — exclude Sat/Sun, don't detect holidays).**
    - `sprint_working_days` = Mon–Fri in `[sprint.startDate, sprint.endDate]`.
@@ -696,7 +697,7 @@ For the weekly window, fetch:
 
    Filter by `publishedAt` falling inside the weekly window (`gh release list` is the cleanest source; raw tags fall back when no formal release was created).
 
-3. **Reconcile** — match Jira version names to GitHub tag/release names. Normalize aggressively (case-insensitive, strip leading `v`, allow trailing `-rc`/`-beta` suffix variants). For each Jira release, expected counterparts are:
+3. **Reconcile** — match Jira version names to GitHub tag/release names after normalizing both sides by exactly three steps: lowercase; strip one leading `v`; strip one trailing suffix matching `-(rc|beta|alpha)[0-9]*$`. Two names match iff the normalized strings are byte-equal — no fuzzier rule, so the Status column cannot change between runs. For each Jira release, expected counterparts are:
 
    - exact tag in the relevant repo(s) — green ✅
    - GitHub release exists but tag spelling differs (e.g. Jira `12.4.0` vs GitHub `v12.4.0`) — yellow ⚠️ "name normalization" (still considered matched)
@@ -785,7 +786,7 @@ If run with `--send`:
 2. Subject: `Weekly Dev Report — <sprint name> — <week_start> to <week_end>`
 3. Body: the rendered Markdown. If the available Gmail transport supports HTML, render the Markdown to HTML first (simple conversion: tables → `<table>`, headings → `<hN>`, links → `<a href>`); otherwise send as plain text with Markdown preserved.
 4. Try delivery in this order:
-   - Any available Google Workspace MCP tool whose name matches `mcp__*gmail*send*` or `mcp__google*workspace*gmail*` — discover via the tool list at runtime, do not hardcode
+   - A Google Workspace MCP tool discovered in the session's tool list at runtime (do not hardcode): eligible names match `mcp__*gmail*send*` or `mcp__google*workspace*gmail*` AND contain `send` (so a search or draft tool never qualifies). Use this path only when exactly one tool is eligible; zero or several eligible tools skip this path entirely and fall through to the `gmail` CLI, so which mail lands never depends on discovery order
    - `gmail send` CLI if installed (`which gmail`)
    - `gcloud` SMTP relay if configured
 5. On success, print `Sent to: <list>`. On failure, leave `WEEKLY_REPORT.md` in place, print the error, and instruct the user to send manually.
@@ -812,7 +813,7 @@ The Gmail MCP tools (path 1) are **discovered at runtime** and so cannot be pre-
 - **Always cite Jira tickets with key + summary.** Every Jira reference rendered in the report — in tables, bullets, why-lines, captions, anywhere — must read `[KEY](.../browse/KEY) — short summary`. A bare `DEV-1234` link is not enough; the reader needs the title to understand without clicking. Truncate summaries to ~80 chars if needed but never omit them.
 - **Releases reconciled across Jira and GitHub.** The Releases-this-week section must compare Jira `released==true` versions in the window with GitHub tags / releases in the same window and surface mismatches. If neither system has releases in the window, render an explicit "*No releases this week.*" line — do not silently omit the section.
 - **No skill / process meta-commentary in the rendered report.** The output is a status report for the team — never include sections like "Skill changes shipped this run", "Implementation notes", "TODOs for the script", or any other description of how the report was produced. Those belong in commit messages and the skill source itself, not in `WEEKLY_REPORT.md`. The report ends after the per-member detail and the trailing "Preview written to WEEKLY_REPORT.md. Re-run with --send to email." line.
-- **Working days.** When computing `days_left` and `expected_hours`, exclude Saturdays and Sundays. Do not attempt to detect holidays.
+- **Working days.** When computing `days_left` and `expected_hours`, exclude Saturdays and Sundays. Do not attempt to detect holidays. `expected_hours = 7.0 × completed working days in the window` — the same 7-hour bar the Time table's short-day flag uses, so the two judgements cannot drift apart.
 - **Roles confirmed once, then cached.** Per-member roles (Step 2.5) are confirmed by the human via AskUserQuestion and persisted to the role cache. Re-prompt only for members missing from the cache, or for everyone when `--reconfirm-roles` is passed. Never prompt during a `--send` / non-interactive run — fall back to cache + auto-defaults and report how many were auto-defaulted.
 - **Role-aware rating.** Each member is rated according to their role: `developer` on the full PR/day scale, `consultant` on relaxed (half) part-time bands with no worklog flags, `tester` on QA metrics, and `manager`/`other` not rated (cell `—`). Never measure a part-timer, leader, or untracked member against the full-time developer baseline.
 - **Untracked ('other') members still surface non-moving work.** Role `other` means "do not track" for rating/throughput — but their sprint tickets are still checked for movement, and any **leaf** ticket with zero transitions sprint-to-date must appear in the 🎯 Delivery-risk At-risk items list noted `untracked member — issue not moving`. Apply the container roll-up first: a parked container (Story) whose children are moving is never flagged.

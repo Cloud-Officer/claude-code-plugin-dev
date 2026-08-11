@@ -63,7 +63,16 @@ Assign each threat a qualitative rating. Default rubric (state it in the output)
 
 - **Impact:** Critical / High / Medium / Low — data loss, RCE, auth bypass, compliance breach → higher.
 - **Likelihood:** High / Medium / Low — exposure (internet-facing?), attacker skill required, whether a control already blocks it.
-- **Risk = Impact × Likelihood** → prioritized list. Don't over-engineer scoring; the point is to rank, not to compute a false-precision number.
+- **Risk** — derived from Impact × Likelihood via this matrix (rows = Impact, columns = Likelihood); it orders the prioritized list:
+
+  | Impact \ Likelihood | High | Medium | Low |
+  | --- | --- | --- | --- |
+  | Critical | Critical | Critical | High |
+  | High | High | High | Medium |
+  | Medium | Medium | Medium | Low |
+  | Low | Low | Low | Low |
+
+  Don't over-engineer scoring beyond the matrix; the point is to rank, not to compute a false-precision number.
 
 ## Step 4: Map mitigations (existing vs. missing)
 
@@ -119,6 +128,8 @@ Structure (adjust to the system; skip empty sections):
 ## Sign-off
 - Modeled by: AI (draft)  ·  Reviewed & accepted by: __________ (human)
 ```
+
+Row order: sort the Assets table by Asset bytewise ascending; sort the Trust boundaries & entry points table by Boundary / entry point bytewise ascending, tie-broken by File / route bytewise ascending, and assign `#` sequentially in that order.
 
 Pass `markdownlint-cli2` defaults: blank lines around lists/tables/fences, a language on every fence, one trailing newline.
 

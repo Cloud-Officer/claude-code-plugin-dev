@@ -79,7 +79,7 @@ Record: organization, repository, has_architecture_doc, has_docs_dir, doc_last_m
 
 ## Phase 2: Exemption Check
 
-If `docs/architecture.md` already starts with "Architecture documentation is not required", **stop here**.
+If `docs/architecture.md` already contains the line "Architecture documentation is not required for this repository." — the first body line of the exemption file written below (its H1 is `# Architecture Design`, so match the line anywhere in the file, not only at the start) — **stop here**.
 
 Otherwise check whether the repo qualifies for an exemption:
 
@@ -87,7 +87,7 @@ Otherwise check whether the repo qualifies for an exemption:
 | ----------- | ------------------- | ------ |
 | Homebrew Tap | Repo name `homebrew-*`; `Formula/` or `Casks/` dirs | Package distribution, no application logic |
 | Claude Code Plugin | `.claude-plugin/plugin.json`; `skills/` and/or `commands/` dirs | Plugin config/prompts, no application logic |
-| Dotfiles / Config | >80% config files (yaml/json/toml/dotfiles), no source code | Configuration only |
+| Dotfiles / Config | >80% of git-tracked files (count via `git ls-files`) have a `.yaml`/`.yml`/`.json`/`.toml` extension or a dot-prefixed name; no source code | Configuration only |
 | Documentation-only | Only `.md` files, no source files | No software architecture |
 | GitHub Profile | Repo name equals owner name | Profile README only |
 | GitHub Action | `action.yml` / `action.yaml` with `runs:` | Simple action wrapper |
@@ -251,7 +251,7 @@ For each: signature, docstring, complexity if documented. Flag undocumented crit
 
 ### 5.B ML/DL Projects
 
-**5.B.1 Datasets.** Find dataset classes/loaders (`class .*Dataset`, `DataLoader`, `tf.data`, `torch.utils.data`); list `data/`, `datasets/`, `raw/`, `processed/` with file counts and sizes. For each: data format, features, labels, validation rules. Verify documented sources/sizes; flag undocumented.
+**5.B.1 Datasets.** Find dataset classes/loaders (`class .*Dataset`, `DataLoader`, `tf.data`, `torch.utils.data`); list `data/`, `datasets/`, `raw/`, `processed/` with file counts (regular files, recursive: `find <dir> -type f | wc -l`) and sizes (total KiB, recursive: `du -sk <dir>`). For each: data format, features, labels, validation rules. Verify documented sources/sizes; flag undocumented.
 
 **5.B.2 Data preprocessing.** Find `def preprocess`, `def transform`, `def normalize`, `def augment`, `class .*Transform`, `Pipeline`, `Compose`. For each: input/output specs, parameters, augmentation techniques. Verify documented order matches code; check parameter defaults.
 

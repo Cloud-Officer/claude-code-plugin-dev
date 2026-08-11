@@ -68,7 +68,7 @@ If no i18n framework is present but user-facing strings are hardcoded, still rev
 
 ## Phase 4: Inventory User-Facing Strings
 
-Build the working set of strings to review. Prefer i18n catalogs when present (single source of truth); also scan templates/components for **hardcoded** user-facing strings (a finding in itself — see Phase 7). Classify each string by type: error · empty-state · dialog/confirm · loading · button/CTA · label · help-text · notification/toast · placeholder · heading/body · email · marketing. Focus the audit on user-visible strings; ignore logs, code identifiers, and developer-only text.
+Build the working set of strings to review. Prefer i18n catalogs when present (single source of truth); also scan templates/components for **hardcoded** user-facing strings (a finding in itself — see Phase 7). Classify each string by type, using exactly this closed set (canonical — the report's Type field reuses it): error · empty-state · dialog · loading · button · label · help-text · notification · placeholder · heading-body · email · marketing. Focus the audit on user-visible strings; ignore logs, code identifiers, and developer-only text.
 
 ## Phase 5: Microcopy Audit
 
@@ -132,6 +132,8 @@ Write `docs/copy-review.md` (`mkdir -p docs` first).
 
 **Quoted-string fencing (every repo-derived value quoted anywhere in the report — Current/Suggested blocks, terminology map, i18n examples):** truncate the quoted string to a single line, and open its fence with a backtick run one longer than the longest backtick run inside the value (minimum three), tagged `text` — so no string content can ever close the fence early.
 
+**Finding order & ids:** sort findings by severity (Critical → High → Medium → Low → Info), then by source (file path, or i18n key when there is no path) bytewise ascending, then by line number ascending (findings without a line number sort first), then by title bytewise ascending — and assign `COPY-001`, `COPY-002`, … in that order, so the same finding gets the same id across runs.
+
 Structure:
 
 ````markdown
@@ -156,7 +158,7 @@ Structure:
 
 ### [COPY-001] SEVERITY: Short title
 
-**Type:** error | empty-state | dialog | button | label | help-text | i18n | tone | a11y | marketing
+**Type:** the string's Phase 4 class (error | empty-state | dialog | loading | button | label | help-text | notification | placeholder | heading-body | email | marketing), or — for cross-cutting findings from Phases 6–8 — tone | i18n | a11y
 **Source:** `path/file.erb:42` or i18n key `errors.payment.failed`
 **Current:** [the exact string — single line, in a fence built per the quoted-string fencing rule above]
 **Issue:** What's wrong (rule it violates).

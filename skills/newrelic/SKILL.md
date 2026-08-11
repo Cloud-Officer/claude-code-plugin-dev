@@ -10,7 +10,7 @@ Query observability data, alerts, and application health.
 
 ## MCP Tools with Fallbacks
 
-**Prefer MCP tools** (`mcp__newrelic__*`) when available. If MCP tools are not available (tool not found errors), **fall back to the `newrelic` CLI**.
+**Prefer MCP tools.** For each operation, the MCP tool is available exactly when the session's tool list contains a tool whose name equals the MCP Tool cell in the table below. If that name is absent from the tool list, or a call to it is rejected by the tool harness before any New Relic data is returned, **fall back to that row's CLI Fallback** (rows marked N/A: use the alternative stated in the cell, or tell the user no CLI equivalent exists).
 
 | Operation | MCP Tool | CLI Fallback |
 | --- | --- | --- |

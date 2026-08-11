@@ -12,7 +12,7 @@ Query Firebase Crashlytics crash data exported to BigQuery. List top crashes, in
 
 ## MCP Tools with Fallbacks
 
-**Prefer BigQuery MCP tools** (`mcp__bigquery__*`) when available for executing queries. If MCP tools are not available (tool not found errors), **fall back to the `bq` CLI**.
+**Prefer BigQuery MCP tools** (`mcp__bigquery__*`) for executing queries. This plugin ships no BigQuery MCP server, so these tools exist only when the user's own configuration defines an MCP server named `bigquery`: they are available exactly when the session's tool list contains a tool named `mcp__bigquery__query`. If that name is absent from the tool list, **fall back to the `bq` CLI**.
 
 | Operation | MCP Tool | CLI Fallback |
 | --- | --- | --- |
