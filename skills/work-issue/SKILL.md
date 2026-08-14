@@ -331,7 +331,8 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
    - For Feature type, follow the architecture chosen in step 6
    - For Bug/Task, implement the fix directly
    - If Figma design context was extracted in step 2, use it to match the design (spacing, colors, typography, component structure)
-   - **Comment discipline: first decide whether a comment is needed at all, and prefer none** — the code and its names should carry the meaning. When one is genuinely needed, keep it to one brief line stating what the code cannot say, and never reference an issue, ticket or PR number in it: those belong in the commit message and the tracker, and a comment narrating the change or its history is reviewer-talk that rots the moment it merges
+   - **Comment discipline — default to none, hard cap of one line.** The code and its names carry the meaning; a comment earns its place only by stating something the code *cannot* say (a non-obvious external constraint, a unit, a workaround for third-party behaviour). Do not write a comment that: justifies the change or the approach ("mirrored rather than recomputed because…", "held in a local so that…"), narrates history or what was rejected, cites how a sibling module does it, restates the line below it, or references an issue, ticket or PR number. **That rationale is the PR body's job** — `create-pr` (step 9) writes it there, where it is read once at review time and then stops rotting the source. A multi-sentence block above a method or a test is the failure mode to avoid, and it applies to test files exactly as it does to production code
+   - Sweep your own diff before moving on: `git diff -U0 | grep -E '^\+[[:space:]]*(#|//|/\*|\*)'` — every added comment line must pass the one-line test above or be deleted
    - Implement incrementally, get user approval before proceeding to the next major change
 
 8. **Write and run unit tests** (hard gate — required for any change that alters behavior: Bug, Feature, and Task alike)
@@ -351,6 +352,8 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 9. **Create PR** (all types — only when user explicitly requests)
 
     **Precondition — tests gate (step 8):** Do not create the PR unless step 8 is satisfied: tests covering the change exist and pass, *or* a stated no-test exception applies. If neither holds, go back and write the tests first.
+
+    **Precondition — comment sweep (step 7):** run `git diff -U0 | grep -E '^\+[[:space:]]*(#|//|/\*|\*)'` over the branch and delete every added comment that fails step 7's one-line test. Rationale that is worth keeping goes into the PR body below, not back into the source.
 
     **Commit (with the issue-tagged message):** the message arrives on stdin through `git commit -F -` and a quoted heredoc, never as a double-quoted `-m` argument — the quoted delimiter (`<<'EOF'`) suppresses all expansion, so the message needs no escaping:
 

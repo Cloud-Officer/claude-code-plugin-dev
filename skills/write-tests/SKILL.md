@@ -103,6 +103,7 @@ For a bug fix, write the regression test **first**, confirm it fails against the
 - Place files where the repo expects them (`spec/`, `test/`, `tests/`, `__tests__/`, `*_test.go`, `androidTest/` vs `test/`, `Tests/` target, etc.) with the repo's naming convention.
 - Reuse existing helpers, factories, fixtures, base classes, and custom matchers — don't reinvent setup that already exists.
 - One behavior per test; descriptive names that state intent. Arrange–Act–Assert.
+- **The test name is the documentation — do not write a comment above a test.** A preamble explaining why the test exists, what it protects, or how the behavior relates to another module is rationale, not code: it belongs in the PR body or the ticket. If a test's purpose isn't obvious, rename the test or sharpen the assertion message; don't annotate it. Same inside the body: no `# Arrange` / `// act` labels and no comment restating the line under it. The rare comment that earns its place states something the code cannot — a magic fixture value's origin, a third-party quirk being reproduced — in one line.
 - Deterministic only: no real network/clock/random. Inject or fake them. Freeze time where the framework supports it (`testing/synctest`, Timecop, `vi.useFakeTimers`, etc.).
 - Match the assertion style already used in the suite.
 
@@ -195,6 +196,7 @@ Summarize concisely:
 - **Deterministic and isolated.** No real time, network, randomness, or shared mutable state between tests. Tests must pass run in any order and in parallel.
 - **Never edit framework/config to bypass failures** (`jest.config`, `phpunit.xml`, `.rspec`, coverage thresholds) to make a run go green. Same spirit as `run-linters`.
 - **Hit the coverage floor.** Default line ≥ 80% and branch ≥ 80% (or the language equivalent) unless the user specifies otherwise or the repo configures a different/higher bar — respect the repo's and never lower it. Report the real numbers; don't game the metric with assertion-free tests.
+- **No narrative comments in test files.** Default to none, hard cap of one line. A comment block above a test explaining its motivation, the convention it follows, or what a sibling integration does is rationale for a reviewer — put it in the PR body and let the test name carry the intent. Sweep before reporting: `git diff -U0 -- <test paths> | grep -E '^\+[[:space:]]*(#|//|/\*|\*)'` and delete what fails that test.
 - **Assert behavior, not implementation.** Prefer public API + observable output/`testTag` selectors over internal call counts and exact-text matching, so tests survive refactors.
 - **Regression tests must actually catch the regression.** For a bug fix, ensure the test fails on the old behavior before it passes on the new.
 - **No silent scope cuts.** If you skipped hard-to-test code (UI needing a device, external integration), list it in the report rather than pretending it's covered.
