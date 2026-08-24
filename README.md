@@ -34,6 +34,7 @@ install works across multiple accounts and tenants.
 ### Features
 
 * Issue tracking integration (GitHub Issues and Jira)
+* Resolved-issue audits — verify a claimed fix exists in the current codebase, then close or reopen the issue
 * Automated deep code reviews using parallel agents
 * PR generation with commit messages
 * Linting and code quality checks
