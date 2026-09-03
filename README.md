@@ -416,6 +416,7 @@ These official plugins from the `claude-plugins-official` marketplace pair well 
 | `sentry`               | Sentry error monitoring — access error reports, analyze stack traces, search issues, debug production errors, and set up Sentry SDKs                                                  | `claude plugin install sentry@claude-plugins-official`                                                                |
 | `azure`                | Microsoft's official Azure plugin — bundles the Azure MCP + ~28 ops skills: list resources, deploy, validate, diagnose, RBAC/Entra, and optimize costs across 50+ services            | `claude plugin install azure@claude-plugins-official`                                                                 |
 | `firebase`             | Google Firebase plugin — bundles the Firebase MCP to manage Firestore, auth, cloud functions, hosting, and storage. Complements `co-dev`'s `crashlytics` skill                        | `claude plugin install firebase@claude-plugins-official`                                                              |
+| `slack`                | Slack's official plugin — bundles the hosted Slack MCP (search, post, schedule, canvases) plus 8 skills and 5 commands for Slack app development (Block Kit, Bolt, Slack CLI)         | `claude plugin install slack@claude-plugins-official`                                                                 |
 
 > The `stripe` plugin bundles Stripe's own MCP and agent tools, so you do **not** need a separate
 > `claude mcp add stripe`. For local webhook
@@ -441,6 +442,35 @@ These official plugins from the `claude-plugins-official` marketplace pair well 
 > operations (deploy, emulators, security rules) use the Firebase CLI — install it with
 > `brew install firebase-cli` then `firebase login`. It complements `co-dev`'s `crashlytics` skill (crash
 > data via BigQuery) rather than replacing it.
+>
+> The `slack` plugin bundles Slack's hosted MCP (`https://mcp.slack.com/mcp`), so no separate
+> `claude mcp add slack` is needed. It authenticates by OAuth on first use and inherits **your** Slack
+> permissions — but your workspace admin must approve MCP integration before that OAuth succeeds. Its
+> app-development skills additionally need the Slack CLI:
+> `curl -fsSL https://downloads.slack-edge.com/slack-cli/install.sh | bash` then `slack login`.
+>
+> **One Slack workspace per machine.** The plugin registers the server under the fixed name `slack`, and
+> that name owns exactly one OAuth grant (see [Naming caveat for multi-tenant setups](#configure-remote-mcps-optional)) — per-folder
+> `.envrc` cannot isolate it the way it does for the stdio `google-workspace` server, because the Slack MCP
+> reads no environment variables. To work across two workspaces, register the extra ones by hand from their
+> folders under distinct names and add a permission entry for each:
+>
+> ```bash
+> cd ~/work/companya && claude mcp add slack-companya --transport http https://mcp.slack.com/mcp \
+>   --client-id 1601185624273.8899143856786 --callback-port 3118
+> cd ~/work/companyb && claude mcp add slack-companyb --transport http https://mcp.slack.com/mcp \
+>   --client-id 1601185624273.8899143856786 --callback-port 3118
+> ```
+>
+> Both flags are mandatory. `mcp.slack.com` does **not** support dynamic client registration, so a plain
+> `claude mcp add --transport http slack https://mcp.slack.com/mcp` fails at authentication with
+> `Incompatible auth server: does not support dynamic client registration`. The client ID above is the
+> public one Slack ships in the plugin's own `.mcp.json`, and `3118` is the callback port Slack
+> pre-registered as the redirect URI — a different port is rejected as well. Because that port is fixed and
+> shared, authorize one instance at a time rather than running two OAuth flows concurrently.
+>
+> The plugin's skills still work against those instances; only its bundled `slack` server is single-tenant.
+> The Slack CLI is unaffected — it manages multiple workspaces natively via `slack login` per team.
 >
 > `document-skills` lives on Anthropic's own `anthropic-agent-skills` marketplace (not
 > `claude-plugins-official`), so it needs the one-time `claude plugin marketplace add` step above. It is
@@ -499,7 +529,7 @@ This plugin bundles several MCP servers. By default, Claude Code will prompt for
 }
 ```
 
-If you also use remote MCP servers (see [Configure Remote MCPs](#configure-remote-mcps-optional)), add their patterns too:
+If you also use remote MCP servers (see [Configure Remote MCPs](#configure-remote-mcps-optional)), add their patterns too — `mcp__slack__*` covers the server bundled by the `slack` plugin:
 
 ```json
 {
@@ -510,7 +540,8 @@ If you also use remote MCP servers (see [Configure Remote MCPs](#configure-remot
       "mcp__figma__*",
       "mcp__monday__*",
       "mcp__newrelic__*",
-      "mcp__paypal__*"
+      "mcp__paypal__*",
+      "mcp__slack__*"
     ]
   }
 }
