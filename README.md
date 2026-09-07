@@ -23,8 +23,8 @@ Claude Code plugin for development workflow automation.
 ## Introduction
 
 `claude-code-plugin-dev` is the source repository for **`co-dev`**, a Claude Code plugin that automates day-to-day
-development workflows. It bundles 32 skills — issue tracking, PR creation, deep code review, test generation, linting,
-documentation reviews, cloud and app-store operations, and reporting — alongside 13 language servers and 13 MCP servers
+development workflows. It bundles 33 skills — issue tracking, PR creation, deep code review, test generation, linting,
+documentation reviews, cloud cost audits, cloud and app-store operations, and reporting — alongside 13 language servers and 13 MCP servers
 that Claude Code loads automatically once the plugin is installed.
 
 It is aimed at engineering teams that want these workflows available in every repository without wiring up each
@@ -54,6 +54,7 @@ install works across multiple accounts and tenants.
 * Figma design-to-code review for Android, iOS, and web
 * PayPal payment management
 * AWS infrastructure management and documentation search
+* AWS cost optimization audits — 3 months vs the same 3 months last year, per-domain parallel agents, adversarial verification of every dollar figure (never recommends Reserved Instances or Savings Plans)
 * Google Cloud infrastructure management via gcloud
 * New Relic observability data and alert management
 * Heroku application management and deployment
@@ -581,6 +582,7 @@ vars, one-time auth commands, or remote MCP additions. Skills with no setup work
 | `paypal`                 | Manage PayPal invoices, payments, and disputes                                                                          | paypal remote MCP **(required — no CLI fallback)**                                                                                                                                                                                                                                                                                        |
 | `playstore`              | Fetch, analyze, and respond to Google Play reviews                                                                      | Env: `GOOGLE_APPLICATION_CREDENTIALS` (path to service-account JSON; needs Google Play Developer API + Play Console access). Requires `uv`/`uvx` on PATH.                                                                                                                                                                                 |
 | `query-db`               | Query databases using natural language via CLI                                                                          | Per DB: PG (`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`) · MySQL (`MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASS`, `MYSQL_DB`) · Mongo (`MONGODB_URI`) · Redis (`REDIS_URL`) · SQLite (`SQLITE_DB`) · BigQuery (`BQ_PROJECT`, `BQ_DATASETS`) · ES (`ES_URL`, `ES_API_KEY`)                                            |
+| `review-aws-cost`        | Audit AWS spend for optimization: last 3 complete months vs the same 3 months of the previous year                      | `aws configure`, or env: `AWS_PROFILE` *(or)* `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` + `AWS_REGION`. Cost Explorer must be enabled; caller needs `ce:Get*`/`ce:List*` plus read on the services audited                                                                                                                            |
 | `review-architecture`    | Review or create docs/architecture.md                                                                                   | None — uses bundled `fetch` + `context7` MCPs                                                                                                                                                                                                                                                                                             |
 | `review-copy`            | Audit user-facing copy — microcopy, form/help text, voice & tone, i18n readiness, marketing; writes docs/copy-review.md | None — uses `git` + optional `loco` handoff for i18n keys                                                                                                                                                                                                                                                                                 |
 | `review-design`          | Compare UI code against Figma designs (Android, iOS, web)                                                               | figma remote MCP **(required — no CLI fallback)**                                                                                                                                                                                                                                                                                         |
