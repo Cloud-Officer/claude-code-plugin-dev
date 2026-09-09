@@ -17,7 +17,7 @@ name: Build
     - "**"
 permissions:
   contents: read
-  pull-requests: read
+  pull-requests: write
 concurrency:
   group: build-${{github.ref}}
   cancel-in-progress: true
@@ -45,7 +45,7 @@ jobs:
     steps:
     - name: Prepare variables
       id: variables
-      uses: cloud-officer/ci-actions/variables@v2
+      uses: cloud-officer/ci-actions/variables@v3
       with:
         ssh-key: "${{secrets.SSH_KEY}}"
         github-token: "${{secrets.GH_PAT}}"
@@ -58,11 +58,12 @@ jobs:
     timeout-minutes: 30
     steps:
     - name: Actionlint
-      uses: cloud-officer/ci-actions/linters/actionlint@v2
+      uses: cloud-officer/ci-actions/linters/actionlint@v3
       with:
         linters: "${{needs.variables.outputs.LINTERS}}"
         ssh-key: "${{secrets.SSH_KEY}}"
         github-token: "${{secrets.GH_PAT}}"
+        reviewdog-token: "${{secrets.GITHUB_TOKEN}}"
   markdownlint:
     name: Markdown Linter
     runs-on: ubuntu-latest
@@ -72,11 +73,12 @@ jobs:
     timeout-minutes: 30
     steps:
     - name: Markdownlint
-      uses: cloud-officer/ci-actions/linters/markdownlint@v2
+      uses: cloud-officer/ci-actions/linters/markdownlint@v3
       with:
         linters: "${{needs.variables.outputs.LINTERS}}"
         ssh-key: "${{secrets.SSH_KEY}}"
         github-token: "${{secrets.GH_PAT}}"
+        reviewdog-token: "${{secrets.GITHUB_TOKEN}}"
   yamllint:
     name: YAML Linter
     runs-on: ubuntu-latest
@@ -86,8 +88,9 @@ jobs:
     timeout-minutes: 30
     steps:
     - name: Yamllint
-      uses: cloud-officer/ci-actions/linters/yamllint@v2
+      uses: cloud-officer/ci-actions/linters/yamllint@v3
       with:
         linters: "${{needs.variables.outputs.LINTERS}}"
         ssh-key: "${{secrets.SSH_KEY}}"
         github-token: "${{secrets.GH_PAT}}"
+        reviewdog-token: "${{secrets.GITHUB_TOKEN}}"
