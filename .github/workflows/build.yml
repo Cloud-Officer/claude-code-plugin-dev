@@ -63,7 +63,7 @@ jobs:
         linters: "${{needs.variables.outputs.LINTERS}}"
         ssh-key: "${{secrets.SSH_KEY}}"
         github-token: "${{github.token}}"
-        reviewdog-token: "${{secrets.GITHUB_TOKEN}}"
+        reviewdog-token: "${{github.token}}"
   markdownlint:
     name: Markdown Linter
     runs-on: ubuntu-latest
@@ -78,7 +78,7 @@ jobs:
         linters: "${{needs.variables.outputs.LINTERS}}"
         ssh-key: "${{secrets.SSH_KEY}}"
         github-token: "${{github.token}}"
-        reviewdog-token: "${{secrets.GITHUB_TOKEN}}"
+        reviewdog-token: "${{github.token}}"
   yamllint:
     name: YAML Linter
     runs-on: ubuntu-latest
@@ -93,4 +93,4 @@ jobs:
         linters: "${{needs.variables.outputs.LINTERS}}"
         ssh-key: "${{secrets.SSH_KEY}}"
         github-token: "${{github.token}}"
-        reviewdog-token: "${{secrets.GITHUB_TOKEN}}"
+        reviewdog-token: "${{github.token}}"
