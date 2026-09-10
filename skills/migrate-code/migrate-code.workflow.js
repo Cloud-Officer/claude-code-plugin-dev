@@ -2,9 +2,9 @@ export const meta = {
   name: 'migrate-code',
   description: 'Six-step AI code migration engine — foundation rulebook + dependency map + gap inventory + stress-test (plan mode), then parallel translate → compile → test → verify with adversarial review (migrate mode)',
   phases: [
-    { title: 'Foundation', detail: 'build the rulebook, dependency map, and gap inventory (strong model)' },
+    { title: 'Foundation', detail: 'build the rulebook, dependency map, and gap inventory' },
     { title: 'StressTest', detail: 'translate a representative sample to shake out systemic rule gaps' },
-    { title: 'Translate', detail: 'one agent per file, dependency-ordered, small model to port + strong model to review' },
+    { title: 'Translate', detail: 'one agent per file, dependency-ordered, port + independent review' },
     { title: 'Compile', detail: 'serialized build loop; fixer agents patch errors and report recurring rule gaps' },
     { title: 'Test', detail: 'run the portable test suite against ported code; fixer agents chase failures' },
     { title: 'Verify', detail: 'adversarial reviewers hunt behavioral mismatches; 2-of-3 escalation' },
@@ -21,8 +21,11 @@ export const meta = {
 //   - mechanical, RESUMABLE work queue (each translate agent checks whether its
 //     output already exists and skips — so a re-run picks up where it left off,
 //     and Workflow's own resumeFromRunId caches completed agents on top of that)
-//   - RIGHT-SIZED models: small model for high-volume translation, strong model
-//     for rulebook authoring and every review/verify
+//   - NO cheap-model shortcut on translation: the output is committed source, so
+//     no phase is downgraded as bulk work. (The article right-sizes a cheaper
+//     model onto translation; we deliberately do not — see MODELS below.)
+//   - SEPARATION OF DUTIES: the agent that ports a file never signs off on it —
+//     authorship, review, and verification are always distinct agents
 //   - ADVERSARIAL review: two reviewers per batch, a disagreement escalates to a
 //     third (2-of-3)
 //   - "FIX THE LOOP, NOT THE CODE": compile/test fixers report recurring failure
@@ -63,11 +66,12 @@ const maxCompileRounds = Number.isFinite(input.maxCompileRounds) ? input.maxComp
 const maxTestRounds = Number.isFinite(input.maxTestRounds) ? input.maxTestRounds : 3
 const maxVerifyFiles = Number.isFinite(input.maxVerifyFiles) ? input.maxVerifyFiles : 24
 
-// Right-sizing: bulk translation on a smaller model; authorship + all judgement
-// on the strong model. The skill may override via args.translateModel etc.
-const TRANSLATE_MODEL = input.translateModel || 'sonnet'
-const REVIEW_MODEL = input.reviewModel || 'opus'
-const FIX_MODEL = input.fixModel || 'sonnet'
+// MODELS: no `model` is pinned anywhere in this script — every agent inherits
+// the session/default model, the same convention the other skills follow. The
+// output here is committed source, so nothing in this pipeline is treated as
+// bulk work worth downgrading: translation, review, compile/test fixing and
+// verification all deserve whatever the strong default is. Pin only to
+// DOWNGRADE a genuinely trivial agent, and say why at the call site.
 
 // ===========================================================================
 // SHARED CONTEXT — every agent prompt is grounded in the same migration facts.
@@ -301,7 +305,7 @@ if (mode === 'plan') {
     '   - project conventions to preserve (naming, file layout, public API shape, comments/docs)',
     '   - what to do when there is NO clean equivalent (the escalation rule: flag with `TODO(migrate): …`)',
     '   - a short "DO NOT" list of tempting-but-wrong translations',
-    '   Write it so a smaller model can follow it mechanically on one file at a time.',
+    '   Write it so it can be applied mechanically to one file at a time, without re-deriving any decision.',
     '   WRITE this rulebook to ' + rulebookPath + ' (create the directory if needed) as well as returning it in',
     '   `rulebook_markdown` — byte-for-byte the same text. The stress test reads it from that file, so anything',
     '   you leave out of the file is invisible to it.',
@@ -317,7 +321,7 @@ if (mode === 'plan') {
     '',
     'Also pick 2–4 `sample_files` that are REPRESENTATIVE of the hard parts (not the easiest files) — these',
     'will be stress-tested next to shake out systemic rule gaps before full-scale work begins.',
-  ].join('\n'), { label: 'foundation', phase: 'Foundation', schema: FOUNDATION_SCHEMA, model: REVIEW_MODEL, effort: 'high' })
+  ].join('\n'), { label: 'foundation', phase: 'Foundation', schema: FOUNDATION_SCHEMA, effort: 'high' })
 
   if (!foundation) {
     log('Foundation agent returned nothing — cannot plan the migration.')
@@ -348,7 +352,7 @@ if (mode === 'plan') {
     'would RECUR across many files (systemic), not one-off quirks of this file. For each, propose the exact rule',
     'to add to the rulebook so it never comes up again. Give a short `translation_preview` excerpt and a',
     '`confidence` (0-100) that the rulebook is ready for full-scale, parallel translation.',
-  ].join('\n'), { label: 'stress:' + file, phase: 'StressTest', schema: STRESS_SCHEMA, model: REVIEW_MODEL, effort: 'high' }))))
+  ].join('\n'), { label: 'stress:' + file, phase: 'StressTest', schema: STRESS_SCHEMA, effort: 'high' }))))
     .filter(Boolean)
 
   const allIssues = stress.flatMap(s => (s.systemic_issues || []).map(i => ({ ...i, file: s.file })))
@@ -411,14 +415,14 @@ if (pathBlocked.length) log('Blocked ' + pathBlocked.length + ' file(s) whose pa
 // ---- Phase: TRANSLATE -----------------------------------------------------
 // One agent per file. Resumable BY DESIGN: each agent first checks whether its
 // target file already exists and is complete, and returns 'skipped-exists' if
-// so. The port (small model) is immediately reviewed (strong model) in the same
+// so. The port is immediately reviewed by a SECOND, independent agent in the same
 // pipeline item, so a file is never "done" until it has been reviewed once.
 phase('Translate')
-log('Translating ' + files.length + ' file(s), dependency-ordered, ' + TRANSLATE_MODEL + ' to port + ' + REVIEW_MODEL + ' to review.')
+log('Translating ' + files.length + ' file(s), dependency-ordered, one agent to port + an independent agent to review.')
 
 const translated = await pipeline(
   files,
-  // Stage 1 — port one file (small model, high volume).
+  // Stage 1 — port one file.
   (f) => agent([
     'You are porting ONE file from ' + fence('source', source) + ' to ' + fence('target', target) + ', following the rulebook exactly.',
     CONTEXT,
@@ -442,11 +446,10 @@ const translated = await pipeline(
     label: 'port:' + f.target_file,
     phase: 'Translate',
     schema: TRANSLATE_SCHEMA,
-    model: TRANSLATE_MODEL,
     effort: 'medium',
   }).then(r => r ? { ...r, _file: f } : { source_file: f.source_file, target_file: f.target_file, status: 'blocked', block_reason: 'port agent returned nothing', _file: f }),
 
-  // Stage 2 — review the port (strong model). Skips cleanly for skipped-exists.
+  // Stage 2 — independent review of the port. Skips cleanly for skipped-exists.
   (port, f) => {
     if (!port || port.status === 'skipped-exists') return port
     if (port.status === 'blocked') return port
@@ -465,7 +468,6 @@ const translated = await pipeline(
       label: 'review:' + f.target_file,
       phase: 'Translate',
       schema: TRANSLATE_SCHEMA,
-      model: REVIEW_MODEL,
       effort: 'medium',
     }).then(rev => rev ? {
       ...port,
@@ -515,7 +517,7 @@ if (!buildCmd) {
       'batched). Order error_groups by number of distinct files descending, then by signature bytewise ascending —',
       'only the first 12 are fixed this round, so the order decides what waits. Do NOT fix anything — you only',
       'build and report.',
-    ].join('\n'), { label: 'build:round-' + round, phase: 'Compile', schema: BUILD_SCHEMA, model: FIX_MODEL, effort: 'low' })
+    ].join('\n'), { label: 'build:round-' + round, phase: 'Compile', schema: BUILD_SCHEMA, effort: 'low' })
 
     if (!build) { build = { ran: false, clean: false, summary: 'build agent returned nothing' }; break }
     if (build.clean) { log('Build clean after ' + round + ' round(s).'); break }
@@ -544,7 +546,7 @@ if (!buildCmd) {
       'class reveals a RULEBOOK GAP (the same mistranslation happened many times), fix the files AND return a',
       '`rule_gap` so the rulebook can be amended — do not just paper over each site. Do NOT run the full build',
       'yourself (the daemon owns that). Report which files you touched and whether you fixed it.',
-      ].join('\n'), { label: 'fix:' + String(g.signature).slice(0, 32), phase: 'Compile', schema: FIX_SCHEMA, model: FIX_MODEL, effort: 'medium' })
+      ].join('\n'), { label: 'fix:' + String(g.signature).slice(0, 32), phase: 'Compile', schema: FIX_SCHEMA, effort: 'medium' })
     })))
       .filter(Boolean)
 
@@ -576,7 +578,7 @@ if (!testCmd) {
       'whether it is green, and each failure with its file and a one-line why, sorted by file bytewise ascending',
       'then test name bytewise ascending — only the first 12 are fixed this round, so the order decides what waits.',
       'Do NOT fix anything here.',
-    ].join('\n'), { label: 'test:round-' + tround, phase: 'Test', schema: TEST_SCHEMA, model: FIX_MODEL, effort: 'low' })
+    ].join('\n'), { label: 'test:round-' + tround, phase: 'Test', schema: TEST_SCHEMA, effort: 'low' })
 
     if (!test) { test = { ran: false, green: false, summary: 'test agent returned nothing' }; break }
     if (test.green) { log('Test suite green after ' + tround + ' round(s).'); break }
@@ -604,7 +606,7 @@ if (!testCmd) {
       'Fix the ported CODE (not the test) so behavior matches the source, following the rulebook. If the failure',
       'reflects a systemic mistranslation, return a `rule_gap` too. Do NOT run the whole suite (the runner owns',
       'that). Report the files you touched and whether you believe it is fixed.',
-      ].join('\n'), { label: 'testfix:' + String(fl.test).slice(0, 32), phase: 'Test', schema: FIX_SCHEMA, model: FIX_MODEL, effort: 'medium' })
+      ].join('\n'), { label: 'testfix:' + String(fl.test).slice(0, 32), phase: 'Test', schema: FIX_SCHEMA, effort: 'medium' })
     })))
       .filter(Boolean)
 
@@ -651,8 +653,8 @@ const verified = await pipeline(
   verifyTargets,
   // Two independent adversarial passes with different lenses.
   (p) => parallel([
-    () => agent(verifyPrompt(p, 'error-handling & edge cases'), { label: 'verify-a:' + p.target_file, phase: 'Verify', schema: VERIFY_SCHEMA, model: REVIEW_MODEL, effort: 'high' }),
-    () => agent(verifyPrompt(p, 'data model, numerics & concurrency'), { label: 'verify-b:' + p.target_file, phase: 'Verify', schema: VERIFY_SCHEMA, model: REVIEW_MODEL, effort: 'high' }),
+    () => agent(verifyPrompt(p, 'error-handling & edge cases'), { label: 'verify-a:' + p.target_file, phase: 'Verify', schema: VERIFY_SCHEMA, effort: 'high' }),
+    () => agent(verifyPrompt(p, 'data model, numerics & concurrency'), { label: 'verify-b:' + p.target_file, phase: 'Verify', schema: VERIFY_SCHEMA, effort: 'high' }),
   ]).then(votes => ({ p, votes: votes.filter(Boolean) })),
   // Tie-break: if the two disagree on whether there IS a mismatch, a third decides.
   ({ p, votes }) => {
@@ -660,7 +662,7 @@ const verified = await pipeline(
     const disagree = flags.length === 2 && flags[0] !== flags[1]
     if (!disagree) return { p, votes }
     return agent(verifyPrompt(p, 'tie-breaker — rule strictly on demonstrable divergence'),
-      { label: 'verify-c:' + p.target_file, phase: 'Verify', schema: VERIFY_SCHEMA, model: REVIEW_MODEL, effort: 'high' })
+      { label: 'verify-c:' + p.target_file, phase: 'Verify', schema: VERIFY_SCHEMA, effort: 'high' })
       .then(third => ({ p, votes: third ? votes.concat([third]) : votes }))
   },
 )
