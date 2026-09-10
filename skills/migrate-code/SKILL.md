@@ -122,15 +122,12 @@ The engine also accepts optional tuning knobs in `args` (omit them to take the d
 | `maxCompileRounds` | `4`      | Build-and-fix rounds before Compile gives up      |
 | `maxTestRounds`    | `3`      | Test-and-fix rounds before Test gives up          |
 | `maxVerifyFiles`   | `24`     | Cap on high-risk files sent to adversarial Verify |
-| `translateModel`   | `sonnet` | Model for the per-file port agents                |
-| `reviewModel`      | `opus`   | Model for the per-file review agents              |
-| `fixModel`         | `sonnet` | Model for the compile/test fixer agents           |
 
 **What the engine does** (you do not orchestrate these — the script does, deterministically):
 
 | Phase | Agents | Purpose |
 | ----- | ------ | ------- |
-| Translate | 1 port + 1 review per file (pipelined) | Small model ports each file following the rulebook; strong model reviews it. Uncertain spots get `TODO(migrate)` markers. Files whose target already exists are skipped (resumable). |
+| Translate | 1 port + 1 review per file (pipelined) | One agent ports each file following the rulebook; a second, independent agent reviews it. Uncertain spots get `TODO(migrate)` markers. Files whose target already exists are skipped (resumable). |
 | Compile | 1 build daemon + N fixers per round | Serialized build (never parallel rebuilds); errors clustered by signature; parallel fixers batch-fix each class and report recurring rule gaps. Loops until clean or the round budget is spent. |
 | Test | 1 runner + N fixers per round | Runs the portable suite; the runner's own marker is the referee; fixers chase failures in the ported code (never edit tests to pass). |
 | Verify | 2–3 adversarial reviewers per high-risk file | Hunt behavioral mismatches; two lenses, a third breaks ties (2-of-3). |
