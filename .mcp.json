@@ -49,7 +49,7 @@
     },
     "appstore": {
       "command": "asc-mcp",
-      "args": ["--workers", "apps,builds,versions,reviews,beta_groups,iap"]
+      "args": ["--workers", "apps,versions,builds,beta_groups,reviews,iap,xcode_cloud"]
     },
     "playstore": {
       "command": "uvx",
