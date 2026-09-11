@@ -1,7 +1,7 @@
 ---
 name: create-pr
 description: Create, open, submit, or prepare a pull request (PR). Generates the commit message, PR title, and PR body, opens the PR, then returns the repo to its default branch. Use when the user wants to create a PR, open a PR, submit a PR, make a PR, push a PR, send a PR, generate PR content, prepare a pull request, or fill a PR template from code changes.
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(open:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Bash(xcodebuild:*), Bash(swift:*), Bash(xcrun:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(bundle:*), Bash(pytest:*), Bash(go:*), Bash(dotnet:*), Read, Glob, Skill, mcp__github__*
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(open:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Bash(xcrun:*), Read, Glob, Skill, mcp__github__*
 ---
 
 # Create Pull Request
@@ -112,39 +112,13 @@ COMMIT_MSG_EOF
 
 The message arrives on stdin through a quoted heredoc, never as a double-quoted `-m` argument: inside double quotes a backtick is command substitution and a literal `"` ends the argument, and generated text routinely carries both. The quoted delimiter (`<<'...'`) suppresses all expansion, so the message body needs no escaping of any kind.
 
-## Step 4: Run Tests Locally (gate before pushing)
-
-Run the project's existing test suite before pushing. A red CI run that a local test would have caught is exactly what this step exists to prevent. **If a test harness exists and you have not run it, do not push.**
-
-**Run this suite in the FOREGROUND. Never use `run_in_background` here, and never end your turn while it is running.** This step is a *gate* — unlike the CI watch in Step 7, which is genuinely a background task. Backgrounding a gate does not pause the skill, it abandons it: when this runs headless (`claude -p`), the turn ends as soon as you stop emitting tool calls, so "test started, will push when it finishes" leaves the work committed but never pushed and no PR ever opens. A slow `xcodebuild test` is worth the wait — announcing the wait instead of doing it is not. Raise the Bash tool's `timeout` (up to 600000 ms) for suites that need it, and if the suite genuinely cannot finish inside one call, apply the Step 4.3 exception and say you are skipping it — do **not** background it.
-
-**Step 4.1 — Detect the runner from the repo, including compiled/mobile stacks:**
-
-- JS/TS: `package.json` scripts → `npm test` / `yarn test` / `pnpm test`
-- Ruby: `Gemfile` + `spec/` → `bundle exec rspec`; `test/` → `bin/rails test`
-- Python: `pytest.ini` / `pyproject.toml` / `tox.ini` → `pytest`
-- Go: `go test ./...`
-- .NET: `*.csproj` / `*.sln` → `dotnet test`
-- **Swift / iOS (you are on macOS — these ARE runnable locally):**
-  - `Package.swift` (SwiftPM) → `swift test`
-  - `*.xcworkspace` / `*.xcodeproj` → `xcodebuild test -scheme '<Scheme>' -destination 'platform=iOS Simulator,name=iPhone 15'`
-    - List schemes with `xcodebuild -list -workspace '<name>.xcworkspace'` (or `-project '<name>.xcodeproj'`) and pick the app/test scheme.
-    - Use `-workspace` when a `.xcworkspace` exists (CocoaPods/SPM workspaces), otherwise `-project`.
-    - Every name lifted out of `xcodebuild -list` output or the filesystem reaches the shell single-quoted, as in the templates above, with any embedded `'` escaped — workspace, project, and scheme names routinely contain spaces.
-
-**Step 4.2 — Run the suite covering your changes and paste the runner's own pass marker as proof:**
-
-`** TEST SUCCEEDED **` / `Test Suite '...' passed` (Xcode), `0 failures` (rspec), `passed`/`N passed` (pytest), `ok` (go). A bare "tests pass" without the runner's output does not count. If anything fails, fix it **before** pushing — never push red.
-
-**Step 4.3 — The "can't run it locally" exception is narrow.** On macOS, `swift test` and `xcodebuild test` against the iOS Simulator run locally; "slow to build" or "needs a scheme" is not an excuse to skip — find the scheme and run it. Only skip when the suite needs infrastructure genuinely absent on this machine (live external services, physical hardware), and say so explicitly. If the repo has no test harness at all, state that and continue.
-
-## Step 5: Push the Branch
+## Step 4: Push the Branch
 
 ```bash
 git push -u origin "$CURRENT_BRANCH"
 ```
 
-## Step 6: Open the Pull Request
+## Step 5: Open the Pull Request
 
 Prefer `mcp__github__create_pull_request` when the GitHub MCP server is available. Otherwise use the GitHub CLI:
 
@@ -163,11 +137,11 @@ open "$PR_URL" 2>/dev/null || true   # macOS only — a no-op elsewhere, never f
 
 The body arrives on stdin through `--body-file -` and a quoted heredoc, never as a double-quoted `--body` argument: Step 2 authorises the body to be any valid markdown, backticks and quotes included, and inside a double-quoted argument a backtick executes and a `"` truncates. The quoted delimiter suppresses all expansion, so the body needs no escaping — this is the same answer `create-issue` uses for the identical sink, without its temp file. If the body or title itself contains a line reading exactly its heredoc delimiter, pick a different delimiter for that run. The title travels the same channel: it is captured into `PR_TITLE` through a quoted heredoc and passed as `"$PR_TITLE"` — a variable's value is not re-scanned for expansion inside double quotes, so the title needs no escaping either.
 
-If a PR already exists for `$CURRENT_BRANCH` (e.g., the caller already opened it), `gh pr create` will fail — treat that as success and continue to Step 7.
+If a PR already exists for `$CURRENT_BRANCH` (e.g., the caller already opened it), `gh pr create` will fail — treat that as success and continue to Step 6.
 
-## Step 7: Monitor CI in the Background
+## Step 6: Monitor CI in the Background
 
-A pushed PR is not done until its checks are green — but CI can take several minutes, so **watch it without blocking the session**. Launch the watch as a background task, then continue straight to Step 8. The background watch re-invokes you when CI settles, so a failure is still caught and triaged in this session — just not by sitting idle.
+A pushed PR is not done until its checks are green — but CI can take several minutes, so **watch it without blocking the session**. Launch the watch as a background task, then continue straight to Step 7. The background watch re-invokes you when CI settles, so a failure is still caught and triaged in this session — just not by sitting idle.
 
 **Read CI status with the Actions runs REST API — not `gh pr checks`.** This workflow authenticates with a **fine-grained PAT**, which has no "Checks" permission (the Checks API is GitHub-App-only), so `gh pr checks` always fails here with `Resource not accessible by personal access token` on `statusCheckRollup...contexts`. Do not use it. The REST `actions/runs` endpoint uses the `Actions` permission the PAT does have.
 
@@ -182,11 +156,11 @@ Write a bounded poll (~30s between polls) over `gh api "repos/{owner}/{repo}/act
 When the background watch completes:
 
 - **All jobs green:** report it; nothing more to do.
-- **A job failed:** Step 8 has likely already returned you to the default branch, so re-checkout the PR branch first (`git checkout "$CURRENT_BRANCH"`), then pull the failing logs, fix the cause, and push again (re-run Steps 4–7). Do not leave the PR with a red required check.
+- **A job failed:** Step 7 has likely already returned you to the default branch, so re-checkout the PR branch first (`git checkout "$CURRENT_BRANCH"`), then pull the failing logs, fix the cause, and push again (re-run Steps 3, 4 and 6). Do not leave the PR with a red required check.
   - GitHub Actions: `gh run view "$RUN_ID" --log-failed`.
-  - **Xcode Cloud:** the check tells you only pass/fail. For the failing test names and logs, use the `appstore` skill — `asc-mcp` does not expose the `ci*` endpoints, so the failing `.xcresult` must be fetched via the App Store Connect API and read with `xcrun xcresulttool`.
+  - **Xcode Cloud:** the check tells you only pass/fail. For the failing actions, issues, test results and logs, use the `appstore` skill — it reads Xcode Cloud build runs through the `asc-mcp` `xcode_cloud_*` tools (or the `asc` CLI fallback) and inspects the `.xcresult` with `xcrun xcresulttool`.
 
-## Step 8: Return to Default Branch
+## Step 7: Return to Default Branch
 
 Leave the repo on the default branch so the user is back at a clean starting point:
 
@@ -216,7 +190,7 @@ In a worktree, leave the branch in place and let the caller `cd` back to the mai
 - One line only, maximum 80 characters
 - Should summarize the overall purpose of the PR
 - Can be similar to commit message but may be slightly more descriptive
-- Any characters are safe: the title reaches `gh pr create` through the quoted-heredoc `PR_TITLE` variable (Step 6), the same channel the body and commit message use
+- Any characters are safe: the title reaches `gh pr create` through the quoted-heredoc `PR_TITLE` variable (Step 5), the same channel the body and commit message use
 
 ## PR Body Guidelines
 
@@ -269,6 +243,5 @@ If the section is required, write a paragraph explaining the breaking changes, c
 - NEVER add "Generated with Claude Code" or similar signatures to commit messages or PR body
 - NO emojis unless explicitly requested
 - Before generating PR content, ensure the `run-linters` skill has been executed to verify code quality
-- Run the existing test suite locally before pushing (Step 4) — for Swift/iOS that means `swift test` or `xcodebuild test`, which run on this Mac; never push a behavior change without running its tests, and never claim tests pass without the runner's own pass marker
-- After pushing, watch CI **in the background** (Step 7) — read status with the Actions runs REST API (`actions/runs?head_sha=…` → `/jobs`), not `gh pr checks` (the fine-grained PAT can't read check runs). Run the poll with `run_in_background: true` so the session is not blocked, and bound it so it also exits when no run exists for the SHA; then triage when it reports — the PR is not done while a required check is red. Xcode Cloud results don't appear in `actions/runs` — use the `appstore` skill for those.
-- The skill is not done until Step 8 has run (or has been deliberately skipped because of a worktree). Do not stop after printing the Step 2 block.
+- After pushing, watch CI **in the background** (Step 6) — read status with the Actions runs REST API (`actions/runs?head_sha=…` → `/jobs`), not `gh pr checks` (the fine-grained PAT can't read check runs). Run the poll with `run_in_background: true` so the session is not blocked, and bound it so it also exits when no run exists for the SHA; then triage when it reports — the PR is not done while a required check is red. Xcode Cloud results don't appear in `actions/runs` — use the `appstore` skill for those.
+- The skill is not done until Step 7 has run (or has been deliberately skipped because of a worktree). Do not stop after printing the Step 2 block.

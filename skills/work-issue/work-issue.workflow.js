@@ -143,7 +143,9 @@ function buildImplementPrompt(issue) {
     '     config/docs, generated files. "Hard to test" is NOT an exception — if you cannot test it, set',
     '     `success:false` and explain in `block_reason` rather than shipping untested code.',
     '',
-    '5. Commit on your branch — single-line message, NO footers, NO co-authors, NO "Generated with Claude Code".',
+    '5. Run the `run-linters` skill and fix every issue it reports. If a fix touches code, re-run the tests.',
+    '',
+    '6. Commit on your branch — single-line message, NO footers, NO co-authors, NO "Generated with Claude Code".',
     '   The message arrives on stdin through `git commit -F -` and a quoted heredoc, never as a double-quoted',
     '   `-m` argument — the quoted delimiter suppresses all expansion, so the message needs no escaping'
       + (isJira ? ':' : ' (PREFIX: Bug→Fix, Feature→Feat, Task→none):'),

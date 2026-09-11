@@ -58,7 +58,7 @@ install works across multiple accounts and tenants.
 * Google Cloud infrastructure management via gcloud
 * New Relic observability data and alert management
 * Heroku application management and deployment
-* App Store Connect management (builds, TestFlight, reviews, IAPs)
+* App Store Connect management (builds, TestFlight, reviews, IAPs, Xcode Cloud)
 * Google Play Store review management and analytics
 * Google Workspace integration (Gmail, Calendar, Drive, Docs, Sheets, Slides, Forms, Tasks, Contacts, Chat) via optional [`workspace-mcp`](#google-workspace-mcp-optional) setup
 
@@ -96,7 +96,8 @@ Optional service CLIs — install only what you need (each maps to a skill in th
 ```bash
 brew install awscli google-cloud-sdk heroku newrelic-cli # cloud
 brew tap ankitpokhrel/jira-cli && brew install jira-cli # jira
-brew install mint && mint install zelentsov-dev/asc-mcp # iOS App Store Connect
+brew install mint && mint install zelentsov-dev/asc-mcp@v4.1.6 # iOS App Store Connect + Xcode Cloud (MCP)
+brew install asc # iOS App Store Connect + Xcode Cloud (CLI fallback)
 ```
 
 Language servers (LSPs) — only what you write. The plugin declares LSPs for many languages, but each binary needs to be on your PATH for that language to activate:
@@ -565,7 +566,7 @@ vars, one-time auth commands, or remote MCP additions. Skills with no setup work
 | Skill                    | Description                                                                                                             | Setup                                                                                                                                                                                                                                                                                                                                     |
 |--------------------------|-------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `analyze-db`             | Generate docs/db.md with database schema docs                                                                           | DB-specific env vars — see `query-db` row                                                                                                                                                                                                                                                                                                 |
-| `appstore`               | Manage App Store Connect (builds, TestFlight, reviews, IAPs)                                                            | macOS-only. `mint install zelentsov-dev/asc-mcp`. Env: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY_PATH` (path to `.p8`). [Create API key](https://appstoreconnect.apple.com/access/integrations/api)                                                                                                                                 |
+| `appstore`               | Manage App Store Connect (builds, TestFlight, reviews, IAPs, Xcode Cloud)                                               | macOS-only. MCP: `mint install zelentsov-dev/asc-mcp@v4.1.6` *(or)* CLI fallback: `brew install asc`. Env: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY_PATH` (path to `.p8`) — see **App Store Connect credentials** below. [Create API key](https://appstoreconnect.apple.com/access/integrations/api)                               |
 | `aws`                    | Manage AWS infrastructure and services                                                                                  | `aws configure`, or env: `AWS_PROFILE` *(or)* `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` + `AWS_REGION`                                                                                                                                                                                                                                |
 | `code-review-deep`       | Exhaustive multi-phase code audit using parallel agents                                                                 | None — uses bundled `github` + `context7` MCPs                                                                                                                                                                                                                                                                                            |
 | `create-issue`           | Create GitHub or Jira issues with proper templates                                                                      | GitHub: `gh auth login` *(or)* `GITHUB_TOKEN`. Jira: atlassian remote MCP *(or)* `jira init`                                                                                                                                                                                                                                              |
@@ -606,6 +607,35 @@ fallback.
 `sprint-summary`, `verify-resolved-issues`, `weekly-dev-report`) authenticate with `JIRA_URL`, `JIRA_EMAIL`, and
 `JIRA_API_TOKEN`. Set these — per directory via [direnv](#multi-account-setups-direnv) — if you rely on the CLI/curl
 fallback rather than the atlassian remote MCP.
+
+**App Store Connect credentials.** The `appstore` skill uses the bundled `asc-mcp` MCP (v4.1.6 or later, which adds
+the Xcode Cloud tools) and falls back to the [`asc` CLI](https://github.com/rorkai/App-Store-Connect-CLI) only when the
+MCP isn't connected. Both read `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_PRIVATE_KEY_PATH`; Xcode Cloud calls need an API
+key with the **Admin** role, or **App Manager** with Xcode Cloud access.
+
+* **MCP:** reads the variables once, from the directory Claude Code was launched in (see
+  [Multi-Account Setups (direnv)](#multi-account-setups-direnv)). To have it start from any directory, put the key in
+  `~/.config/asc-mcp/companies.json` instead (`chmod 600` it); add one entry per team and the skill switches between them:
+
+  ```json
+  {
+    "companies": [
+      {
+        "id": "my-company",
+        "name": "My Company",
+        "key_id": "XXXXXXXXXX",
+        "issuer_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+        "key_path": "/Users/you/.keys/AuthKey_XXXXXXXXXX.p8"
+      }
+    ]
+  }
+  ```
+
+* **CLI fallback:** `brew install asc` (macOS/Linux; or `curl -fsSL https://asccli.sh/install | bash`). It reads the
+  variables on every command, so a per-repo direnv `.envrc` just works — no `asc auth login` needed. The CLI sends usage
+  telemetry by default; the skill runs it with `ASC_TELEMETRY_DISABLED=1`, and you can opt out globally with
+  `asc telemetry disable`. The skill never uses the CLI's `asc web` commands, which log in with your Apple ID against
+  Apple's private web API.
 
 ### Language Servers (LSPs)
 
