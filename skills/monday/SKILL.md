@@ -64,8 +64,11 @@ exposes them is registering the **local** stdio server instead, launched with
 the flag:
 
 ```bash
-claude mcp add monday -- npx -y @mondaydotcomorg/monday-api-mcp -t "$MONDAY_TOKEN" --enable-dynamic-api-tools true
+claude mcp add monday -- npx -y @mondaydotcomorg/monday-api-mcp -t '${MONDAY_TOKEN}' --enable-dynamic-api-tools true
 ```
+
+Single-quote the token argument so it stays a runtime `${MONDAY_TOKEN}` reference
+rather than being written into the stored config.
 
 This is subject to the Node caveat above (the local server's `isolated-vm`
 dependency fails to build on Node 22+); on a Node version where it cannot
