@@ -74,7 +74,7 @@ This skill assumes database connection environment variables are already set:
 
 Use these exact command formats.
 
-**Universal quoting rule — every engine, every path:** no query, command, filter, key, or identifier text that this skill generates — or takes from the user, `docs/db.md`, or any tool return — ever appears inside a shell-quoted argument. Every engine receives that text on stdin via a quoted heredoc (`<<'SQL'`, `<<'JS'`, `<<'JSON'`, `<<'CMD'`), so the shell never parses it. Never `-e "query"` (mysql), `-c "query"` (psql), `--eval "code"` (mongosh), a `"QUERY"` positional argument (sqlite3, bq), or an inline `-d 'JSON'` (curl). This rule covers query execution (Steps 6 and 8), CSV export (Step 10), and every follow-up query. Only fixed literal text written verbatim in this file (e.g. the `SELECT 1` connectivity tests in Step 3) may be passed as an argument. The heredoc fences the shell only, not the query body: any identifier taken from the environment, `docs/db.md`, a tool return or the user that does not match `^[A-Za-z0-9_]+$` is reported and skipped, never written into a query body — a backtick inside a BigQuery identifier is invisible to a quoted heredoc.
+**Universal quoting rule — every engine, every path:** no query, command, filter, key, or identifier text that this skill generates — or takes from the user, `docs/db.md`, or any tool return — ever appears inside a shell-quoted argument. Every engine receives that text on stdin via a quoted heredoc (`<<'SQL'`, `<<'JS'`, `<<'JSON'`, `<<'CMD'`), so the shell never parses it. Never `-e "query"` (mysql), `-c "query"` (psql), `--eval "code"` (mongosh), a `"QUERY"` positional argument (sqlite3, bq), or an inline `-d 'JSON'` (curl). This rule covers query execution (Steps 6 and 8), CSV export (Step 10), and every follow-up query. Only fixed literal text written verbatim in this file (e.g. the `SELECT 1` connectivity tests in Step 3) may be passed as an argument. The heredoc fences the shell only, not the query body: any identifier taken from the environment, `docs/db.md`, a tool return or the user that does not match `^[A-Za-z0-9_]+$` (`^[A-Za-z0-9-]+$` for the GCP project id, which legitimately carries hyphens) is reported and skipped, never written into a query body — a backtick inside a BigQuery identifier is invisible to a quoted heredoc.
 
 **Unobtainable-value policy — every step, every engine:** any value this skill needs but cannot obtain — an unset or empty environment variable, an absent `docs/db.md` section, a command or tool return that yields nothing — is never guessed, invented, or silently skipped: stop before generating or running the query, say exactly which value is missing, and ask the user for it. The one defined default: a row count that cannot be read is treated as unknown and fails closed to the >50M band in Automatic LIMIT Injection (refuse without a date-range filter).
 
@@ -398,7 +398,7 @@ CMD
 
 #### For BigQuery
 
-The heredoc is quoted, so `$BQ_PROJECT` is **not** expanded inside it — read the project id once with `echo "$BQ_PROJECT"` and write it literally into the fully-qualified table names (`myproject` below). The value is an identifier under the universal quoting rule (skipped and reported if it fails `^[A-Za-z0-9_]+$`), and an empty `echo` output is an unobtainable value — stop and ask, never guess a project id:
+The heredoc is quoted, so `$BQ_PROJECT` is **not** expanded inside it — read the project id once with `echo "$BQ_PROJECT"` and write it literally into the fully-qualified table names (`myproject` below). The value is an identifier under the universal quoting rule (skipped and reported if it fails `^[A-Za-z0-9-]+$` — real project ids carry hyphens), and an empty `echo` output is an unobtainable value — stop and ask, never guess a project id:
 
 ```bash
 bq query --use_legacy_sql=false --format=pretty --project_id="$BQ_PROJECT" <<'SQL'
@@ -574,7 +574,7 @@ When the user wants chart data, structure the output as:
 - Partitioned tables: always filter on the partition column (usually `_PARTITIONTIME` or a date column) to reduce bytes scanned
 - BigQuery charges by bytes scanned — use `--dry_run` before running expensive queries
 - `LIMIT` does NOT reduce bytes scanned — only `WHERE` filters on partitioned/clustered columns do
-- Backticks in table names need no shell escaping — the query arrives via a quoted heredoc (universal quoting rule), never a double-quoted shell string; write the project id literally, since the quoted heredoc does not expand `$BQ_PROJECT`, and only after it passes the universal quoting rule's `^[A-Za-z0-9_]+$` identifier check
+- Backticks in table names need no shell escaping — the query arrives via a quoted heredoc (universal quoting rule), never a double-quoted shell string; write the project id literally, since the quoted heredoc does not expand `$BQ_PROJECT`, and only after it passes the universal quoting rule's `^[A-Za-z0-9-]+$` project-id check — real project ids carry hyphens
 
 ## Safety Guardrails
 

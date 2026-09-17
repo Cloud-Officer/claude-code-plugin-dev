@@ -69,6 +69,24 @@ function chunk(arr, n) {
   return out
 }
 
+function joinVerdicts(issues, verdicts) {
+  const ambiguous = new Set()
+  const markRepeats = (list, key) => {
+    const seen = new Set()
+    for (const item of (list || [])) {
+      if (seen.has(item[key])) ambiguous.add(item[key])
+      seen.add(item[key])
+    }
+  }
+  markRepeats(issues, 'id')
+  markRepeats(verdicts, 'finding_id')
+  const byId = new Map()
+  for (const v of (verdicts || [])) {
+    if (!ambiguous.has(v.finding_id)) byId.set(v.finding_id, v)
+  }
+  return { byId, ambiguous }
+}
+
 // --- Shared context block injected into every agent prompt -----------------
 // Every value in here is untrusted input: the scope is whatever the user typed,
 // and the rest comes back from `gh repo view` and `git log`, which anyone who
@@ -936,10 +954,16 @@ for (const item of reviewed.filter(Boolean)) {
   if (!review) continue
   for (const p of (review.positives || [])) positives.push({ area: agentDef.key, text: p })
   if (review.counts) counts[agentDef.key] = review.counts
-  const byId = new Map((verdicts || []).map(v => [v.finding_id, v]))
+  const { byId, ambiguous } = joinVerdicts(review.issues || [], verdicts || [])
   const skippedIds = new Set(item.skipped || [])
   const dedupedIds = new Set(item.deduped || [])
+  if (ambiguous.size) log('WARNING: ' + agentDef.key + ' returned more than one finding or verdict under id(s) ' + [...ambiguous].join(', ') + ' — each is reported unverified rather than risking another finding\'s verdict and evidence.')
   for (const f of (review.issues || [])) {
+    // Checked first: a duplicated id makes the skipped and deduped id sets ambiguous too.
+    if (ambiguous.has(f.id)) {
+      unverified.push({ ...f, agent: agentDef.key, confidence_score: 0, code_quoted: '', confirmation_evidence: 'unverified: duplicate finding id — no verdict can be attributed to this finding' })
+      continue
+    }
     // An identical finding from an earlier agent is already in the payload;
     // this copy would only duplicate it in the report.
     if (dedupedIds.has(f.id)) { deduped_count++; continue }
