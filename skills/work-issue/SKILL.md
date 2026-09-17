@@ -36,7 +36,7 @@ This command uses MCP tools when available and falls back gracefully if they are
 
 | Operation | MCP Tool | CLI Fallback |
 | --- | --- | --- |
-| Check issues enabled | `mcp__github__get_repository` (read the `has_issues` field) | `gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'` |
+| Check issues enabled | `mcp__github__list_issues` (if it succeeds, issues are enabled) | `gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'` |
 | Get issue details | `mcp__github__get_issue` | `gh issue view <issue> --comments` |
 | Create PR | `mcp__github__create_pull_request` | `gh pr create --base ... --head ... --title "..." --body "..."` |
 | Update issue | `mcp__github__update_issue` | `gh issue edit <issue> --title "..." --body "..."` |
