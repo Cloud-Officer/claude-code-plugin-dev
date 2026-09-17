@@ -84,13 +84,25 @@ A user argument or environment value that fails aborts with a message. An accoun
 - `--profile NAME` — audit a specific AWS profile instead of the ambient one.
 - A free-text scope ("just the data platform", "us-east-1 only") narrows the audit; it is passed through to the workflow as `args.scope`.
 
+## Run from the target repo's directory (direnv)
+
+Step 5's dedupe queries — `gh issue list` and `jira issue list` — and the `create-issue` handoff they feed authenticate with credentials that [direnv](https://direnv.net/) loads from the `.envrc` of the **current working directory**: `GITHUB_TOKEN` for `gh`, and `JIRA_URL`/`JIRA_EMAIL`/`JIRA_API_TOKEN` for `jira`. Run them from a directory whose `.envrc` belongs to a **different** repo/org and they authenticate as the wrong account — the dedupe query returns nothing, so it silently passes, and the cost findings are filed into the wrong repository or Jira project.
+
+**Before any command that needs per-repo credentials (`gh`, `jira`), make the target repo the working directory — in its own Bash call:**
+
+```bash
+cd /path/to/target-repo        # or, when already inside it: cd "$(git rev-parse --show-toplevel)"
+```
+
+Run the `cd` as a **separate** call — never chain it as `cd … && gh …`. direnv reloads `.envrc` on the next prompt, so the *following* calls get the right token; a command on the same line as the `cd` still runs with the old environment. The AWS scan itself is unaffected: it reads `AWS_PROFILE` and the standard credential environment variables, not the repo's `.envrc`.
+
 ## MCP Tools with Fallbacks
 
 Prefer MCP tools (`mcp__aws__*`) when available; fall back to the `aws` CLI on errors. Do not let an MCP failure block the audit.
 
 | Operation | Preferred | Fallback |
 | --- | --- | --- |
-| Cost Explorer / any AWS API call | `mcp__aws__aws___call_aws` | `aws <service> <command>` |
+| Cost Explorer / any AWS API call | `mcp__aws__aws___run_script` | `aws <service> <command>` |
 | Confirm a price, limit or deprecation date | `mcp__aws__aws___search_documentation` then `read_documentation` | `WebSearch` |
 | List regions | `mcp__aws__aws___list_regions` | `aws ec2 describe-regions` |
 
@@ -360,7 +372,9 @@ and note that a console change would be reverted on the next apply.
 
 [The workflow's `filtered` array. One row each: severity | confidence | service | one-line description |
 confirmation_evidence or rejection reason. A finding with no verdict carries
-"unverified: no validator verdict returned". Empty section is fine.]
+"unverified: no validator verdict returned"; one whose id was not unique within its agent's findings carries
+"unverified: duplicate finding id" and no saving, because no verdict can be attributed to it. Empty section is
+fine.]
 
 ## Action Items
 

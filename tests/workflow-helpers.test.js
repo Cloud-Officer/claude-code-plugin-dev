@@ -5,7 +5,8 @@ const { describe, it } = require('node:test')
 const { loadHelpers, workflowScript } = require('../scripts/workflow-helpers.js')
 
 describe('review-aws-cost helpers', () => {
-  const { normSev, keepFinding, chunk, num, clean } = loadHelpers(workflowScript('review-aws-cost'), ['SEV_THRESHOLDS', 'normSev', 'keepFinding', 'chunk', 'num', 'clean'])
+  const { normSev, keepFinding, chunk, num, clean, joinVerdicts } = loadHelpers(workflowScript('review-aws-cost'), ['SEV_THRESHOLDS', 'normSev', 'keepFinding', 'chunk', 'num', 'clean', 'joinVerdicts'])
+  const verdict = (finding_id, adjusted_monthly_saving_usd) => ({ finding_id, decision: 'CONFIRM', confidence_score: 90, adjusted_monthly_saving_usd })
 
   it('normSev maps any spelling onto the five buckets', () => {
     assert.equal(normSev('Critical'), 'critical')
@@ -56,6 +57,44 @@ describe('review-aws-cost helpers', () => {
     assert.equal(clean(undefined), 'unknown')
     assert.equal(clean(null), 'unknown')
     assert.equal(clean(0), '0')
+  })
+
+  it('joinVerdicts matches each unique finding to its own verdict', () => {
+    const { byId, ambiguous } = joinVerdicts([{ id: 'A' }, { id: 'B' }], [verdict('B', 200), verdict('A', 100)])
+
+    assert.equal(ambiguous.size, 0)
+    assert.equal(byId.get('A').adjusted_monthly_saving_usd, 100)
+    assert.equal(byId.get('B').adjusted_monthly_saving_usd, 200)
+  })
+
+  it('joinVerdicts refuses to attribute a verdict to a duplicated finding id', () => {
+    const { byId, ambiguous } = joinVerdicts([{ id: 'A' }, { id: 'A' }, { id: 'B' }], [verdict('A', 100), verdict('B', 200)])
+
+    assert.deepEqual([...ambiguous], ['A'])
+    assert.equal(byId.has('A'), false)
+    assert.equal(byId.get('B').adjusted_monthly_saving_usd, 200)
+  })
+
+  it('joinVerdicts refuses a finding that drew more than one verdict', () => {
+    const { byId, ambiguous } = joinVerdicts([{ id: 'A' }, { id: 'B' }], [verdict('A', 100), verdict('A', 9000), verdict('B', 200)])
+
+    assert.deepEqual([...ambiguous], ['A'])
+    assert.equal(byId.has('A'), false)
+    assert.equal(byId.get('B').adjusted_monthly_saving_usd, 200)
+  })
+
+  it('joinVerdicts tolerates missing and empty inputs', () => {
+    for (const c of [
+      { name: 'both empty', issues: [], verdicts: [], matched: 0 },
+      { name: 'both undefined', issues: undefined, verdicts: undefined, matched: 0 },
+      { name: 'no verdict returned', issues: [{ id: 'A' }], verdicts: [], matched: 0 },
+      { name: 'verdict for a finding that is gone', issues: [], verdicts: [verdict('A', 100)], matched: 1 },
+    ]) {
+      const { byId, ambiguous } = joinVerdicts(c.issues, c.verdicts)
+
+      assert.equal(ambiguous.size, 0, c.name)
+      assert.equal(byId.size, c.matched, c.name)
+    }
   })
 })
 
