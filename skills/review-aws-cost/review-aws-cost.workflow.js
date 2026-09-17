@@ -8,24 +8,7 @@ export const meta = {
   ],
 }
 
-// ---------------------------------------------------------------------------
-// This script is the canonical source of truth for the review-aws-cost
-// analysis behaviour: the Phase 1 scout prompts, the Phase 2 per-domain
-// analysis prompts, the Phase 3 adversarial-validation checklist, the
-// no-commitment policy, the severity bands and the per-severity confidence
-// thresholds all live here. Edit THIS FILE to tune what the audit looks for.
-// The skill markdown only handles preflight (existing-report check, account
-// identity, window computation), rendering the
-// report, and the optional human-in-the-loop remediation step.
-//
-// Invoked by skills/review-aws-cost/SKILL.md via:
-//   Workflow({ scriptPath: "${CLAUDE_PLUGIN_ROOT}/skills/review-aws-cost/review-aws-cost.workflow.js",
-//              args: { windows: {...}, account: {...}, scope: "..." } })
-//
-// Every agent in every phase is READ-ONLY. Nothing here creates, modifies,
-// deletes or tags an AWS resource. Remediation happens only in the skill, with
-// the user, one item at a time.
-// ---------------------------------------------------------------------------
+// Every agent in every phase is READ-ONLY: nothing here creates, modifies, deletes or tags an AWS resource.
 
 const input = args || {}
 const windows = input.windows || {}
@@ -1036,9 +1019,7 @@ const VERDICT_SCHEMA = {
   required: ['verdicts'],
 }
 
-// --- Single failure policy for every agent dispatch, all three phases ------
-// A rejected dispatch resolves to null (logged), so `await parallel` never
-// aborts the run and the per-site falsy checks fire on empty AND thrown returns.
+// A rejected dispatch resolves to null (logged) so the per-site falsy guards cover thrown failures too.
 const safeAgent = (p, o) => agent(p, o).catch(e => { log('WARNING: agent ' + o.label + ' failed: ' + e); return null })
 
 // ===========================================================================

@@ -6,33 +6,7 @@ export const meta = {
   ],
 }
 
-// ---------------------------------------------------------------------------
-// Canonical source of truth for the PER-ISSUE VERIFICATION behaviour of the
-// verify-resolved-issues skill: the verification checklist (Steps 4-G / 6-J),
-// the four-way outcome rules, the SKIP_NEEDS_MANUAL guidance, the comment
-// templates, and the language rule all live here. Edit THIS FILE to tune how a
-// single candidate is judged and what the drafted comment looks like.
-//
-// What stays in SKILL.md (NOT here, because it needs judgement, credentials,
-// and a human-in-the-loop confirmation a background workflow can't do):
-//   - tracker detection (GitHub vs Jira) and scope resolution
-//   - candidate discovery (the gh search / JQL queries, Step 2-G / 2-J/3-J)
-//   - resolver identification from PR author / Jira changelog
-//   - the single --apply confirmation gate
-//   - the actual writes (comment, close/transition, reassign)
-//
-// The skill gathers candidates, calls this workflow to verify them all in
-// parallel, then renders the dry-run report (and, on --apply, performs the
-// writes) from the structured array this workflow returns.
-//
-// Invoked by skills/verify-resolved-issues/SKILL.md via:
-//   Workflow({ scriptPath: "${CLAUDE_PLUGIN_ROOT}/skills/verify-resolved-issues/verify-resolved-issues.workflow.js",
-//              args: { tracker: "github"|"jira", scope: "...", candidates: [ ... ] } })
-//
-// Workflow agents inherit the working directory, so their `gh` / `git` / test
-// runner calls authenticate with whatever token the current directory's
-// .envrc provides — the skill must cd into the target repo BEFORE launching.
-// ---------------------------------------------------------------------------
+// Agents inherit the working directory, so their gh/git calls authenticate with that directory's .envrc token.
 
 const input = args || {}
 const tracker = input.tracker === 'jira' ? 'jira' : 'github'
@@ -224,6 +198,9 @@ const RESULT_SCHEMA = {
   required: ['id', 'outcome', 'one_line', 'comment_markdown', 'planned_action'],
 }
 
+// A rejected dispatch resolves to null (logged) so the per-site falsy guards cover thrown failures too.
+const safeAgent = (p, o) => agent(p, o).catch(e => { log('WARNING: agent ' + o.label + ' failed: ' + e); return null })
+
 // ===========================================================================
 // PHASE: VERIFY — one agent per candidate, all in parallel (pipeline of a
 // single stage so each result streams back as soon as that issue is judged).
@@ -239,7 +216,7 @@ log('Verifying ' + candidates.length + ' candidate ' + (tracker === 'jira' ? 'Ji
 
 const results = await pipeline(
   candidates,
-  (c) => agent(buildVerifyPrompt(c), {
+  (c) => safeAgent(buildVerifyPrompt(c), {
     label: 'verify:' + (c.id ?? '?'),
     phase: 'Verify',
     schema: RESULT_SCHEMA,

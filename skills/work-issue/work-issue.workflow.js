@@ -6,26 +6,7 @@ export const meta = {
   ],
 }
 
-// ---------------------------------------------------------------------------
-// Parallel path for the work-issue command. Used ONLY when the user passes
-// more than one issue. A single issue still runs the normal interactive flow
-// in SKILL.md (clarifying-questions gate, architecture choice, per-step
-// approval) — those gates need a human and don't fit a background workflow.
-//
-// Each issue is implemented by its OWN agent in its OWN git worktree
-// (isolation: 'worktree') so parallel file edits never collide. Each agent
-// commits its work on a dedicated branch; because worktrees share the repo's
-// object store and refs, those branches persist after the worktree is removed,
-// so the command can open PR(s) from them afterwards.
-//
-// This workflow deliberately STOPS at "committed on a branch, tests green". It
-// does NOT open PRs — the command asks the user "separate PRs or one combined
-// PR?" once, after this returns, and drives create-pr accordingly.
-//
-// Invoked by skills/work-issue/SKILL.md via:
-//   Workflow({ scriptPath: "${CLAUDE_PLUGIN_ROOT}/skills/work-issue/work-issue.workflow.js",
-//              args: { issues: [{ ref, tracker }], defaultBranch, repoRoot } })
-// ---------------------------------------------------------------------------
+// Worktrees share the repo's object store, so each agent's branch outlives the worktree it was committed in.
 
 // Some harnesses deliver `args` as a JSON-encoded string rather than an object.
 // Parse that case rather than silently running zero agents.
@@ -190,6 +171,9 @@ const RESULT_SCHEMA = {
   required: ['ref', 'branch', 'success', 'summary'],
 }
 
+// A rejected dispatch resolves to null (logged) so the per-site falsy guards cover thrown failures too.
+const safeAgent = (p, o) => agent(p, o).catch(e => { log('WARNING: agent ' + o.label + ' failed: ' + e); return null })
+
 // ===========================================================================
 // PHASE: IMPLEMENT — one worktree-isolated agent per issue, in parallel.
 // ===========================================================================
@@ -215,7 +199,7 @@ const results = await pipeline(
       return { ref: issue.ref, tracker: issue.tracker, branch: '', success: false, summary: '', block_reason: e.message }
     }
 
-    return agent(prompt, {
+    return safeAgent(prompt, {
       label: 'impl:' + issue.ref,
       phase: 'Implement',
       schema: RESULT_SCHEMA,

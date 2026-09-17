@@ -11,47 +11,6 @@ export const meta = {
   ],
 }
 
-// ---------------------------------------------------------------------------
-// migrate-code — the deterministic engine behind the `migrate-code` skill.
-//
-// The article this is modelled on (claude.com/blog/ai-code-migration) splits a
-// migration into six steps and stresses ONE principle above all: front-load the
-// human effort on the RULEBOOK and the STRESS-TEST, and everything after
-// automates. The rest of its patterns are encoded here directly:
-//   - mechanical, RESUMABLE work queue (each translate agent checks whether its
-//     output already exists and skips — so a re-run picks up where it left off,
-//     and Workflow's own resumeFromRunId caches completed agents on top of that)
-//   - NO cheap-model shortcut on translation: the output is committed source, so
-//     no phase is downgraded as bulk work. (The article right-sizes a cheaper
-//     model onto translation; we deliberately do not — see MODELS below.)
-//   - SEPARATION OF DUTIES: the agent that ports a file never signs off on it —
-//     authorship, review, and verification are always distinct agents
-//   - ADVERSARIAL review: two reviewers per batch, a disagreement escalates to a
-//     third (2-of-3)
-//   - "FIX THE LOOP, NOT THE CODE": compile/test fixers report recurring failure
-//     patterns as rulebook gaps so the human can amend the rulebook rather than
-//     hand-patch every file
-//   - VERIFICATION AS REFEREE: the compiler and the portable test suite are the
-//     objective success signal, not an agent's opinion
-//   - BUILD DAEMON: compilation is serialized into one build agent per round,
-//     with fixes batched between rounds, never rebuilding in parallel
-//
-// TWO MODES, one file (the skill invokes each in turn with a human gate between):
-//   mode:'plan'    → Foundation + StressTest. Returns rulebook/dep-map/gap drafts
-//                    and the stress findings for the human to review and finalize.
-//   mode:'migrate' → Translate → Compile → Test → Verify over the finalized
-//                    dependency-ordered file list, using the human-approved
-//                    rulebook. Returns per-file results + build/test/verify state.
-//
-// Invoked by skills/migrate-code/SKILL.md via:
-//   Workflow({ scriptPath: "${CLAUDE_PLUGIN_ROOT}/skills/migrate-code/migrate-code.workflow.js",
-//              args: { mode, source, target, scope, rulebookPath, buildCmd, testCmd,
-//                      files, sampleFiles, outDir, repoRoot } })
-//
-// Nothing in this file runs a build or edits code by itself — the AGENTS do,
-// with the repo as their working directory. The script only orchestrates.
-// ---------------------------------------------------------------------------
-
 const input = args || {}
 const mode = input.mode === 'migrate' ? 'migrate' : 'plan'
 const source = input.source || 'the source language'
@@ -67,12 +26,7 @@ const maxTestRounds = Number.isFinite(input.maxTestRounds) ? input.maxTestRounds
 const maxVerifyFiles = Number.isFinite(input.maxVerifyFiles) ? input.maxVerifyFiles : 24
 const maxFixesPerRound = Number.isFinite(input.maxFixesPerRound) ? input.maxFixesPerRound : 12
 
-// MODELS: no `model` is pinned anywhere in this script — every agent inherits
-// the session/default model, the same convention the other skills follow. The
-// output here is committed source, so nothing in this pipeline is treated as
-// bulk work worth downgrading: translation, review, compile/test fixing and
-// verification all deserve whatever the strong default is. Pin only to
-// DOWNGRADE a genuinely trivial agent, and say why at the call site.
+// No `model` is pinned anywhere: every agent inherits the session default deliberately.
 
 // ===========================================================================
 // SHARED CONTEXT — every agent prompt is grounded in the same migration facts.
@@ -285,6 +239,9 @@ const VERIFY_SCHEMA = {
   required: ['file', 'verdict'],
 }
 
+// A rejected dispatch resolves to null (logged) so the per-site falsy guards cover thrown failures too.
+const safeAgent = (p, o) => agent(p, o).catch(e => { log('WARNING: agent ' + o.label + ' failed: ' + e); return null })
+
 // ===========================================================================
 // PLAN MODE — Foundation + StressTest. Front-loaded, human-reviewed afterward.
 // ===========================================================================
@@ -292,7 +249,7 @@ if (mode === 'plan') {
   phase('Foundation')
   log('Building rulebook, dependency map, and gap inventory for ' + source + ' → ' + target + ' (' + scope + ').')
 
-  const foundation = await agent([
+  const foundation = await safeAgent([
     'You are a senior migration architect. Produce the FOUNDATION for porting ' + fence('source', source) + ' to ' + fence('target', target) + '.',
     CONTEXT,
     '',
@@ -344,7 +301,7 @@ if (mode === 'plan') {
   log('Stress-testing the rulebook on ' + sample.length + ' representative file(s) before committing to full scale.')
   log('The stress agents read the draft rulebook from ' + rulebookPath + ', where the foundation agent wrote it.')
 
-  const stress = (await parallel(sample.map(file => () => agent([
+  const stress = (await parallel(sample.map(file => () => safeAgent([
     'You are stress-testing a DRAFT migration rulebook by translating ONE representative file end to end.',
     CONTEXT,
     '',
@@ -431,7 +388,7 @@ log('Translating ' + files.length + ' file(s), dependency-ordered, one agent to 
 const translated = await pipeline(
   files,
   // Stage 1 — port one file.
-  (f) => agent([
+  (f) => safeAgent([
     'You are porting ONE file from ' + fence('source', source) + ' to ' + fence('target', target) + ', following the rulebook exactly.',
     CONTEXT,
     '',
@@ -461,7 +418,7 @@ const translated = await pipeline(
   (port, f) => {
     if (!port || port.status === 'skipped-exists') return port
     if (port.status === 'blocked') return port
-    return agent([
+    return safeAgent([
       'You are the REVIEWER for a freshly ported file. Judge the port of ' + fence('source_file', f.source_file) + ' → ' + fence('target_file', f.target_file) + '.',
       CONTEXT,
       '',
@@ -514,7 +471,7 @@ async function runFixLoop(opts) {
   let round = 0
   while (round < opts.maxRounds) {
     round += 1
-    state = await agent(opts.runnerPrompt, { label: opts.runnerLabel + round, phase: opts.phaseName, schema: opts.runnerSchema, effort: 'low' })
+    state = await safeAgent(opts.runnerPrompt, { label: opts.runnerLabel + round, phase: opts.phaseName, schema: opts.runnerSchema, effort: 'low' })
 
     if (!state) { state = opts.silentState; break }
     if (opts.isDone(state)) { log(opts.doneLog(round)); break }
@@ -528,7 +485,7 @@ async function runFixLoop(opts) {
     }
     if (!items.length) break
 
-    const fixes = (await parallel(items.map(item => () => agent(
+    const fixes = (await parallel(items.map(item => () => safeAgent(
       opts.fixerPrompt(item),
       { label: opts.fixerLabel(item), phase: opts.phaseName, schema: FIX_SCHEMA, effort: 'medium' },
     )))).filter(Boolean)
@@ -687,15 +644,15 @@ const verified = await pipeline(
   verifyTargets,
   // Two independent adversarial passes with different lenses.
   (p) => parallel([
-    () => agent(verifyPrompt(p, 'error-handling & edge cases'), { label: 'verify-a:' + p.target_file, phase: 'Verify', schema: VERIFY_SCHEMA, effort: 'high' }),
-    () => agent(verifyPrompt(p, 'data model, numerics & concurrency'), { label: 'verify-b:' + p.target_file, phase: 'Verify', schema: VERIFY_SCHEMA, effort: 'high' }),
+    () => safeAgent(verifyPrompt(p, 'error-handling & edge cases'), { label: 'verify-a:' + p.target_file, phase: 'Verify', schema: VERIFY_SCHEMA, effort: 'high' }),
+    () => safeAgent(verifyPrompt(p, 'data model, numerics & concurrency'), { label: 'verify-b:' + p.target_file, phase: 'Verify', schema: VERIFY_SCHEMA, effort: 'high' }),
   ]).then(votes => ({ p, votes: votes.filter(Boolean) })),
   // Tie-break: if the two disagree on whether there IS a mismatch, a third decides.
   ({ p, votes }) => {
     const flags = votes.map(v => v.verdict === 'mismatch')
     const disagree = flags.length === 2 && flags[0] !== flags[1]
     if (!disagree) return { p, votes }
-    return agent(verifyPrompt(p, 'tie-breaker — rule strictly on demonstrable divergence'),
+    return safeAgent(verifyPrompt(p, 'tie-breaker — rule strictly on demonstrable divergence'),
       { label: 'verify-c:' + p.target_file, phase: 'Verify', schema: VERIFY_SCHEMA, effort: 'high' })
       .then(third => ({ p, votes: third ? votes.concat([third]) : votes }))
   },
