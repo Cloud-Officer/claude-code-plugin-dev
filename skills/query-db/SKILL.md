@@ -1,7 +1,7 @@
 ---
 name: query-db
 description: Query the database, run a query, look up data, search the database, or check data. Use when the user wants to query the database, run a SQL query, look up data, find data, search for records, check the database, or ask questions about data. Executes queries via CLI commands using natural language. Reads schema context from docs/db.md. Supports MySQL, PostgreSQL, SQLite, MongoDB, Elasticsearch, Redis, and BigQuery.
-allowed-tools: Read, Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), mcp__postgres__query, mcp__postgres__list_tables, mcp__postgres__describe_table, mcp__postgres__list_schemas, mcp__mysql__mysql_query, mcp__mongodb__find, mcp__mongodb__aggregate, mcp__mongodb__count, mcp__mongodb__list-databases, mcp__mongodb__list-collections, mcp__mongodb__collection-schema, mcp__redis__*, mcp__bigquery__*
+allowed-tools: Read, Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), mcp__postgres__execute_sql, mcp__postgres__search_objects, mcp__mysql__execute_sql, mcp__mysql__search_objects, mcp__mongodb__find, mcp__mongodb__aggregate, mcp__mongodb__count, mcp__mongodb__list-databases, mcp__mongodb__list-collections, mcp__mongodb__collection-schema, mcp__redis__*, mcp__bigquery__*
 ---
 
 ## Purpose
@@ -16,13 +16,15 @@ This skill uses database MCP tools when available and falls back to CLI commands
 
 | Database | MCP Tools | CLI Fallback | Env Vars (inherited from shell) |
 | --- | --- | --- | --- |
-| PostgreSQL | `mcp__postgres__query`, `list_tables`, `describe_table` | `psql` | `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` |
-| MySQL | `mcp__mysql__mysql_query` | `mysql` | `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASS`, `MYSQL_DB` |
+| PostgreSQL | `mcp__postgres__execute_sql`, `mcp__postgres__search_objects` | `psql` | `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` |
+| MySQL | `mcp__mysql__execute_sql`, `mcp__mysql__search_objects` | `mysql` | `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASS`, `MYSQL_DB` |
 | MongoDB | `mcp__mongodb__find`, `aggregate`, `list-collections` | `mongosh` | `MONGODB_URI` |
 | Redis | `mcp__redis__get`, `hgetall`, `lrange`, `zrange`, `json_get`, etc. | `redis-cli` | `REDIS_URL` |
 | SQLite | No MCP — CLI only | `sqlite3` | `SQLITE_DB` |
 | BigQuery | `mcp__bigquery__query`, `list_tables`, `get_table_schema` | `bq` | `BQ_PROJECT`, `BQ_DATASETS` |
 | Elasticsearch | No MCP — CLI only | `curl` | `ES_URL`, `ES_API_KEY` |
+
+PostgreSQL and MySQL are both served by DBHub, which exposes exactly two tools per server: `execute_sql` (one `sql` string) and `search_objects` (`object_type`: `schema` | `table` | `view` | `column` | `procedure` | `function` | `index`, optional LIKE `pattern`, optional `schema` / `table` filters, `detail_level`: `names` | `summary` | `full`, `limit`). DBHub builds its DSN from the env vars in the table, so they must be set before Claude Code starts.
 
 **Prefer MCP tools** when available — they handle connection management and provide structured output. If MCP tools return errors (tool not found, connection refused), fall back to the CLI. Database connection env vars must be set in the user's shell for both MCP servers and CLI tools to work.
 
@@ -253,8 +255,8 @@ For PostgreSQL, MySQL, MongoDB, Redis, and BigQuery, check whether MCP tools are
 
 | Database | MCP Tool | CLI Fallback |
 | --- | --- | --- |
-| PostgreSQL | `mcp__postgres__query` | `psql -f -` (stdin heredoc) |
-| MySQL | `mcp__mysql__mysql_query` | `mysql -h ...` (stdin heredoc) |
+| PostgreSQL | `mcp__postgres__execute_sql` | `psql -f -` (stdin heredoc) |
+| MySQL | `mcp__mysql__execute_sql` | `mysql -h ...` (stdin heredoc) |
 | MongoDB | `mcp__mongodb__find`, `mcp__mongodb__aggregate` | `mongosh --file -` (stdin heredoc) |
 | Redis | `mcp__redis__get`, `mcp__redis__hgetall`, `mcp__redis__lrange`, `mcp__redis__zrange`, `mcp__redis__json_get`, etc. | `redis-cli -u ... COMMAND` |
 | BigQuery | `mcp__bigquery__query` | `bq query --use_legacy_sql=false --project_id="$BQ_PROJECT" <<'SQL'` (stdin heredoc) |
