@@ -88,7 +88,7 @@ Otherwise check whether the repo qualifies for an exemption:
 | Exempt Type | Detection signal(s) | Reason |
 | ----------- | ------------------- | ------ |
 | Homebrew Tap | Repo name `homebrew-*`; `Formula/` or `Casks/` dirs | Package distribution, no application logic |
-| Claude Code Plugin | `.claude-plugin/plugin.json`; `skills/` and/or `commands/` dirs | Plugin config/prompts, no application logic |
+| Claude Code Plugin | `.claude-plugin/plugin.json`; `skills/` and/or `commands/` dirs — **and no substantial code of its own** (see below) | Plugin config/prompts, no application logic |
 | Dotfiles / Config | >80% of git-tracked files (count via `git ls-files`) have a `.yaml`/`.yml`/`.json`/`.toml` extension or a dot-prefixed name; no source code | Configuration only |
 | Documentation-only | Only `.md` files, no source files | No software architecture |
 | GitHub Profile | Repo name equals owner name | Profile README only |
@@ -97,6 +97,10 @@ Otherwise check whether the repo qualifies for an exemption:
 | Ansible Role | `playbooks/`, `roles/`, `tasks/`, `ansible.cfg` | Automation, not software |
 | Helm Chart | `Chart.yaml`, `templates/` | K8s deployment config |
 | Meta Repository | Name matches `.github`, `meta`, `org-*`, `*-config`, `*-settings` | Org settings, no application |
+
+**The Claude Code Plugin row is conditional, not automatic.** A plugin that ships only prompts and manifests is exempt. One that has grown code of its own is not: check for orchestration scripts (`*.workflow.js`), a `scripts/` directory, or a test suite, and count their lines with `git ls-files | grep -E '\.(js|ts|py|rb|sh)$' | xargs wc -l`. Past roughly 500 lines of first-party code, or any test suite run by CI, the plugin has software architecture worth documenting — treat it as a Standard Project and continue to Phase 3. Say which signal decided it.
+
+This check exists because the exemption is self-sealing: once the stub is written, Phase 2's first gate stops every later run, so a plugin that grows code stays permanently undocumented and a real architecture document gets overwritten by the stub on the next run.
 
 If exempt, write `docs/architecture.md` with this content (substitute `{type}` and the message/link from the table below) and STOP:
 
@@ -230,6 +234,8 @@ For **every** package in `soup.json` (not a sample), validate three fields:
 **Completeness/staleness:** every package in lock files must be in `soup.json`; packages removed from lock files must be removed from `soup.json`.
 
 **Architecture.md duplication check:** flag any version numbers or dependency tables in `architecture.md` for removal — it must reference `soup.md`, not duplicate it.
+
+**When no `soup.json` exists:** there is nothing to reference, so the SOUP table belongs in `architecture.md` and must not be flagged for removal. Review it as the source of truth instead — each entry needs its provenance and the credentials it is trusted with. Note in the report that creating a `soup.json` would move the table out; do not empty the section in the meantime.
 
 **5.A.4 Critical algorithms.** Find candidates:
 
