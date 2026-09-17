@@ -65,6 +65,7 @@ const repoRoot = input.repoRoot || '.'
 const maxCompileRounds = Number.isFinite(input.maxCompileRounds) ? input.maxCompileRounds : 4
 const maxTestRounds = Number.isFinite(input.maxTestRounds) ? input.maxTestRounds : 3
 const maxVerifyFiles = Number.isFinite(input.maxVerifyFiles) ? input.maxVerifyFiles : 24
+const maxFixesPerRound = Number.isFinite(input.maxFixesPerRound) ? input.maxFixesPerRound : 12
 
 // MODELS: no `model` is pinned anywhere in this script — every agent inherits
 // the session/default model, the same convention the other skills follow. The
@@ -330,7 +331,14 @@ if (mode === 'plan') {
 
   const sample = (input.sampleFiles && input.sampleFiles.length)
     ? input.sampleFiles
-    : (foundation.sample_files || (foundation.dependency_order || []).slice(0, 3).map(f => f.source_file)).map(safeRepoPath).filter(Boolean)
+    : ((foundation.sample_files && foundation.sample_files.length)
+      ? foundation.sample_files
+      : (foundation.dependency_order || []).slice(0, 3).map(f => f.source_file)).map(safeRepoPath).filter(Boolean)
+
+  if (!sample.length) {
+    log('No stress-test sample could be determined — refusing to report an unvalidated rulebook as stress-tested.')
+    return { mode, ok: false, reason: 'no-stress-sample' }
+  }
 
   phase('StressTest')
   log('Stress-testing the rulebook on ' + sample.length + ' representative file(s) before committing to full scale.')
@@ -492,50 +500,77 @@ const totalTodos = ported.reduce((n, p) => n + (p.todo_count || 0), 0)
 const translateRuleGaps = ported.flatMap(p => p.rule_gaps || [])
 log('Translated ' + portedOk.length + '/' + files.length + '  ·  ' + blocked.length + ' blocked  ·  ' + needsHuman.length + ' need human  ·  ' + totalTodos + ' TODO(migrate) markers.')
 
-// ---- Phase: COMPILE -------------------------------------------------------
-// Build daemon: ONE build agent per round (serialized, never parallel builds),
-// then parallel fixers on the CLUSTERED error groups, then rebuild. Loop until
-// clean or the round budget is spent.
-phase('Compile')
-const compileRuleGaps = []
-let droppedErrorGroups = 0
-let build = { ran: false, clean: false, summary: 'no build command provided' }
+// ---- Phase: COMPILE / TEST ------------------------------------------------
+async function runFixLoop(opts) {
+  const ruleGaps = []
+  let dropped = 0
+  let state = opts.idleState
 
-if (!buildCmd) {
-  log('No build command provided — skipping the compile loop. The human must compile manually.')
-} else {
+  if (!opts.cmd) {
+    log(opts.idleLog)
+    return { state, dropped, ruleGaps }
+  }
+
   let round = 0
-  while (round < maxCompileRounds) {
+  while (round < opts.maxRounds) {
     round += 1
-    build = await agent([
-      'You are the BUILD DAEMON. Run the build ONCE and report the result — nothing else builds in parallel.',
-      CONTEXT,
-      '',
-      'Build command: `' + buildCmd + '` (run it from ' + repoRoot + ').',
-      'Run it, capture the output, and report: whether it ran, whether it is clean, the build tool\'s OWN failure',
-      'marker pasted verbatim, and the errors CLUSTERED into `error_groups` by shared signature (so fixes can be',
-      'batched). Order error_groups by number of distinct files descending, then by signature bytewise ascending —',
-      'only the first 12 are fixed this round, so the order decides what waits. Do NOT fix anything — you only',
-      'build and report.',
-    ].join('\n'), { label: 'build:round-' + round, phase: 'Compile', schema: BUILD_SCHEMA, effort: 'low' })
+    state = await agent(opts.runnerPrompt, { label: opts.runnerLabel + round, phase: opts.phaseName, schema: opts.runnerSchema, effort: 'low' })
 
-    if (!build) { build = { ran: false, clean: false, summary: 'build agent returned nothing' }; break }
-    if (build.clean) { log('Build clean after ' + round + ' round(s).'); break }
+    if (!state) { state = opts.silentState; break }
+    if (opts.isDone(state)) { log(opts.doneLog(round)); break }
 
-    const allGroups = build.error_groups || []
-    const groups = allGroups.slice(0, 12)
-    log('Compile round ' + round + ': ' + groups.length + ' error group(s) — dispatching fixers.')
-    if (allGroups.length > groups.length) {
-      droppedErrorGroups += allGroups.length - groups.length
-      log('Capped at 12 of ' + allGroups.length + ' error group(s) this round; ' + (allGroups.length - groups.length) + ' deferred to the next round.')
+    const all = opts.itemsOf(state) || []
+    const items = all.slice(0, maxFixesPerRound)
+    log(opts.phaseName + ' round ' + round + ': ' + items.length + ' ' + opts.itemNoun + ' — dispatching fixers.')
+    if (all.length > items.length) {
+      dropped += all.length - items.length
+      log('Capped at ' + maxFixesPerRound + ' of ' + all.length + ' ' + opts.itemNoun + ' this round; ' + (all.length - items.length) + ' deferred to the next round.')
     }
-    if (!groups.length) break
+    if (!items.length) break
 
-    const fixes = (await parallel(groups.map(g => () => {
-      // g.files rides the same rail as dependency_order: out-of-repo paths are dropped.
-      const safeFiles = (g.files || []).map(safeRepoPath).filter(Boolean)
-      const droppedNote = safeFiles.length < (g.files || []).length ? ' (paths outside the repo root were dropped; discover from the build output)' : ''
-      return agent([
+    const fixes = (await parallel(items.map(item => () => agent(
+      opts.fixerPrompt(item),
+      { label: opts.fixerLabel(item), phase: opts.phaseName, schema: FIX_SCHEMA, effort: 'medium' },
+    )))).filter(Boolean)
+
+    ruleGaps.push(...fixes.filter(x => x.rule_gap).map(x => x.rule_gap))
+    if (!fixes.some(x => x.fixed)) { log(opts.noProgressLog); break }
+  }
+
+  return { state, dropped, ruleGaps }
+}
+
+phase('Compile')
+const compileLoop = await runFixLoop({
+  cmd: buildCmd,
+  phaseName: 'Compile',
+  maxRounds: maxCompileRounds,
+  itemNoun: 'error group(s)',
+  idleState: { ran: false, clean: false, summary: 'no build command provided' },
+  idleLog: 'No build command provided — skipping the compile loop. The human must compile manually.',
+  silentState: { ran: false, clean: false, summary: 'build agent returned nothing' },
+  runnerSchema: BUILD_SCHEMA,
+  runnerLabel: 'build:round-',
+  runnerPrompt: [
+    'You are the BUILD DAEMON. Run the build ONCE and report the result — nothing else builds in parallel.',
+    CONTEXT,
+    '',
+    'Build command: `' + buildCmd + '` (run it from ' + repoRoot + ').',
+    'Run it, capture the output, and report: whether it ran, whether it is clean, the build tool\'s OWN failure',
+    'marker pasted verbatim, and the errors CLUSTERED into `error_groups` by shared signature (so fixes can be',
+    'batched). Order error_groups by number of distinct files descending, then by signature bytewise ascending —',
+    'only the first ' + maxFixesPerRound + ' are fixed this round, so the order decides what waits. Do NOT fix anything — you only',
+    'build and report.',
+  ].join('\n'),
+  isDone: (s) => s.clean,
+  doneLog: (round) => 'Build clean after ' + round + ' round(s).',
+  itemsOf: (s) => s.error_groups,
+  fixerLabel: (g) => 'fix:' + String(g.signature).slice(0, 32),
+  fixerPrompt: (g) => {
+    // g.files rides the same rail as dependency_order: out-of-repo paths are dropped.
+    const safeFiles = (g.files || []).map(safeRepoPath).filter(Boolean)
+    const droppedNote = safeFiles.length < (g.files || []).length ? ' (paths outside the repo root were dropped; discover from the build output)' : ''
+    return [
       'You are a FIXER. Resolve ONE class of build error across the files it affects — batched, not one-off.',
       CONTEXT,
       '',
@@ -546,56 +581,42 @@ if (!buildCmd) {
       'class reveals a RULEBOOK GAP (the same mistranslation happened many times), fix the files AND return a',
       '`rule_gap` so the rulebook can be amended — do not just paper over each site. Do NOT run the full build',
       'yourself (the daemon owns that). Report which files you touched and whether you fixed it.',
-      ].join('\n'), { label: 'fix:' + String(g.signature).slice(0, 32), phase: 'Compile', schema: FIX_SCHEMA, effort: 'medium' })
-    })))
-      .filter(Boolean)
+    ].join('\n')
+  },
+  noProgressLog: 'No progress this round — stopping the compile loop for human intervention.',
+})
+const build = compileLoop.state
+const droppedErrorGroups = compileLoop.dropped
 
-    compileRuleGaps.push(...fixes.filter(x => x.rule_gap).map(x => x.rule_gap))
-    if (!fixes.some(x => x.fixed)) { log('No progress this round — stopping the compile loop for human intervention.'); break }
-  }
-}
-
-// ---- Phase: TEST ----------------------------------------------------------
-// Verification as referee. Run the PORTABLE test suite; failing tests feed
-// fixers. The suite is the objective signal — an agent never declares "tests
-// pass" without the runner's own marker.
 phase('Test')
-let droppedTestFailures = 0
-let test = { ran: false, green: false, summary: 'no test command provided' }
-
-if (!testCmd) {
-  log('No test command provided — skipping the test loop. The human must run the suite manually.')
-} else {
-  let tround = 0
-  while (tround < maxTestRounds) {
-    tround += 1
-    test = await agent([
-      'You are the TEST RUNNER. Run the suite ONCE and report objectively.',
-      CONTEXT,
-      '',
-      'Test command: `' + testCmd + '` (run it from ' + repoRoot + ').',
-      'Run it and report: whether it ran, the runner\'s OWN pass/fail marker pasted verbatim (never paraphrased),',
-      'whether it is green, and each failure with its file and a one-line why, sorted by file bytewise ascending',
-      'then test name bytewise ascending — only the first 12 are fixed this round, so the order decides what waits.',
-      'Do NOT fix anything here.',
-    ].join('\n'), { label: 'test:round-' + tround, phase: 'Test', schema: TEST_SCHEMA, effort: 'low' })
-
-    if (!test) { test = { ran: false, green: false, summary: 'test agent returned nothing' }; break }
-    if (test.green) { log('Test suite green after ' + tround + ' round(s).'); break }
-
-    const allFails = test.failures || []
-    const fails = allFails.slice(0, 12)
-    log('Test round ' + tround + ': ' + fails.length + ' failing test(s) — dispatching fixers.')
-    if (allFails.length > fails.length) {
-      droppedTestFailures += allFails.length - fails.length
-      log('Capped at 12 of ' + allFails.length + ' failing test(s) this round; ' + (allFails.length - fails.length) + ' deferred to the next round.')
-    }
-    if (!fails.length) break
-
-    const fixes = (await parallel(fails.map(fl => () => {
-      // fl.file rides the same rail as dependency_order: an out-of-repo path is dropped.
-      const safeFile = safeRepoPath(fl.file)
-      return agent([
+const testLoop = await runFixLoop({
+  cmd: testCmd,
+  phaseName: 'Test',
+  maxRounds: maxTestRounds,
+  itemNoun: 'failing test(s)',
+  idleState: { ran: false, green: false, summary: 'no test command provided' },
+  idleLog: 'No test command provided — skipping the test loop. The human must run the suite manually.',
+  silentState: { ran: false, green: false, summary: 'test agent returned nothing' },
+  runnerSchema: TEST_SCHEMA,
+  runnerLabel: 'test:round-',
+  runnerPrompt: [
+    'You are the TEST RUNNER. Run the suite ONCE and report objectively.',
+    CONTEXT,
+    '',
+    'Test command: `' + testCmd + '` (run it from ' + repoRoot + ').',
+    'Run it and report: whether it ran, the runner\'s OWN pass/fail marker pasted verbatim (never paraphrased),',
+    'whether it is green, and each failure with its file and a one-line why, sorted by file bytewise ascending',
+    'then test name bytewise ascending — only the first ' + maxFixesPerRound + ' are fixed this round, so the order decides what waits.',
+    'Do NOT fix anything here.',
+  ].join('\n'),
+  isDone: (s) => s.green,
+  doneLog: (round) => 'Test suite green after ' + round + ' round(s).',
+  itemsOf: (s) => s.failures,
+  fixerLabel: (fl) => 'testfix:' + String(fl.test).slice(0, 32),
+  fixerPrompt: (fl) => {
+    // fl.file rides the same rail as dependency_order: an out-of-repo path is dropped.
+    const safeFile = safeRepoPath(fl.file)
+    return [
       'You are a FIXER chasing a behavioral test failure in the ported code.',
       CONTEXT,
       '',
@@ -606,14 +627,13 @@ if (!testCmd) {
       'Fix the ported CODE (not the test) so behavior matches the source, following the rulebook. If the failure',
       'reflects a systemic mistranslation, return a `rule_gap` too. Do NOT run the whole suite (the runner owns',
       'that). Report the files you touched and whether you believe it is fixed.',
-      ].join('\n'), { label: 'testfix:' + String(fl.test).slice(0, 32), phase: 'Test', schema: FIX_SCHEMA, effort: 'medium' })
-    })))
-      .filter(Boolean)
-
-    compileRuleGaps.push(...fixes.filter(x => x.rule_gap).map(x => x.rule_gap))
-    if (!fixes.some(x => x.fixed)) { log('No progress on tests this round — stopping for human intervention.'); break }
-  }
-}
+    ].join('\n')
+  },
+  noProgressLog: 'No progress on tests this round — stopping for human intervention.',
+})
+const test = testLoop.state
+const droppedTestFailures = testLoop.dropped
+const fixRuleGaps = [...compileLoop.ruleGaps, ...testLoop.ruleGaps]
 
 // ---- Phase: VERIFY --------------------------------------------------------
 // Adversarial behavioral check on the highest-risk ported files. Two reviewers
@@ -629,6 +649,20 @@ const verifyTargets = verifyCandidates.slice(0, maxVerifyFiles)
 const droppedVerifyFiles = verifyCandidates.length - verifyTargets.length
 log('Adversarially verifying ' + verifyTargets.length + ' of ' + verifyCandidates.length + ' ported file(s) for behavioral fidelity.')
 if (droppedVerifyFiles > 0) log('Capped at ' + verifyTargets.length + ' of ' + verifyCandidates.length + ' ported file(s) — ranked by TODO(migrate) marker count (unknown, so ranked last, for files skipped as already-ported), so the ' + droppedVerifyFiles + ' lowest-ranked are never verified.')
+
+function tallyVerdict(votes) {
+  if (votes.length < 2) return null
+  const mismatchVotes = votes.filter(v => v.verdict === 'mismatch').length
+  if (mismatchVotes >= Math.ceil(votes.length / 2)) return 'mismatch'
+  return votes.every(v => v.verdict === 'faithful') ? 'faithful' : 'uncertain'
+}
+
+function verifyCoverage(candidateCount, targetCount, resultCount) {
+  return {
+    verify_files: candidateCount - targetCount,
+    unverified_files: targetCount - resultCount,
+  }
+}
 
 function verifyPrompt(p, lens) {
   return [
@@ -671,17 +705,17 @@ const verifyResults = verified.filter(Boolean).map(({ p, votes }) => {
   // Fewer than 2 returned votes = failed verification: drop the file (null) so it
   // lands in capped.unverified_files — never scored on 0–1 opinions, and never
   // 'faithful' or 'mismatch' by default.
-  if (votes.length < 2) return null
-  const mismatchVotes = votes.filter(v => v.verdict === 'mismatch').length
-  const isMismatch = mismatchVotes >= Math.ceil(votes.length / 2)
+  const verdict = tallyVerdict(votes)
+  if (!verdict) return null
   const mismatches = votes.flatMap(v => v.mismatches || [])
-  return { source_file: p.source_file, target_file: p.target_file, verdict: isMismatch ? 'mismatch' : 'faithful', votes: votes.length, mismatches }
+  return { source_file: p.source_file, target_file: p.target_file, verdict, votes: votes.length, mismatches }
 }).filter(Boolean)
 const behavioralMismatches = verifyResults.filter(r => r.verdict === 'mismatch')
-log('Verify: ' + behavioralMismatches.length + '/' + verifyResults.length + ' file(s) flagged with behavioral mismatches.')
+const behavioralUncertain = verifyResults.filter(r => r.verdict === 'uncertain')
+log('Verify: ' + behavioralMismatches.length + '/' + verifyResults.length + ' file(s) flagged with behavioral mismatches; ' + behavioralUncertain.length + ' inconclusive (uncertain).')
 
 // De-duplicate proposed rule gaps by pattern so the human sees each once.
-const allRuleGaps = [...translateRuleGaps, ...compileRuleGaps]
+const allRuleGaps = [...translateRuleGaps, ...fixRuleGaps]
 const seenGap = new Set()
 const ruleGaps = allRuleGaps.filter(g => {
   const k = (g.pattern || '').trim().toLowerCase()
@@ -704,6 +738,7 @@ return {
     // null — NEVER 0 — when nothing was verified: a zero here reads as "verified
     // clean" when no file was ever checked.
     behavioral_mismatches: verifyResults.length ? behavioralMismatches.length : null,
+    behavioral_uncertain: verifyResults.length ? behavioralUncertain.length : null,
   },
   // What the per-phase caps dropped, so the report can say so instead of implying
   // full coverage. error_groups/test_failures sum per-round deferral EVENTS: the
@@ -711,8 +746,7 @@ return {
   capped: {
     error_groups: droppedErrorGroups,
     test_failures: droppedTestFailures,
-    verify_files: droppedVerifyFiles,
-    unverified_files: verifyCandidates.length - verifyResults.length,
+    ...verifyCoverage(verifyCandidates.length, verifyTargets.length, verifyResults.length),
   },
   translated: ported.map(p => ({
     source_file: p.source_file, target_file: p.target_file, status: p.status,

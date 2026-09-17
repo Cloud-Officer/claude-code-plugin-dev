@@ -122,6 +122,7 @@ The engine also accepts optional tuning knobs in `args` (omit them to take the d
 | `maxCompileRounds` | `4`      | Build-and-fix rounds before Compile gives up      |
 | `maxTestRounds`    | `3`      | Test-and-fix rounds before Test gives up          |
 | `maxVerifyFiles`   | `24`     | Cap on high-risk files sent to adversarial Verify |
+| `maxFixesPerRound` | `12`     | Error groups or failing tests fixed per round     |
 
 **What the engine does** (you do not orchestrate these — the script does, deterministically):
 
