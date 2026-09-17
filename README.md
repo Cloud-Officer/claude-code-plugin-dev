@@ -75,6 +75,7 @@ actually use.
 ```bash
 # Core (required)
 brew install node uv gh jq
+brew install github-mcp-server # GitHub's official MCP server binary — verified against v1.12.2
 ```
 
 In Claude Code:
@@ -152,6 +153,7 @@ types.
 sudo apt update && sudo apt install -y curl jq git nodejs npm
 curl -LsSf https://astral.sh/uv/install.sh | sh
 # gh: https://github.com/cli/cli/blob/trunk/docs/install_linux.md
+# github-mcp-server: https://github.com/github/github-mcp-server/releases (verified against v1.12.2)
 ```
 
 In Claude Code:
@@ -180,6 +182,7 @@ install commands listed under the macOS section are cross-platform. Use your dis
 ```powershell
 # Core (required)
 scoop install nodejs uv gh jq
+# github-mcp-server: https://github.com/github/github-mcp-server/releases (verified against v1.12.2)
 ```
 
 In Claude Code:
@@ -485,6 +488,15 @@ These official plugins from the `claude-plugins-official` marketplace pair well 
 All credentials are read from **environment variables** — they are never stored in the plugin. Each skill's required
 vars are listed in the **Setup** column of the [Skills](#skills) table below.
 
+Two bundled servers read vars that are easy to miss. The `github` MCP server reads
+`GITHUB_PERSONAL_ACCESS_TOKEN` rather than `GITHUB_TOKEN`, so `.mcp.json` maps one to the other and the single
+`GITHUB_TOKEN` the [direnv](#multi-account-setups-direnv) setup already exports covers both the MCP and the `gh`
+CLI fallback — no second variable to set. The `postgres` and `mysql` servers are both
+[DBHub](https://github.com/bytebase/dbhub), which builds its
+connection string from the `query-db` vars (`PGUSER`, `PGPASSWORD`, `PGHOST`, `PGPORT`, `PGDATABASE` and
+`MYSQL_USER`, `MYSQL_PASS`, `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_DB`); unset vars mean the server starts with no
+usable DSN and its tools are unavailable for that session.
+
 For switching between accounts/projects per directory, see the [Multi-Account Setups](#multi-account-setups-direnv) section.
 
 ### Multi-Account Setups (direnv)
@@ -599,9 +611,9 @@ vars, one-time auth commands, or remote MCP additions. Skills with no setup work
 
 **GitHub credentials.** The `gh` and `git` CLI fallbacks read `GITHUB_TOKEN` (this is what the
 [direnv](#multi-account-setups-direnv) setup sets per directory); `gh auth login` works instead if you prefer stored
-credentials. The bundled `github` MCP is separate and reads `GITHUB_PERSONAL_ACCESS_TOKEN` — set that too if you want
-the MCP path (preferred by `code-review-deep`, `work-issue`, `verify-resolved-issues`) rather than only the CLI
-fallback.
+credentials. The bundled `github` MCP reads `GITHUB_PERSONAL_ACCESS_TOKEN`, which `.mcp.json` fills from the same
+`GITHUB_TOKEN`, so the MCP path (preferred by `code-review-deep`, `work-issue`, `verify-resolved-issues`) and the CLI
+fallback authenticate as the same account with one variable.
 
 **Jira credentials.** Skills that fall back to `curl` against the Jira REST API (`doc-tracker-coverage`,
 `sprint-summary`, `verify-resolved-issues`, `weekly-dev-report`) authenticate with `JIRA_URL`, `JIRA_EMAIL`, and

@@ -1,8 +1,11 @@
 {
   "mcpServers": {
     "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"]
+      "command": "github-mcp-server",
+      "args": ["stdio"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      }
     },
     "fetch": {
       "command": "uvx",
@@ -17,7 +20,7 @@
       "args": [
         "-y",
         "@playwright/mcp",
-        "--user-data-dir=${HOME}/.playwright-mcp-default"
+        "--isolated"
       ]
     },
     "chrome-devtools": {
@@ -26,11 +29,25 @@
     },
     "postgres": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-postgres"]
+      "args": [
+        "-y",
+        "@bytebase/dbhub",
+        "--transport",
+        "stdio",
+        "--dsn",
+        "postgres://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}"
+      ]
     },
     "mysql": {
       "command": "npx",
-      "args": ["-y", "@benborla/mcp-server-mysql"]
+      "args": [
+        "-y",
+        "@bytebase/dbhub",
+        "--transport",
+        "stdio",
+        "--dsn",
+        "mysql://${MYSQL_USER}:${MYSQL_PASS}@${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DB}"
+      ]
     },
     "mongodb": {
       "command": "npx",

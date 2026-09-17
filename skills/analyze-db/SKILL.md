@@ -1,7 +1,7 @@
 ---
 name: analyze-db
 description: Analyze, document, map, or scan the database schema. Use when the user wants to analyze the database, document the database, generate schema docs, map the database, create DB documentation, or inspect the database structure. Generates a docs/db.md file with complete database schema documentation. Auto-detects language/framework. Supports MySQL, PostgreSQL, SQLite, MongoDB, Elasticsearch, Redis, and BigQuery.
-allowed-tools: Bash(php:*), Bash(python:*), Bash(ruby:*), Bash(npm:*), Bash(npx:*), Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Glob, Grep, mcp__postgres__query, mcp__postgres__list_tables, mcp__postgres__describe_table, mcp__postgres__list_schemas, mcp__mysql__mysql_query, mcp__mongodb__find, mcp__mongodb__aggregate, mcp__mongodb__count, mcp__mongodb__list-databases, mcp__mongodb__list-collections, mcp__mongodb__collection-schema, mcp__redis__scan_keys, mcp__redis__scan_all_keys, mcp__redis__type, mcp__redis__get, mcp__redis__hgetall, mcp__redis__lrange, mcp__redis__zrange, mcp__redis__smembers, mcp__redis__llen, mcp__redis__json_get, mcp__redis__dbsize, mcp__redis__info, mcp__bigquery__query, mcp__bigquery__list_tables, mcp__bigquery__get_table_schema
+allowed-tools: Bash(php:*), Bash(python:*), Bash(ruby:*), Bash(npm:*), Bash(npx:*), Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Glob, Grep, mcp__postgres__execute_sql, mcp__postgres__search_objects, mcp__mysql__execute_sql, mcp__mysql__search_objects, mcp__mongodb__find, mcp__mongodb__aggregate, mcp__mongodb__count, mcp__mongodb__list-databases, mcp__mongodb__list-collections, mcp__mongodb__collection-schema, mcp__redis__scan_keys, mcp__redis__scan_all_keys, mcp__redis__type, mcp__redis__get, mcp__redis__hgetall, mcp__redis__lrange, mcp__redis__zrange, mcp__redis__smembers, mcp__redis__llen, mcp__redis__json_get, mcp__redis__dbsize, mcp__redis__info, mcp__bigquery__query, mcp__bigquery__list_tables, mcp__bigquery__get_table_schema
 ---
 
 # Analyze Database Schema
@@ -18,13 +18,15 @@ Prefer MCP tools when available — they handle connection management. On an MCP
 
 | Database | MCP Tools | CLI Fallback |
 | --- | --- | --- |
-| PostgreSQL | `mcp__postgres__list_tables`, `describe_table`, `list_schemas`, `query` | `psql` |
-| MySQL | `mcp__mysql__mysql_query` | `mysql` |
+| PostgreSQL | `mcp__postgres__search_objects`, `mcp__postgres__execute_sql` | `psql` |
+| MySQL | `mcp__mysql__search_objects`, `mcp__mysql__execute_sql` | `mysql` |
 | MongoDB | `mcp__mongodb__list-databases`, `list-collections`, `collection-schema`, `find` | `mongosh` |
 | Redis | `mcp__redis__scan_keys`, `type`, `get`, `hgetall`, `lrange`, `zrange`, `smembers`, `dbsize` | `redis-cli` |
 | SQLite | (no MCP) | `sqlite3` |
 | BigQuery | `mcp__bigquery__query`, `list_tables`, `get_table_schema` | `bq` |
 | Elasticsearch | (no MCP) | `curl` |
+
+PostgreSQL and MySQL are both served by DBHub, which exposes exactly two tools per server: `execute_sql` (one `sql` string) and `search_objects` (`object_type`: `schema` | `table` | `view` | `column` | `procedure` | `function` | `index`, optional LIKE `pattern`, optional `schema` / `table` filters, `detail_level`: `names` | `summary` | `full`, `limit`). Use `search_objects` with `detail_level: full` to enumerate tables and columns, and `execute_sql` for anything else.
 
 ## Connection Environment Variables
 
