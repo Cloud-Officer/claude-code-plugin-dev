@@ -98,6 +98,49 @@ describe('review-aws-cost helpers', () => {
   })
 })
 
+describe('code-review-deep helpers', () => {
+  const { joinVerdicts } = loadHelpers(workflowScript('code-review-deep'), ['joinVerdicts'])
+  const verdict = (finding_id, confirmation_evidence) => ({ finding_id, decision: 'CONFIRM', confidence_score: 90, confirmation_evidence })
+
+  it('joinVerdicts matches each unique finding to its own verdict', () => {
+    const { byId, ambiguous } = joinVerdicts([{ id: 'A' }, { id: 'B' }], [verdict('B', 'b.js:2'), verdict('A', 'a.js:1')])
+
+    assert.equal(ambiguous.size, 0)
+    assert.equal(byId.get('A').confirmation_evidence, 'a.js:1')
+    assert.equal(byId.get('B').confirmation_evidence, 'b.js:2')
+  })
+
+  it('joinVerdicts refuses to attribute a verdict to a duplicated finding id', () => {
+    const { byId, ambiguous } = joinVerdicts([{ id: 'A' }, { id: 'A' }, { id: 'B' }], [verdict('A', 'a.js:1'), verdict('B', 'b.js:2')])
+
+    assert.deepEqual([...ambiguous], ['A'])
+    assert.equal(byId.has('A'), false)
+    assert.equal(byId.get('B').confirmation_evidence, 'b.js:2')
+  })
+
+  it('joinVerdicts refuses a finding that drew more than one verdict', () => {
+    const { byId, ambiguous } = joinVerdicts([{ id: 'A' }, { id: 'B' }], [verdict('A', 'a.js:1'), verdict('A', 'elsewhere.js:99'), verdict('B', 'b.js:2')])
+
+    assert.deepEqual([...ambiguous], ['A'])
+    assert.equal(byId.has('A'), false)
+    assert.equal(byId.get('B').confirmation_evidence, 'b.js:2')
+  })
+
+  it('joinVerdicts tolerates missing and empty inputs', () => {
+    for (const c of [
+      { name: 'both empty', issues: [], verdicts: [], matched: 0 },
+      { name: 'both undefined', issues: undefined, verdicts: undefined, matched: 0 },
+      { name: 'no verdict returned', issues: [{ id: 'A' }], verdicts: [], matched: 0 },
+      { name: 'verdict for a finding that is gone', issues: [], verdicts: [verdict('A', 'a.js:1')], matched: 1 },
+    ]) {
+      const { byId, ambiguous } = joinVerdicts(c.issues, c.verdicts)
+
+      assert.equal(ambiguous.size, 0, c.name)
+      assert.equal(byId.size, c.matched, c.name)
+    }
+  })
+})
+
 describe('work-issue helpers', () => {
   const logged = []
   const { readArgs, branchName } = loadHelpers(workflowScript('work-issue'), ['readArgs', 'REF_PATTERN', 'TRACKER_REF', 'branchName'], { log: message => logged.push(message) })
