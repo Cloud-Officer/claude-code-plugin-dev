@@ -31,17 +31,7 @@ const clean = v => String(v ?? 'unknown').replace(/[<>]/g, '')
 const scope = input.scope || 'the whole repository'
 
 // --- Per-severity confidence thresholds (Phase 3.5) ------------------------
-// IMPORTANT: the validator scores on the anchor grid 0/25/50/75/100. That grid
-// is not an assumption — it is enforced twice: buildVerifyPrompt instructs the
-// validator to output exactly one anchor, and VERDICT_SCHEMA pins
-// confidence_score to enum [0, 25, 50, 75, 100] so an off-grid value fails
-// validation instead of being silently mis-bucketed here. Thresholds MUST land
-// ON those anchors — a threshold of 65 silently rounds a "50 = verified real
-// but minor" finding up into the reject bucket, which is why the main report
-// used to come back empty while the appendix filled up. Keep every value in
-// {25, 50, 75}.
-// Critical/High survive at lower confidence (cost of a miss is high); Low/Info
-// need a higher bar so stochastic re-runs stay deterministic.
+// Keep every threshold on the validator's 0/25/50/75/100 anchor grid; an off-anchor value mis-buckets silently.
 const SEV_THRESHOLDS = { critical: 25, high: 50, medium: 50, low: 50, info: 75 }
 
 function normSev(s) {
@@ -65,23 +55,7 @@ function keepFinding(sev, score) {
 // downstream reads. They skip Phase 3 and go straight to the appendix.
 const VERIFY_SEVERITIES = new Set(['critical', 'high', 'medium'])
 
-// Cross-agent dedupe. The analysis agents overlap by design - A_QUALITY,
-// A_BUGS and A_CONSISTENCY all carry explicit "do not duplicate Agent B/C"
-// notes, which is the evidence that they collide anyway - so the same defect
-// arrives from several agents and was previously validated once per copy, then
-// deduplicated in the report afterwards. Dropping the copies BEFORE validation
-// removes the duplicate validator calls instead of paying for them.
-//
-// The key is conservative on purpose: an exact file + normalized-description
-// match. Two agents that describe one defect in different words are NOT merged
-// here (the report-time dedupe in SKILL.md Step 4 still catches those). Under-
-// deduping costs a validator call; over-deduping would silently drop a real
-// finding, so this errs toward the former.
-//
-// Whichever agent returns first wins the finding, and the pipeline completes
-// agents in whatever order they finish - so on a re-run an identical duplicated
-// finding may be attributed to a different agent. The finding itself, its ID and
-// its verdict are unaffected; only the `agent` field moves.
+// Key is file + normalized description; a duplicate costs a validator call, a false merge loses a finding.
 const seenKeys = new Set()
 function findingKey(f) {
   const file = String(f.file || '').trim().toLowerCase()
@@ -197,16 +171,7 @@ const SHARED_RULES = [
 ].join('\n')
 
 // --- Phase 1 repository map injected into every Phase 2 analysis prompt ----
-// Phase 1 already mapped the stack, the config inventory and the directory
-// structure. Without this block each of the 8-12 analysis agents re-derives
-// that same map from scratch, so the repository is discovered a dozen times
-// over. Passing it forward also improves the findings: A_DOCS needs the config
-// inventory, A_TESTING needs the test-file counts, and A_CONSISTENCY has to
-// establish the repo's dominant patterns before it can flag drift.
-//
-// Everything here is agent-derived from repository content, so it carries the
-// same untrusted status as repoBlock: fence it, label it as data once at the
-// source, and escape "</" so smuggled text cannot close the fence early.
+// Agent-derived repository content: fence it as data and escape "</" so it cannot close the fence early.
 function buildPhase1Block(stack, configs, structure) {
   const payload = {
     stack: {
@@ -864,9 +829,7 @@ const VERDICT_SCHEMA = {
   required: ['verdicts'],
 }
 
-// --- Single failure policy for every agent dispatch, all three phases ------
-// A rejected dispatch resolves to null (logged), so `await parallel` never
-// aborts the run and the per-site falsy checks fire on empty AND thrown returns.
+// A rejected dispatch resolves to null (logged) so the per-site falsy guards cover thrown failures too.
 const safeAgent = (p, o) => agent(p, o).catch(e => { log('WARNING: agent ' + o.label + ' failed: ' + e); return null })
 
 // ===========================================================================
@@ -903,26 +866,12 @@ const phase1Block = buildPhase1Block(stack, configs, structure)
 log('Phase 1 done. Running ' + selected.length + ' analysis agents: ' + selected.map(a => a.key).join(', '))
 
 // ===========================================================================
-// PHASE 2 -> PHASE 3 as a pipeline: each agent's findings are adversarially
-// verified as soon as that agent returns (no global barrier). Verification is
-// batched up to 5 findings per validator: small enough that the validator can
-// actually open and quote every file in the batch (larger batches starved the
-// per-finding code-read budget and caused false rejections).
-//
-// Three filters run before batching, all of them cutting validator calls
-// without touching what the validator does to a finding it receives:
-//   1. Low/Info findings skip validation entirely (VERIFY_SEVERITIES).
-//   2. A finding already sent for another agent is dropped (seenKeys). The
-//      running set keeps the pipeline barrier-free - a cross-agent dedupe pass
-//      would otherwise have to wait for every agent to finish.
-//   3. Batches are grouped by file rather than by emission order, so one file
-//      is opened and quoted once instead of once per severity band.
+// PHASE 2 -> PHASE 3: each agent's findings are validated as soon as that agent returns
 // ===========================================================================
 phase('Analyze')
 const reviewed = await pipeline(
   selected,
-  // safeAgent resolves null on failure, so the agentDef stays attached and
-  // the drop is attributable, never silent.
+  // safeAgent resolves null on failure, so the agentDef stays attached and the drop is attributable.
   (a) => safeAgent(buildAnalysisPrompt(a, phase1Block), { label: 'analyze:' + a.key, phase: 'Analyze', schema: FINDINGS_SCHEMA, agentType: 'general-purpose' })
     .then(r => ({ agentDef: a, review: r })),
   async ({ agentDef, review }) => {
@@ -953,16 +902,8 @@ const reviewed = await pipeline(
     const ordered = toVerify.slice().sort((x, y) =>
       String(x.file || '').localeCompare(String(y.file || '')) || String(x.id).localeCompare(String(y.id)))
     const batches = await parallel(
-      // No `model` here on purpose: the validators inherit the parent model.
-      // This is the phase that decides which findings reach the report, and
-      // checks 6-8 of buildVerifyPrompt ("would a senior engineer flag this",
-      // the reasoned-intent check, the re-read stability test) plus the
-      // confidence calibration are judgment with no checklist to fall back on.
-      // Cost is controlled by the three filters above, which cut how many
-      // findings reach a validator - not by making the validator cheaper.
-      //
-      // A failed batch yields null; its findings surface as unverified below.
       chunk(ordered, 5).map((group, i) => () =>
+        // Validators inherit the parent model deliberately.
         safeAgent(buildVerifyPrompt(group), { label: 'verify:' + agentDef.key + '#' + i, phase: 'Verify', schema: VERDICT_SCHEMA, agentType: 'general-purpose' })
       )
     )

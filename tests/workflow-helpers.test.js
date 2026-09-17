@@ -163,3 +163,30 @@ describe('verify-resolved-issues helpers', () => {
     assert.equal(oneLine(null), '')
   })
 })
+
+describe('safeAgent dispatch failure policy', () => {
+  const load = (skill, agent, logs) => loadHelpers(workflowScript(skill), ['safeAgent'], { agent, log: (m) => logs.push(m) }).safeAgent
+
+  for (const skill of ['code-review-deep', 'migrate-code', 'review-aws-cost', 'verify-resolved-issues', 'work-issue']) {
+    it(skill + ' resolves a rejected dispatch to null and logs the label', async () => {
+      const logs = []
+      const safeAgent = load(skill, () => Promise.reject(new Error('dispatch exploded')), logs)
+
+      assert.equal(await safeAgent('prompt', { label: 'scan:stack' }), null)
+      assert.equal(logs.length, 1)
+      assert.match(logs[0], /^WARNING: agent scan:stack failed: Error: dispatch exploded$/)
+    })
+
+    it(skill + ' forwards prompt and options and passes a resolved dispatch through', async () => {
+      const logs = []
+      const seen = []
+      const returned = { issues: [] }
+      const opts = { label: 'analyze:one', phase: 'Analyze' }
+      const safeAgent = load(skill, (p, o) => { seen.push([p, o]); return Promise.resolve(returned) }, logs)
+
+      assert.equal(await safeAgent('prompt', opts), returned)
+      assert.deepEqual(seen, [['prompt', opts]])
+      assert.deepEqual(logs, [])
+    })
+  }
+})
