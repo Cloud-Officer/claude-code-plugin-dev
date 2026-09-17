@@ -75,6 +75,24 @@ function num(v) {
   return Number.isFinite(n) ? n : null
 }
 
+function joinVerdicts(issues, verdicts) {
+  const ambiguous = new Set()
+  const markRepeats = (list, key) => {
+    const seen = new Set()
+    for (const item of (list || [])) {
+      if (seen.has(item[key])) ambiguous.add(item[key])
+      seen.add(item[key])
+    }
+  }
+  markRepeats(issues, 'id')
+  markRepeats(verdicts, 'finding_id')
+  const byId = new Map()
+  for (const v of (verdicts || [])) {
+    if (!ambiguous.has(v.finding_id)) byId.set(v.finding_id, v)
+  }
+  return { byId, ambiguous }
+}
+
 // --- Shared context block injected into every agent prompt -----------------
 // Values in here come from the user (scope) and
 // from `aws sts get-caller-identity` / `aws ec2 describe-regions`. This one
@@ -1140,8 +1158,20 @@ for (const item of reviewed.filter(Boolean)) {
   for (const t of (review.tables || [])) tables.push({ area: agentDef.key, ...t })
   for (const n of (review.coverage_notes || [])) coverage_notes.push({ area: agentDef.key, note: n })
   for (const g of (review.data_gaps || [])) data_gaps.push({ area: agentDef.key, gap: g })
-  const byId = new Map((verdicts || []).map(v => [v.finding_id, v]))
+  const { byId, ambiguous } = joinVerdicts(review.issues || [], verdicts || [])
+  if (ambiguous.size) log('WARNING: ' + agentDef.key + ' returned more than one finding or verdict under id(s) ' + [...ambiguous].join(', ') + ' — each is reported unverified with no saving rather than risking another finding\'s verdict and dollar figure.')
   for (const f of (review.issues || [])) {
+    if (ambiguous.has(f.id)) {
+      unverified.push({
+        ...f,
+        agent: agentDef.key,
+        confidence_score: 0,
+        verified_monthly_saving_usd: null,
+        saving_reconciles: null,
+        confirmation_evidence: 'unverified: duplicate finding id — no verdict can be attributed to this finding',
+      })
+      continue
+    }
     const v = byId.get(f.id)
     if (!v) {
       // No verdict (validator batch failed or omitted it): unverified, not
@@ -1185,7 +1215,7 @@ const filtered = confirmed.filter(f => !keepFinding(f.severity, f.confidence_sco
 const totalMonthly = kept.reduce((s, f) => s + (num(f.verified_monthly_saving_usd) || 0), 0)
 const quantified = kept.filter(f => num(f.verified_monthly_saving_usd) !== null).length
 
-log('Confirmed ' + confirmed.length + ' findings; ' + kept.length + ' cleared the confidence threshold, ' + filtered.length + ' went to the appendix' + (unverified.length ? ' (' + unverified.length + ' unverified: no validator verdict)' : '') + '. Verified recurring saving across kept findings: $' + Math.round(totalMonthly).toLocaleString('en-US') + '/mo from ' + quantified + ' quantified finding(s).')
+log('Confirmed ' + confirmed.length + ' findings; ' + kept.length + ' cleared the confidence threshold, ' + filtered.length + ' went to the appendix' + (unverified.length ? ' (' + unverified.length + ' unverified)' : '') + '. Verified recurring saving across kept findings: $' + Math.round(totalMonthly).toLocaleString('en-US') + '/mo from ' + quantified + ' quantified finding(s).')
 
 return {
   ok: true,
