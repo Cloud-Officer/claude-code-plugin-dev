@@ -1,7 +1,7 @@
 ---
 name: migrate-code
 description: "Migrate, port, translate, rewrite, or convert a codebase from one language, framework, or runtime to another (e.g. Python→TypeScript, JavaScript→TypeScript, Zig/C++→Rust, Java→Kotlin, Angular→React, Express→Fastify, Rails→Phoenix, Enzyme→React Testing Library, CommonJS→ESM). Use when the user wants to migrate code, port a project, translate a language, rewrite a service in another stack, do a large-scale mechanical refactor, or run a framework/version upgrade that spans many files. Runs a six-step engine: build a rulebook, map dependencies, inventory gaps, stress-test, then translate → compile → test → verify with parallel agents and adversarial review."
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(jq:*), Bash(awk:*), Bash(cat:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(ls:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(xargs:*), Bash(cloc:*), Bash(tokei:*), Read, Write, Edit, Glob, Grep, TodoWrite, Workflow, Agent, Skill, AskUserQuestion, WebSearch, WebFetch, mcp__context7__*
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(jq:*), Bash(awk:*), Bash(cat:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(ls:*), Bash(rm:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(xargs:*), Bash(cloc:*), Bash(tokei:*), Read, Write, Edit, Glob, Grep, TodoWrite, Workflow, Agent, Skill, AskUserQuestion, WebSearch, WebFetch, mcp__context7__*
 ---
 
 # Code Migration (Workflow-Orchestrated)

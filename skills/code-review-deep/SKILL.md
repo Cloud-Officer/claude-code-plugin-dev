@@ -1,7 +1,7 @@
 ---
 name: code-review-deep
 description: "Exhaustive multi-phase code audit using parallel agents (security, dependencies, code quality, infrastructure, tests, and more). Use when the user wants a deep or thorough code review, a comprehensive audit, a security-and-quality sweep of a repo or subsystem, or a multi-agent review that goes beyond the current diff. Optionally scoped to a path or subsystem."
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(jira:*), Bash(jq:*), Bash(awk:*), Bash(cat:*), Bash(date:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(ls:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, Workflow, Agent, Skill, AskUserQuestion, WebSearch, WebFetch, mcp__github__*, mcp__context7__*
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(jira:*), Bash(jq:*), Bash(awk:*), Bash(cat:*), Bash(date:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(ls:*), Bash(rm:*), Bash(sed:*), Bash(shasum:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, Workflow, Agent, Skill, AskUserQuestion, WebSearch, WebFetch, mcp__github__*, mcp__context7__*
 ---
 
 # Deep Code Review (Workflow-Orchestrated)
