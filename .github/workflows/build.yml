@@ -17,6 +17,9 @@ name: Build
     - "**"
 permissions:
   contents: read
+env:
+  NODE-CACHE: npm
+  NODE-VERSION: 26.8.2
 concurrency:
   group: build-${{github.ref}}
   cancel-in-progress: true
@@ -102,3 +105,30 @@ jobs:
         ssh-key: "${{secrets.SSH_KEY}}"
         github-token: "${{github.token}}"
         reviewdog-token: "${{github.token}}"
+  js_unit_tests:
+    name: JavaScript Unit Tests
+    runs-on: ubuntu-latest
+    needs:
+    - variables
+    if: "${{needs.variables.outputs.SKIP_TESTS != '1'}}"
+    timeout-minutes: 30
+    steps:
+    - name: Setup
+      uses: cloud-officer/ci-actions/setup@v3
+      with:
+        ssh-key: "${{secrets.SSH_KEY}}"
+        github-token: "${{github.token}}"
+        node-version: "${{env.NODE-VERSION}}"
+        node-cache: "${{env.NODE-CACHE}}"
+        node-cache-dependency-path: package-lock.json
+    - name: NPM
+      shell: bash
+      run: npm ci
+      env:
+        GITHUB_TOKEN: "${{github.token}}"
+    - name: Jest
+      shell: bash
+      run: |-
+        node scripts/check-workflow-syntax.js
+        node scripts/check-repo-consistency.js
+        node --test 'tests/*.test.js'
