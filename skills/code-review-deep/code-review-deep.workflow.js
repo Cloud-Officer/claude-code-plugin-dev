@@ -4,7 +4,7 @@ export const meta = {
   phases: [
     { title: 'Scan', detail: '3 Explore scouts: tech stack, configs, structure' },
     { title: 'Analyze', detail: 'Core + conditional deep-analysis agents (security, bugs, deps, CI, docs, ...)' },
-    { title: 'Verify', detail: 'Adversarial validation of every finding, 0-100 confidence scoring' },
+    { title: 'Verify', detail: 'Adversarial validation of Critical/High/Medium findings, 0-100 confidence scoring' },
   ],
 }
 
@@ -362,7 +362,8 @@ const A_QUALITY = {
     '  SQL-injection or secret-detection rules); (c) a linter config exists but NO CI step actually invokes it.',
     '- Memory observers: count addObserver vs removeObserver (Swift/Obj-C/Java). Report in counts under exactly these keys:',
     '  observers_added, observers_removed.',
-    '- Pattern duplication count: total duplicated blocks, with one example per group.',
+    '- Pattern duplication: count total duplicated blocks, with one example per group. Report in counts under exactly',
+    '  this key: duplicated_blocks.',
     'Comment quality (in-code only - README/architecture is Agent G): factually inaccurate (signature mismatch),',
     'outdated references, stale TODOs without owner/ticket, restating obvious code, misleading phrasing, misplaced doc blocks,',
     'refactor scars that no longer carry information, missing critical context on complex code,',
