@@ -55,9 +55,11 @@ Check for an existing plan: if `docs/migration/rulebook.md` already exists, ask 
 
 Launch the workflow in **plan** mode. It builds the rulebook draft, the dependency-ordered file list, and the gap inventory, then stress-tests the rulebook on representative files.
 
+The Workflow tool refuses a `scriptPath` outside the working directory, and the plugin root always is, so pass the script inline: Read the whole `${CLAUDE_PLUGIN_ROOT}/skills/migrate-code/migrate-code.workflow.js` with the Read tool and send its text verbatim as `script`, without Read's line-number prefixes.
+
 ```text
 Workflow({
-  scriptPath: "${CLAUDE_PLUGIN_ROOT}/skills/migrate-code/migrate-code.workflow.js",
+  script: "<verbatim contents of ${CLAUDE_PLUGIN_ROOT}/skills/migrate-code/migrate-code.workflow.js>",
   args: {
     mode: "plan",
     source: "<source>",
@@ -101,7 +103,7 @@ Once the rulebook is approved, launch the workflow in **migrate** mode with the 
 
 ```text
 Workflow({
-  scriptPath: "${CLAUDE_PLUGIN_ROOT}/skills/migrate-code/migrate-code.workflow.js",
+  script: "<verbatim contents of ${CLAUDE_PLUGIN_ROOT}/skills/migrate-code/migrate-code.workflow.js>",
   args: {
     mode: "migrate",
     source: "<source>",

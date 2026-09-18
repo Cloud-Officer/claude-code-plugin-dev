@@ -96,9 +96,11 @@ The governance rules (solo/small teams cannot enforce multi-reviewer governance,
 
 Invoke the workflow with the gathered context. Pass the scope the user provided when they narrowed the review (e.g. a path or subsystem); otherwise omit it to review the whole repository.
 
+The Workflow tool refuses a `scriptPath` outside the working directory, and the plugin root always is, so pass the script inline: Read the whole `${CLAUDE_PLUGIN_ROOT}/skills/code-review-deep/code-review-deep.workflow.js` with the Read tool and send its text verbatim as `script`, without Read's line-number prefixes.
+
 ```text
 Workflow({
-  scriptPath: "${CLAUDE_PLUGIN_ROOT}/skills/code-review-deep/code-review-deep.workflow.js",
+  script: "<verbatim contents of ${CLAUDE_PLUGIN_ROOT}/skills/code-review-deep/code-review-deep.workflow.js>",
   args: {
     scope: "<the user-provided scope, or 'the whole repository'>",
     repoContext: {

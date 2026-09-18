@@ -99,9 +99,11 @@ The expensive part of this skill — reading each issue's claims, reading its li
 
 **Before launching**, `cd` into the target repo (its own Bash call) so the workflow's agents inherit the right working directory and direnv token — their `gh`/`git`/test-runner calls depend on it. Then invoke:
 
+The Workflow tool refuses a `scriptPath` outside the working directory, and the plugin root always is, so pass the script inline: Read the whole `${CLAUDE_PLUGIN_ROOT}/skills/verify-resolved-issues/verify-resolved-issues.workflow.js` with the Read tool and send its text verbatim as `script`, without Read's line-number prefixes.
+
 ```text
 Workflow({
-  scriptPath: "${CLAUDE_PLUGIN_ROOT}/skills/verify-resolved-issues/verify-resolved-issues.workflow.js",
+  script: "<verbatim contents of ${CLAUDE_PLUGIN_ROOT}/skills/verify-resolved-issues/verify-resolved-issues.workflow.js>",
   args: {
     tracker: "github" | "jira",
     scope: "<owner/repo, or project=<KEY>, sprint=<NAME|all>>",
