@@ -157,9 +157,11 @@ If this errors, stop per the Failure Policy. Report the monthly totals to the us
 
 Invoke the workflow with the gathered context:
 
+The Workflow tool refuses a `scriptPath` outside the working directory, and the plugin root always is, so pass the script inline: Read the whole `${CLAUDE_PLUGIN_ROOT}/skills/review-aws-cost/review-aws-cost.workflow.js` with the Read tool and send its text verbatim as `script`, without Read's line-number prefixes.
+
 ```text
 Workflow({
-  scriptPath: "${CLAUDE_PLUGIN_ROOT}/skills/review-aws-cost/review-aws-cost.workflow.js",
+  script: "<verbatim contents of ${CLAUDE_PLUGIN_ROOT}/skills/review-aws-cost/review-aws-cost.workflow.js>",
   args: {
     scope: "<the user-provided scope, or 'the whole account'>",
     windows: {

@@ -78,7 +78,7 @@ The invocation contract is a plain tool call written into the skill body, for ex
 
 ```text
 Workflow({
-  scriptPath: "${CLAUDE_PLUGIN_ROOT}/skills/code-review-deep/code-review-deep.workflow.js",
+  script: "<verbatim contents of ${CLAUDE_PLUGIN_ROOT}/skills/code-review-deep/code-review-deep.workflow.js>",
   args: { scope: "...", repoContext: { ... } }
 })
 ```

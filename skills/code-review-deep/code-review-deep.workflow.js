@@ -18,7 +18,7 @@ export const meta = {
 // final report rendering from the structured data this workflow returns.
 //
 // Invoked by skills/code-review-deep/SKILL.md via:
-//   Workflow({ scriptPath: "${CLAUDE_PLUGIN_ROOT}/skills/code-review-deep/code-review-deep.workflow.js",
+//   Workflow({ script: "<verbatim contents of this file>",
 //              args: { repoContext: {...}, scope: "..." } })
 // ---------------------------------------------------------------------------
 

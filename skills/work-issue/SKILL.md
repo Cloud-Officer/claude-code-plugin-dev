@@ -110,9 +110,11 @@ Detect the tracker once (`gh repo view --json hasIssuesEnabled --jq '.hasIssuesE
 
 ### P2 — Launch the workflow
 
+The Workflow tool refuses a `scriptPath` outside the working directory, and the plugin root always is, so pass the script inline: Read the whole `${CLAUDE_PLUGIN_ROOT}/skills/work-issue/work-issue.workflow.js` with the Read tool and send its text verbatim as `script`, without Read's line-number prefixes.
+
 ```text
 Workflow({
-  scriptPath: "${CLAUDE_PLUGIN_ROOT}/skills/work-issue/work-issue.workflow.js",
+  script: "<verbatim contents of ${CLAUDE_PLUGIN_ROOT}/skills/work-issue/work-issue.workflow.js>",
   args: {
     defaultBranch: "<DEFAULT_BRANCH>",
     repoRoot: "<REPO_ROOT>",
