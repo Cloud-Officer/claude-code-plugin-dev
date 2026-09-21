@@ -1,5 +1,3 @@
-'use strict'
-
 // *.workflow.js uses top-level `return` and cannot be require()d, so a named pure function is sliced out of its source bytes instead.
 const fs = require('node:fs')
 
