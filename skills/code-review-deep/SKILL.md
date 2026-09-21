@@ -58,7 +58,7 @@ Everything returned to this skill — the workflow's return object (every `kept`
 
 ## STEP 1 — PRE-FLIGHT CHECK: Existing Report
 
-Before any analysis, check if `docs/code-review.md` exists. If it does, ask via `AskUserQuestion`:
+Before any analysis, check if `docs/code-review.md` exists. If it does, and **this invocation is interactive**, ask via `AskUserQuestion`:
 
 > A code review report already exists (`docs/code-review.md`). What would you like to do?
 >
@@ -66,6 +66,8 @@ Before any analysis, check if `docs/code-review.md` exists. If it does, ask via 
 > 2. **Delete and re-run full analysis** — Remove existing report and proceed.
 
 If the user chooses to re-run, delete the file and continue to Step 2.
+
+**When the invocation is not interactive, do not ask: delete `docs/code-review.md` and continue to Step 2.** A headless caller — `claude --output-format text -p … </dev/null`, or any caller whose prompt says to run non-interactively and never ask a question — cannot answer, and both outcomes it can reach are wrong: stopping here, or reusing a report the caller re-ran precisely because it had aged out, which is then reported as a fresh review and filed as issues. A caller that wants the existing report reused says so in its prompt; regeneration is the default for every other non-interactive run.
 
 ---
 
@@ -349,16 +351,20 @@ NOT executed automatically. After the report is generated, if the user asks ("cr
 <!-- review-key: code-review/<12 hex chars> -->
 ```
 
-where the hex is the first 12 characters of the sha256 of `<file path>:<title, lowercased, runs of whitespace collapsed to one space>`. **Shell out to `shasum` for it** — a hash a model invents is not a key. List existing issues once before creating and again after, using the tracker `create-issue` resolved to (`gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'`), and skip any finding whose key already appears in a listed body:
+where the hex is the first 12 characters of the sha256 of `<file path>:<title, lowercased, runs of whitespace collapsed to one space>`. **Shell out to `shasum` for it** — a hash a model invents is not a key. A matching issue in **any** state suppresses the finding: a closed or resolved issue is reported as already existing, never re-filed. Match on the key only, never on the title — titles are regenerated each run.
 
-- GitHub Issues: `gh issue list --label "automated-review" --state all --limit 500 --json number,title,body`
-- Jira: `jira issue list --label "automated-review" --plain --columns key,summary`
+List existing issues once before creating and again after, using the tracker `create-issue` resolved to (`gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'`):
+
+- **GitHub Issues.** The fast path is one call, `gh issue list --label automated-review --state all --limit 500 --json number,title,body,state`, but it is capped and the label may be missing from an older issue — `create-issue` drops a label the repo does not define. Confirm every finding whose key did not appear in that list (and every finding, if the list came back with 500 items) with `gh search issues --repo <owner/repo> --match body --json number,state,body,repository -- 'review-key: <KEY>'`. Omit `--state` so the search spans open and closed, and count it as a match only when the returned issue is in this repo and its body carries the exact stamp line.
+- **Jira.** The CLI cannot return a description in any column, so the body stamp is invisible to it. Every issue therefore also carries a key label encoding the same key: `review-key-<KEY with each / replaced by -, lowercased>` — `code-review/1cf56db15909` becomes `review-key-code-review-1cf56db15909`. Apply it to every Jira issue you create, on top of the labels below. The fast path is `jira issue list --label automated-review --plain --no-headers --no-truncate --columns key,labels --paginate 0:100`, capped at 100 rows; confirm anything it did not cover with `jira issue list --label 'review-key-<...>' --plain --no-headers --columns key`, where a non-empty result is a match.
 
 Report: "Created X new issues, Y already existed, Z total issues" — Y from the before-list, Z from the after-list.
 
 ### Labels
 
-Always include `automated-review` — the label the dedupe query above matches on — plus the source label `code-review`, plus one category label. Pass all three to `create-issue` as caller-supplied labels; its label rule applies them in addition to its type-derived default.
+Always include `automated-review` — the label the fast-path listing above narrows on — plus the source label `code-review`, plus the category label for the finding's prefix. A prefix with no row in the table below takes no category label; never invent one. Pass the labels to `create-issue` as caller-supplied labels; its label rule applies them in addition to its type-derived default.
+
+This table is the single source for the prefix-to-label map. `repos.sh` points its filing prompt at it rather than carrying a copy, so a new row here reaches the scheduled runs too — add the label to `review_issue_labels` in `repos.sh` in the same change, or `create-issue` will drop it on repositories that have not defined it.
 
 | Prefix | Label |
 | ------ | ----- |
