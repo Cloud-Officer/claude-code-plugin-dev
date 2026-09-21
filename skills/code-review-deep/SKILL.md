@@ -339,7 +339,7 @@ Highlight what the team is doing well, organized by area (Architecture, Code Qua
 
 NOT executed automatically. After the report is generated, if the user asks ("create issues", "create tickets", "log issues"), use the `create-issue` skill — it auto-detects GitHub Issues vs Jira.
 
-**There is one issue-filing mechanism, and it is shared with every other automated review.** `repos.sh` in the `aws` repository owns it (`file_review_issues`): it reads whichever findings reports a run produced — `docs/code-review.md` and `docs/prompt-review.md` — and files them through `create-issue` under one dedupe query and one label set. Follow that contract here rather than a second one of your own, so an issue filed by hand from this report and one filed by the scheduled run are the same issue.
+**The rules below are the filing contract for this report.** Follow them exactly, whoever files — by hand or from an automated run — so the same finding always maps to the same issue.
 
 **Selection.** File findings at CRITICAL, HIGH and MEDIUM. LOW and INFO stay in the report: "when convenient" and "awareness only" do not survive contact with a backlog, and every filed issue costs a dedupe check on every later run. When the user explicitly asks for the full set, file all severities.
 
@@ -363,8 +363,6 @@ Report: "Created X new issues, Y already existed, Z total issues" — Y from the
 ### Labels
 
 Always include `automated-review` — the label the fast-path listing above narrows on — plus the source label `code-review`, plus the category label for the finding's prefix. A prefix with no row in the table below takes no category label; never invent one. Pass the labels to `create-issue` as caller-supplied labels; its label rule applies them in addition to its type-derived default.
-
-This table is the single source for the prefix-to-label map. `repos.sh` points its filing prompt at it rather than carrying a copy, so a new row here reaches the scheduled runs too — add the label to `review_issue_labels` in `repos.sh` in the same change, or `create-issue` will drop it on repositories that have not defined it.
 
 | Prefix | Label |
 | ------ | ----- |
