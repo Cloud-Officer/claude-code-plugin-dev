@@ -19,6 +19,7 @@ const scope = input.scope || 'the whole repository'
 const outDir = input.outDir || 'docs/migration'
 const rulebookPath = input.rulebookPath || (outDir + '/rulebook.md')
 const buildCmd = input.buildCmd || ''
+const xcodeBuild = input.xcodeBuild === true // Xcode target: build through the xcode MCP instead of a shell command
 const testCmd = input.testCmd || ''
 const repoRoot = input.repoRoot || '.'
 const maxCompileRounds = Number.isFinite(input.maxCompileRounds) ? input.maxCompileRounds : 4
@@ -155,7 +156,7 @@ const BUILD_SCHEMA = {
   type: 'object',
   additionalProperties: true,
   properties: {
-    ran: { type: 'boolean' },                        // false when no buildCmd was provided
+    ran: { type: 'boolean' },                        // false when neither buildCmd nor xcodeBuild was provided
     clean: { type: 'boolean' },                      // true when the build succeeded with no errors
     error_marker: { type: 'string' },                // the build tool's OWN failure line, pasted verbatim
     error_groups: {                                  // errors clustered so fixers can be batched
@@ -510,13 +511,26 @@ async function runFixLoop(opts) {
 }
 
 phase('Compile')
+
+// With xcodeBuild the loop runs on the MCP tools, so it must not be treated as idle for an empty buildCmd.
+const buildInstruction = xcodeBuild
+  ? [
+    'Build through the Xcode MCP, NOT a shell command. The project is at ' + repoRoot + '.',
+    'Call `mcp__xcode__XcodeListWorkspaces`; if the project is not open, `mcp__xcode__XcodeOpenWorkspace` with its',
+    'absolute path, and pass the returned identifier as `workspaceIdentifier` on every later call. Then',
+    '`mcp__xcode__BuildProject`, then `mcp__xcode__GetBuildLog` with `severity: "error"` to read the errors alone.',
+    'GetBuildLog returns issues already structured with `path` and `message` — cluster on those fields directly and',
+    'do NOT re-parse console text. For `error_marker`, paste the failure line the build log itself reports.',
+  ].join('\n')
+  : 'Build command: `' + buildCmd + '` (run it from ' + repoRoot + ').'
+
 const compileLoop = await runFixLoop({
-  cmd: buildCmd,
+  cmd: buildCmd || (xcodeBuild ? 'xcode-mcp' : ''),
   phaseName: 'Compile',
   maxRounds: maxCompileRounds,
   itemNoun: 'error group(s)',
   idleState: { ran: false, clean: false, summary: 'no build command provided' },
-  idleLog: 'No build command provided — skipping the compile loop. The human must compile manually.',
+  idleLog: 'No build command and no xcodeBuild flag — skipping the compile loop. The human must compile manually.',
   silentState: { ran: false, clean: false, summary: 'build agent returned nothing' },
   runnerSchema: BUILD_SCHEMA,
   runnerLabel: 'build:round-',
@@ -524,7 +538,7 @@ const compileLoop = await runFixLoop({
     'You are the BUILD DAEMON. Run the build ONCE and report the result — nothing else builds in parallel.',
     CONTEXT,
     '',
-    'Build command: `' + buildCmd + '` (run it from ' + repoRoot + ').',
+    buildInstruction,
     'Run it, capture the output, and report: whether it ran, whether it is clean, the build tool\'s OWN failure',
     'marker pasted verbatim, and the errors CLUSTERED into `error_groups` by shared signature (so fixes can be',
     'batched). Order error_groups by number of distinct files descending, then by signature bytewise ascending —',

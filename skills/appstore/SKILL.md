@@ -34,6 +34,14 @@ Credentials are the same for both: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_K
 
 Subscriptions, provisioning, screenshots, analytics, users and the other `asc-mcp` workers are not enabled. If the request needs one, say which worker is missing and stop.
 
+## Related skills
+
+This skill is the **server-side** half of Apple tooling. For the local build, run, test and debug loop — and for
+Apple's Organizer crash and field-performance reports (`GetTopCrashIssues`, `GetCrashIssueLogs`,
+`GetTopFieldPerformanceIssues`, `GetFieldPerformanceIssueLogs`), which need an open workspace to resolve the bundle id
+and platform from the active scheme — use the `xcode` skill. Those reports are **not** part of App Store Connect's API
+and no `asc-mcp` tool serves them.
+
 ## Usage
 
 1. **Understand the request**: what does the user want (builds, TestFlight, reviews, Xcode Cloud)?
