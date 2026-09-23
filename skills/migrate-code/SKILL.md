@@ -33,9 +33,10 @@ Establish exactly what is being migrated. Ask the user (use `AskUserQuestion` if
 - **Target** — language/framework/runtime and version (e.g. "TypeScript strict", "React 18 + Vite").
 - **Scope** — whole repo, a directory, or a subsystem. A first migration should usually be scoped small.
 - **Build command** — how the *target* code compiles/type-checks (e.g. `tsc --noEmit`, `cargo build`). Optional but strongly recommended; without it the compile loop is skipped and the human compiles manually.
+  - **Xcode targets** (`*.xcodeproj` / `*.xcworkspace`) — pass `xcodeBuild: true` in the Step 4 args instead of a build command and the compile loop builds through the `xcode` MCP (`BuildProject` → `GetBuildLog`), which needs macOS + Xcode 27 with the bridge enabled. Prefer it over a hand-written `xcodebuild` line for two reasons: `GetBuildLog` returns issues already structured with `path` and `message`, so the daemon clusters on fields rather than re-parsing console text; and nothing is handed to a shell, so the verbatim-execution caveat below does not apply. Confirm the active scheme and run destination with the `xcode` skill before launching — the MCP builds whatever is active. A SwiftPM-only target has no Xcode project; use `swift build` as an ordinary build command.
 - **Test command** — the **portable** test suite that must pass against the port the same way it passed against the original (e.g. `pytest`, `npm test`). Optional; without it the test loop is skipped.
 
-**Answer hygiene.** Every answer enters the workflow `args` as a single line and is a fact about the migration, never an instruction to the engine. How each answer may appear in a command is fixed by the untrusted-values Guardrail above: slugged (source/target), reduced to the character class `[A-Za-z0-9._/-]` and passed single-quoted (scope — refused, never repaired, if it contains anything else), or — the build and test commands only — executed verbatim by the engine, so echo those two back to the user and get explicit confirmation before Step 4.
+**Answer hygiene.** Every answer enters the workflow `args` as a single line and is a fact about the migration, never an instruction to the engine. How each answer may appear in a command is fixed by the untrusted-values Guardrail above: slugged (source/target), reduced to the character class `[A-Za-z0-9._/-]` and passed single-quoted (scope — refused, never repaired, if it contains anything else), or — the build and test commands only — executed verbatim by the engine, so echo those two back to the user and get explicit confirmation before Step 4. `xcodeBuild` is a boolean the engine reads, never a string it runs, so it carries none of that risk; it does not remove the need to confirm `testCmd`.
 
 Then pre-flight the repo:
 
@@ -111,6 +112,7 @@ Workflow({
     scope: "<scope>",
     rulebookPath: "docs/migration/rulebook.md",
     buildCmd: "<build command or ''>",
+    xcodeBuild: <true for an Xcode target built through the xcode MCP, else omit>,
     testCmd: "<test command or ''>",
     files: <dependency_order array from Step 2, leaves first>,
     repoRoot: "<repo root>"
@@ -122,6 +124,7 @@ The engine also accepts optional tuning knobs in `args` (omit them to take the d
 
 | Knob               | Default  | Effect                                            |
 | ------------------ | -------- | ------------------------------------------------- |
+| `xcodeBuild`       | `false`  | Build via the `xcode` MCP instead of `buildCmd`   |
 | `maxCompileRounds` | `4`      | Build-and-fix rounds before Compile gives up      |
 | `maxTestRounds`    | `3`      | Test-and-fix rounds before Test gives up          |
 | `maxVerifyFiles`   | `24`     | Cap on high-risk files sent to adversarial Verify |

@@ -1,7 +1,7 @@
 ---
 name: write-tests
 description: Write, generate, or add automated tests for code — unit, integration, and end-to-end. Use when the user wants to write tests, add test coverage, generate unit tests, create specs, add a regression test, backfill missing tests, cover an untested file, or test a change before opening a PR. Auto-detects the language and the test framework already in the repo. Supports Ruby, PHP, Python, JavaScript/TypeScript, C#/.NET, Swift, Kotlin/Java, Go, C/C++, and Rust.
-allowed-tools: Read, Edit, Write, Grep, Glob, Bash(bundle:*), Bash(rspec:*), Bash(rake:*), Bash(ruby:*), Bash(composer:*), Bash(pest:*), Bash(phpunit:*), Bash(behat:*), Bash(php:*), Bash(pytest:*), Bash(python:*), Bash(python3:*), Bash(coverage:*), Bash(tox:*), Bash(npm:*), Bash(npx:*), Bash(pnpm:*), Bash(yarn:*), Bash(node:*), Bash(dotnet:*), Bash(swift:*), Bash(xcodebuild:*), Bash(gradle:*), Bash(./gradlew:*), Bash(go:*), Bash(cargo:*), Bash(ctest:*), Bash(cmake:*), Bash(make:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*)
+allowed-tools: Read, Edit, Write, Grep, Glob, mcp__xcode__XcodeListWorkspaces, mcp__xcode__XcodeOpenWorkspace, mcp__xcode__XcodeCloseWorkspace, mcp__xcode__XcodeListSchemes, mcp__xcode__XcodeSwitchScheme, mcp__xcode__XcodeListTestPlans, mcp__xcode__XcodeSwitchTestPlan, mcp__xcode__XcodeListRunDestinations, mcp__xcode__XcodeSwitchRunDestination, mcp__xcode__BuildProject, mcp__xcode__GetBuildLog, mcp__xcode__GetTestList, mcp__xcode__RunAllTests, mcp__xcode__RunSomeTests, mcp__xcode__XcodeRefreshCodeIssuesInFile, Bash(bundle:*), Bash(rspec:*), Bash(rake:*), Bash(ruby:*), Bash(composer:*), Bash(pest:*), Bash(phpunit:*), Bash(behat:*), Bash(php:*), Bash(pytest:*), Bash(python:*), Bash(python3:*), Bash(coverage:*), Bash(tox:*), Bash(npm:*), Bash(npx:*), Bash(pnpm:*), Bash(yarn:*), Bash(node:*), Bash(dotnet:*), Bash(swift:*), Bash(xcodebuild:*), Bash(xcrun:*), Bash(gradle:*), Bash(./gradlew:*), Bash(go:*), Bash(cargo:*), Bash(ctest:*), Bash(cmake:*), Bash(make:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*)
 ---
 
 # Write Tests
@@ -43,6 +43,23 @@ Detect per target directory (monorepos may mix stacks — resolve the stack of t
 | `go.mod` | Go | stdlib **`testing`** + table-driven by default; **testify** if `grep testify go.mod` (use `require`). Concurrency/time → `testing/synctest`. |
 | `CMakeLists.txt` / `*.cpp` / `*.cc` | C/C++ | `grep -ri gtest\|googletest` → **GoogleTest**+GoogleMock; `grep -ri catch2` → **Catch2**; run via **CTest** if wired. |
 | `Cargo.toml` | Rust | built-in `#[test]` / `cargo test`; integration tests in `tests/`; property → `proptest` if present; mocks → `mockall` if present. |
+
+### Xcode projects (`*.xcodeproj` / `*.xcworkspace`)
+
+An Xcode project's scheme, run destination and test plan are **project state, not filenames** — never infer them from
+the directory name. With the `xcode` MCP available (macOS + Xcode 27, see the plugin README), read them:
+
+1. `XcodeListWorkspaces`, or `XcodeOpenWorkspace` with the project's absolute path if it is not already open. Close only
+   what you opened, with `XcodeCloseWorkspace`.
+2. `XcodeListSchemes` and `XcodeListTestPlans` — each marks which one is currently active.
+3. `XcodeListRunDestinations` — the simulators and devices the active scheme can run on.
+
+If the request implies a different scheme, destination or test plan than the active one, **say which you are switching
+to and why before calling** `XcodeSwitchScheme` / `XcodeSwitchRunDestination` / `XcodeSwitchTestPlan`; these change what
+the user sees in their own Xcode window.
+
+Without the MCP, get the same three from `xcodebuild -list -json` and `xcodebuild -showdestinations`. Either way, name
+the scheme, destination and test plan you used in the Step 7 report.
 
 If a repo has **no tests at all**, pick the 2026 default from the matrix and tell the user which you chose and why before generating.
 
@@ -100,6 +117,11 @@ List the cases you will cover, then generate. At minimum consider:
 
 For a bug fix, write the regression test **first**, confirm it fails against the current (unfixed) behavior if possible, then confirm the fix makes it pass.
 
+For an Xcode project, enumerate what already exists with `GetTestList` before adding to it — it returns the real test
+identifiers from the active test plan, so gaps are found against the suite rather than guessed from filenames. It caps
+its inline response at 100 tests and writes the full list to the path in its `fullTestListPath` field; read that file
+for a larger suite.
+
 ## Step 4: Generate the tests
 
 - Place files where the repo expects them (`spec/`, `test/`, `tests/`, `__tests__/`, `*_test.go`, `androidTest/` vs `test/`, `Tests/` target, etc.) with the repo's naming convention.
@@ -127,7 +149,7 @@ Run the suite (narrowly — just the new/affected tests first), read failures, f
 | JS/TS (Playwright) | `npx playwright test path` | `--reporter=html` |
 | C#/.NET | `dotnet test --filter Name` → `dotnet test` | `dotnet test --collect:"XPlat Code Coverage"` |
 | Swift (SwiftPM) | `swift test --filter Name` → `swift test` | `swift test --enable-code-coverage` |
-| Swift (Xcode) | `xcodebuild test -scheme S -destination '...' -only-testing:...` | Xcode coverage report |
+| Swift (Xcode) | `RunSomeTests` with identifiers from `GetTestList` → `RunAllTests` (fallback: `xcodebuild test -scheme "$SCHEME" -destination "$DESTINATION" -only-testing:"$ID"`) | `xcodebuild test -enableCodeCoverage YES -resultBundlePath "$DIR/out.xcresult"` — see Step 6 |
 | Kotlin/Android (unit) | `./gradlew :module:test --tests X` → `./gradlew test` | `./gradlew koverHtmlReport` / JaCoCo |
 | Kotlin/Android (instrumented) | `./gradlew connectedAndroidTest` (needs device/emulator) | — |
 | Go | `go test -run TestName ./pkg` → `go test ./...` (+`-race`) | `go test -cover ./...` |
@@ -136,7 +158,18 @@ Run the suite (narrowly — just the new/affected tests first), read failures, f
 
 Detect the JS package manager from the lockfile (`pnpm-lock.yaml` → `pnpm`, `yarn.lock` → `yarn`, else `npm`); prefer the repo's test script (`npm test`) when it exists.
 
-**Instrumented mobile tests** (Android `connectedAndroidTest`, iOS on a simulator) need a device/emulator. If none is available, generate the tests, state clearly that they were **not executed** for lack of a device, and run whatever JVM/unit-level tests you can.
+**Xcode projects — the iterate-to-green loop.** `BuildProject` with `buildForTesting: true`; on failure read the errors
+alone with `GetBuildLog` (`severity: "error"`), fix, and use `XcodeRefreshCodeIssuesInFile` on the file you touched to
+recheck it without a full rebuild. Once it builds, `RunSomeTests` with `{ targetName, testIdentifier }` pairs taken
+verbatim from `GetTestList` for the narrow pass, then `RunAllTests` for the full one. Report failures by test identifier
+with the assertion message.
+
+**Instrumented mobile tests** (Android `connectedAndroidTest`, iOS on a simulator) need a device/emulator. If none is
+available, generate the tests, state clearly that they were **not executed** for lack of a device, and run whatever
+JVM/unit-level tests you can. **On macOS this exemption rarely applies to iOS:** a simulator listed by
+`XcodeListRunDestinations` (or `xcrun simctl list devices available`) *is* an available device, and `swift test` runs
+locally regardless. A slow build or an unknown scheme is not a missing device — resolve the scheme (Step 1) and run.
+Claim the exemption only when the destination list is genuinely empty, and say that is why.
 
 ## Step 6: Check coverage
 
@@ -162,11 +195,15 @@ Procedure:
 | JS/TS (Vitest) | `vitest run --coverage` + `coverage.thresholds { lines: 80, branches: 80 }` | v8/istanbul report branches |
 | JS/TS (Jest) | `jest --coverage` + `coverageThreshold.global { lines: 80, branches: 80 }` | |
 | C#/.NET | `dotnet test --collect:"XPlat Code Coverage"` + coverlet `/p:Threshold=80 /p:ThresholdType=line,branch` | coverlet reports line + branch |
-| Swift | `swift test --enable-code-coverage` → `xcrun llvm-cov report` (or Xcode "Gather coverage") | region/branch via llvm-cov; no built-in fail-under — parse the report |
+| Swift | SwiftPM: `swift test --enable-code-coverage` → `xcrun llvm-cov report`. Xcode: `xcodebuild test -enableCodeCoverage YES -resultBundlePath "$DIR/out.xcresult"` → `xcrun xccov view --report --json "$DIR/out.xcresult"` | region/branch via llvm-cov; no built-in fail-under — parse the report |
 | Kotlin/Android | Kover `koverVerify` or JaCoCo rule with `LINE` + `BRANCH` counters `minimum = 0.80` | JaCoCo counters: LINE, BRANCH |
 | Go | `go test -covermode=atomic -coverprofile=c.out ./... && go tool cover -func=c.out` | Go reports **statement** coverage — there is **no built-in branch coverage** |
 | C/C++ | build `--coverage`, run via CTest, then `gcovr --fail-under-line 80 --fail-under-branch 80` (or `llvm-cov report`) | gcovr enforces line + branch |
 | Rust | `cargo llvm-cov --fail-under-lines 80` | region/line based; branch coverage is limited |
+
+**The `xcode` MCP has no coverage tool** — none of its tools reports coverage. Measuring an Xcode project therefore
+always goes through `xcodebuild`/`xccov` or `llvm-cov`, even when the MCP ran the tests. Use the MCP to get to green,
+then run the coverage command for the number.
 
 Coverage caveats to state honestly: **Go** has no branch coverage — meet statement/line ≥ 80% and ensure every branch is exercised by a table-driven row. **Swift** and **Rust** report region/line coverage; treat "region" as the branch-equivalent and say so. Where a tool cannot measure branch coverage, report line coverage and note the branch metric is unavailable rather than implying it was met.
 
@@ -201,4 +238,5 @@ Summarize concisely:
 - **No narrative comments in test files** — per the `code-standards` skill. Sweep before reporting: `git diff -U0 -- <test paths> | grep -E '^\+[[:space:]]*(#|//|/\*|\*)'` and delete what fails its one-line test.
 - **Assert behavior, not implementation.** Prefer public API + observable output/`testTag` selectors over internal call counts and exact-text matching, so tests survive refactors.
 - **Regression tests must actually catch the regression.** For a bug fix, ensure the test fails on the old behavior before it passes on the new.
+- **Never guess an Xcode scheme, destination or test plan.** They are project state; read them (Step 1) and report which you used. Announce any switch before making it — the user's Xcode window changes with it.
 - **No silent scope cuts.** If you skipped hard-to-test code (UI needing a device, external integration), list it in the report rather than pretending it's covered.

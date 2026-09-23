@@ -8,6 +8,7 @@ Claude Code plugin for development workflow automation.
   * [Features](#features)
 * [Installation](#installation)
   * [Quick Start](#quick-start)
+  * [Enable the Xcode MCP (macOS)](#enable-the-xcode-mcp-macos)
   * [Configure Remote MCPs (optional)](#configure-remote-mcps-optional)
   * [Google Workspace MCP (optional)](#google-workspace-mcp-optional)
   * [Complementary Plugins (optional)](#complementary-plugins-optional)
@@ -23,8 +24,8 @@ Claude Code plugin for development workflow automation.
 ## Introduction
 
 `claude-code-plugin-dev` is the source repository for **`co-dev`**, a Claude Code plugin that automates day-to-day
-development workflows. It bundles 31 skills — issue tracking, PR creation, deep code review, test generation, linting,
-documentation reviews, cloud cost audits, cloud and app-store operations, and reporting — alongside 13 language servers and 13 MCP servers
+development workflows. It bundles 33 skills — issue tracking, PR creation, deep code review, test generation, linting,
+documentation reviews, cloud cost audits, cloud, Xcode and app-store operations, and reporting — alongside 13 language servers and 14 MCP servers
 that Claude Code loads automatically once the plugin is installed.
 
 It is aimed at engineering teams that want these workflows available in every repository without wiring up each
@@ -48,16 +49,17 @@ install works across multiple accounts and tenants.
 * Sprint work summaries grouped by repository
 * Weekly development and project-status reports from Jira, GitHub, and monday.com
 * Tracker coverage checks — verify a planning doc's items exist in monday.com and/or Jira
-* Translation asset management via Loco (localise.biz) API
+* Translation asset management via Loco (localise.biz) API, including Apple String Catalogs (`.xcstrings`)
 * monday.com board, item, and work-management operations
 * Firebase Crashlytics crash analysis via BigQuery
-* Figma design-to-code review for Android, iOS, and web
+* Figma design-to-code review for Android, iOS, and web — rendering the real UI on iOS (SwiftUI previews or the simulator) and web (headless browser) rather than comparing the design against source alone
 * PayPal payment management
 * AWS infrastructure management and documentation search
 * AWS cost optimization audits — 3 months vs the same 3 months last year, per-domain parallel agents, adversarial verification of every dollar figure (never recommends Reserved Instances or Savings Plans)
 * Google Cloud infrastructure management via gcloud
 * New Relic observability data and alert management
 * Heroku application management and deployment
+* Local Xcode build/run/test/debug loop for iOS, macOS, watchOS, tvOS and visionOS — schemes, destinations, test plans, LLDB, SwiftUI previews, simulator UI automation, String Catalogs, and Apple's crash and field performance reports
 * App Store Connect management (builds, TestFlight, reviews, IAPs, Xcode Cloud)
 * Google Play Store review management and analytics
 * Google Workspace integration (Gmail, Calendar, Drive, Docs, Sheets, Slides, Forms, Tasks, Contacts, Chat) via optional [`workspace-mcp`](#google-workspace-mcp-optional) setup
@@ -100,6 +102,10 @@ brew tap ankitpokhrel/jira-cli && brew install jira-cli # jira
 brew install mint && mint install zelentsov-dev/asc-mcp@v4.1.6 # iOS App Store Connect + Xcode Cloud (MCP)
 brew install asc # iOS App Store Connect + Xcode Cloud (CLI fallback)
 ```
+
+The bundled `xcode` MCP server needs **Xcode 27 or later** and one extra toggle — see
+[Enable the Xcode MCP](#enable-the-xcode-mcp-macos) below. On Linux and Windows it simply fails to start and the rest of
+the plugin is unaffected.
 
 Language servers (LSPs) — only what you write. The plugin declares LSPs for many languages, but each binary needs to be on your PATH for that language to activate:
 
@@ -203,6 +209,43 @@ Optional service CLIs: install via `scoop`, `winget`, or each tool's installer. 
 Language servers (LSPs): the `npm`, `gem`, `go install`, and `rustup`
 install commands listed under the macOS section work on Windows under their respective toolchains. Use
 `scoop install llvm` for `clangd`. Swift LSP is macOS-only (requires Xcode).
+
+### Enable the Xcode MCP (macOS)
+
+The plugin declares an `xcode` MCP server (`xcrun mcpbridge`) that backs the [`xcode`](#skills) skill. It is bundled, so
+there is nothing to install — but Xcode ships it **off**, and it is macOS-only. One of the two setups below is required
+before the `mcp__xcode__*` tools appear:
+
+* **With Xcode open** — Xcode → Settings → Intelligence → Model Context Protocol → tick **Allow external agents to use
+  Xcode tools**. The bridge attaches to the Xcode selected by `xcode-select`.
+* **Headless**, so the tools also work with Xcode closed:
+
+  ```bash
+  sudo xcrun mcp-server enable # one-time
+  xcrun mcp-server start
+  xcrun mcp-server status # expect "Permission: enabled" + "mcp-server: running"
+  ```
+
+Headless mode gives up the Canvas, the view debugger and the Organizer window; building, testing, LLDB and previews all
+still work.
+
+**Two things to know before you turn it on:**
+
+* **It is not cheap.** The server exposes 54 tools — roughly 36k tokens of schema in every session, in every repository,
+  because `mcpbridge` has no way to serve a subset. If most of your work is not Apple-platform work, disable it per
+  project with `"disabledMcpjsonServers": ["xcode"]` in that repo's `.claude/settings.json`, or globally in
+  `~/.claude/settings.json`.
+* **It can write.** The tools can edit source, move and delete files, change build settings and entitlements, run
+  arbitrary code snippets and issue LLDB commands against a live process. The `xcode` skill requires confirmation before
+  any of those, but the permission grant below is broad — `mcp__xcode__*` auto-approves reads and writes alike.
+
+`xcrun` resolves to whichever Xcode `xcode-select -p` points at. To run the bridge against a beta toolchain instead,
+export `DEVELOPER_DIR` in the shell (or the [direnv](#multi-account-setups-direnv) `.envrc`) you launch Claude Code
+from — the server inherits it at spawn time:
+
+```bash
+export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
+```
 
 ### Configure Remote MCPs (optional)
 
@@ -537,7 +580,8 @@ This plugin bundles several MCP servers. By default, Claude Code will prompt for
       "mcp__playstore__*",
       "mcp__playwright__*",
       "mcp__postgres__*",
-      "mcp__redis__*"
+      "mcp__redis__*",
+      "mcp__xcode__*"
     ]
   }
 }
@@ -588,7 +632,7 @@ vars, one-time auth commands, or remote MCP additions. Skills with no setup work
 | `doc-tracker-coverage`   | Verify a Google Doc section's items are tracked in Monday/Jira                                                          | Google Doc read: Workspace Docs MCP *(or)* `claude.ai Google Drive` MCP *(or)* published-to-web doc. monday: `claude mcp add monday` (`${MONDAY_TOKEN}`). Jira: atlassian remote MCP *(or)* `jira init` Optional env: `DOC_TRACKER_COVERAGE_TEAMS`                                                                                        |
 | `gcloud`                 | Manage Google Cloud infrastructure and services                                                                         | `gcloud auth login && gcloud config set project <id>`. Optional: `CLOUDSDK_ACTIVE_CONFIG_NAME` for named configs                                                                                                                                                                                                                          |
 | `heroku`                 | Manage Heroku apps, dynos, logs, and databases                                                                          | `heroku login`                                                                                                                                                                                                                                                                                                                            |
-| `loco`                   | Manage Loco translation assets (create, delete, scan)                                                                   | Env: `LOCO_API_KEY` *(or)* per-project `LOCO_API_KEY_<PROJECT>` (e.g. `LOCO_API_KEY_IOS`)                                                                                                                                                                                                                                                 |
+| `loco`                   | Manage Loco translation assets (create, delete, scan)                                                                   | Env: `LOCO_API_KEY` *(or)* per-project `LOCO_API_KEY_<PROJECT>` (e.g. `LOCO_API_KEY_IOS`). Apple String Catalogs (`.xcstrings`) additionally need the `xcode` MCP                                                                                                                                                                         |
 | `migrate-code`           | Port a codebase to another language/framework via a six-step rulebook/translate/compile/test/verify engine              | None — uses the repo's own build/test commands + bundled `context7` MCP                                                                                                                                                                                                                                                                   |
 | `monday`                 | Manage monday.com boards, items, groups, columns, and updates                                                           | `claude mcp add monday` with a `${MONDAY_TOKEN}` Bearer header — see [Configure Remote MCPs](#configure-remote-mcps-optional). Token from avatar → Developers → My access tokens. MCP-only, no CLI fallback                                                                                                                               |
 | `monday-weekly-report`   | Weekly project-status report from monday.com board(s)                                                                   | `claude mcp add monday` with a `${MONDAY_TOKEN}` Bearer header (see `monday` above). For attribution enable dynamic API. Optional env: `MONDAY_WEEKLY_REPORT_BOARDS`, `MONDAY_WEEKLY_REPORT_TO` (required for `--send`), `MONDAY_WEEKLY_REPORT_CC`, `MONDAY_WEEKLY_REPORT_ROLES` / `MONDAY_WEEKLY_REPORT_STATUSES` (cache path overrides) |
@@ -599,7 +643,7 @@ vars, one-time auth commands, or remote MCP additions. Skills with no setup work
 | `review-architecture`    | Review or create docs/architecture.md                                                                                   | None — uses bundled `fetch` + `context7` MCPs                                                                                                                                                                                                                                                                                             |
 | `review-aws-cost`        | Audit AWS spend for optimization: last 3 complete months vs the same 3 months of the previous year                      | `aws configure`, or env: `AWS_PROFILE` *(or)* `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` + `AWS_REGION`. Cost Explorer must be enabled; caller needs `ce:Get*`/`ce:List*` plus read on the services audited                                                                                                                            |
 | `review-copy`            | Audit user-facing copy — microcopy, form/help text, voice & tone, i18n readiness, marketing; writes docs/copy-review.md | None — uses `git` + optional `loco` handoff for i18n keys                                                                                                                                                                                                                                                                                 |
-| `review-design`          | Compare UI code against Figma designs (Android, iOS, web)                                                               | figma remote MCP **(required — no CLI fallback)**                                                                                                                                                                                                                                                                                         |
+| `review-design`          | Compare UI code against Figma designs (Android, iOS, web)                                                               | figma remote MCP **(required — no CLI fallback)**. Optional for rendered comparison: bundled `chrome-devtools` (web) and the `xcode` MCP (iOS); without them the review falls back to source-only                                                                                                                                         |
 | `review-readme`          | Review or create README.md to match standards                                                                           | None — uses bundled `fetch` + `context7` MCPs                                                                                                                                                                                                                                                                                             |
 | `review-seo`             | Audit SEO + GEO + front-end web quality (perf, Core Web Vitals, accessibility) for a codebase and/or live URL           | None — uses `curl` + bundled `fetch` + `chrome-devtools` MCPs                                                                                                                                                                                                                                                                             |
 | `review-user-guide`      | Review or create docs/user-guide.md with user documentation                                                             | None — uses bundled `fetch` + `context7` MCPs                                                                                                                                                                                                                                                                                             |
@@ -609,6 +653,7 @@ vars, one-time auth commands, or remote MCP additions. Skills with no setup work
 | `weekly-dev-report`      | Weekly dev activity report from Jira sprint + GitHub                                                                    | atlassian remote MCP *(or)* `jira init`. GitHub: `gh auth login`. Optional env: `WEEKLY_DEV_REPORT_TO` (required for `--send`), `WEEKLY_DEV_REPORT_CC`, `GITHUB_USERNAME_MAP`, `WEEKLY_DEV_REPORT_ROLES` (cache path override)                                                                                                            |
 | `work-issue`             | Implement GitHub/Jira issue(s) end-to-end and open a PR                                                                 | GitHub: `gh auth login` *(or)* `GITHUB_TOKEN`. Jira: atlassian remote MCP *(or)* `jira init`                                                                                                                                                                                                                                              |
 | `write-tests`            | Generate and run tests in the repo's own framework (unit/integration/e2e); enforces 80/80 line/branch coverage          | None — uses the test runner already in the repo (RSpec, pytest, Jest/Vitest, go test, dotnet, xcodebuild, gradle, PHPUnit/Pest, cargo, ctest, …)                                                                                                                                                                                          |
+| `xcode`                  | Build, run, test, debug and inspect an Xcode project locally (schemes, destinations, test plans, LLDB, previews)        | macOS + Xcode 27 only. No credentials — but the bridge is off by default, see [Enable the Xcode MCP](#enable-the-xcode-mcp-macos). CLI fallback: `xcodebuild`, bundled with Xcode                                                                                                                                                         |
 
 **GitHub credentials.** The `gh` and `git` CLI fallbacks read `GITHUB_TOKEN` (this is what the
 [direnv](#multi-account-setups-direnv) setup sets per directory); `gh auth login` works instead if you prefer stored

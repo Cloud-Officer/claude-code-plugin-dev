@@ -1,7 +1,7 @@
 ---
 name: run-linters
 description: Run linters, lint the code, check code style, or fix linting issues. Use when the user wants to lint, run linters, check code quality, verify code style, fix linting errors, or run code checks after completing code modifications.
-allowed-tools: Bash(linters:*), Bash(awk:*), Bash(basename:*), Bash(bundle:*), Bash(cargo:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(go:*), Bash(golangci-lint:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(make:*), Bash(mkdir:*), Bash(npm:*), Bash(npx:*), Bash(pnpm:*), Bash(python3:*), Bash(rake:*), Bash(rubocop:*), Bash(ruff:*), Bash(sed:*), Bash(shellcheck:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Bash(yamllint:*), Bash(yarn:*), Read, Edit
+allowed-tools: Bash(linters:*), Bash(awk:*), Bash(basename:*), Bash(bundle:*), Bash(cargo:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(go:*), Bash(golangci-lint:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(make:*), Bash(mkdir:*), Bash(npm:*), Bash(npx:*), Bash(pnpm:*), Bash(python3:*), Bash(rake:*), Bash(rubocop:*), Bash(ruff:*), Bash(sed:*), Bash(shellcheck:*), Bash(sort:*), Bash(swiftlint:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Bash(yamllint:*), Bash(yarn:*), Read, Edit
 ---
 
 # Run Linters
@@ -39,9 +39,12 @@ which linters
 | `ruff.toml`, `.ruff.toml`, `pyproject.toml` (with `tool.ruff`) | `ruff check .` |
 | `.golangci.yml`, `.golangci.yaml` | `golangci-lint run` |
 | `Cargo.toml` | `cargo clippy` |
+| `.swiftlint.yml` | `swiftlint lint --strict` (macOS only) |
 | `.markdownlint*` | `npx markdownlint-cli2 .` |
 | `.yamllint*` | `yamllint .` |
 | `*.sh` files | `shellcheck` on the shell scripts |
+
+`--strict` is what the `linters` wrapper uses, so the fallback holds the same bar: SwiftLint warnings fail the run. SwiftLint ships for macOS only — on another platform, report that Swift files went unchecked rather than passing over them.
 
 Prefer the project's own runner whenever one exists — an `npm run lint` script in `package.json`, a `rake lint` task, or a `make lint` target that already wraps the linter — over invoking the binary directly. Use the package manager the repository already uses (`npm`, `yarn`, or `pnpm`).
 

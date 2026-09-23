@@ -64,6 +64,10 @@
         "https://aws-mcp.us-east-1.api.aws/mcp"
       ]
     },
+    "xcode": {
+      "command": "xcrun",
+      "args": ["mcpbridge"]
+    },
     "appstore": {
       "command": "asc-mcp",
       "args": ["--workers", "apps,versions,builds,beta_groups,reviews,iap,xcode_cloud"]
