@@ -68,46 +68,83 @@ install works across multiple accounts and tenants.
 
 ### Quick Start
 
-The plugin bundles MCP servers that need `node` (for `npx`) and `uv` (for `uvx`). Most skills also use a CLI as a
-fallback when the MCP isn't available. Install the **core** for everyone, then only the optional CLIs for the skills you
-actually use.
+Install the **required** set on every machine, add the plugin, then pick from the **optional** list — those are only
+needed if you use the skills that call them.
+
+| Component                               | Required?    | Needed for                                                                                                                                                                                                                                                                             |
+|-----------------------------------------|--------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Claude Code                             | **Required** | Everything                                                                                                                                                                                                                                                                             |
+| `git` (Git for Windows on Windows)      | **Required** | Any skill that reads history, branches, or diffs. On Windows it also provides Git Bash, which Claude Code's Bash tool — and so every skill's shell commands (`curl`, `sed`, `awk`) — runs in                                                                                           |
+| `node` (`npm` / `npx`)                  | **Required** | Bundled MCP servers started with `npx` (`context7`, `chrome-devtools`, `playwright`, the database and `gcloud` MCPs) and npm-installed LSPs                                                                                                                                            |
+| `uv` (`uvx`)                            | **Required** | Bundled MCP servers started with `uvx` (`fetch`, `aws`, `redis`, `playstore`)                                                                                                                                                                                                          |
+| `jq`                                    | **Required** | JSON parsing in `code-review-deep`, `review-readme`, and the GitHub, Jira, and Loco skills                                                                                                                                                                                             |
+| `direnv` (plus PowerShell 7 on Windows) | **Required** | Loading each repo's credentials (`GITHUB_TOKEN`, `JIRA_*`, database and cloud variables) from its `.envrc` — see [Multi-Account Setups (direnv)](#multi-account-setups-direnv)                                                                                                         |
+| `github-mcp-server` and/or `gh`         | Optional     | GitHub skills: `create-pr`, `create-issue`, `work-issue`, `verify-resolved-issues`, `weekly-dev-report`, `code-review-deep`. The MCP is preferred and `gh` is the fallback — either one is enough. Without the MCP binary, the bundled `github` server just shows as failed to connect |
+| Google Chrome                           | Optional     | The bundled `chrome-devtools` MCP, used by `review-seo` and `review-design` for rendered-page checks                                                                                                                                                                                   |
+| Playwright Chromium                     | Optional     | The bundled `playwright` MCP, for ad-hoc browser automation — no skill requires it                                                                                                                                                                                                     |
+| Service CLIs                            | Optional     | The matching skill — see the **Setup** column in the [Skills](#skills) table                                                                                                                                                                                                           |
+| Database CLIs                           | Optional     | `query-db` and `analyze-db`, for the engines you point them at                                                                                                                                                                                                                         |
+| Language servers (LSPs)                 | Optional     | Real type information for the languages you write — see [Language Servers (LSPs)](#language-servers-lsps)                                                                                                                                                                              |
+| Xcode 27+ (macOS)                       | Optional     | The `xcode` skill and MCP — see [Enable the Xcode MCP](#enable-the-xcode-mcp-macos)                                                                                                                                                                                                    |
 
 #### macOS (Homebrew)
 
+**Required.** Install [Homebrew](https://brew.sh) first if you don't have it, then:
+
 ```bash
-# Core (required)
-brew install node uv gh jq
-brew install github-mcp-server # GitHub's official MCP server binary — verified against v1.12.2
+brew install --cask claude-code
+brew install git node uv jq direnv
 ```
 
-In Claude Code:
+Then add the direnv shell hook from [Multi-Account Setups (direnv)](#multi-account-setups-direnv).
+
+**Install the plugin** — in Claude Code:
 
 ```text
 claude plugin marketplace add cloud-officer/claude-code-plugin-dev
 claude plugin install co-dev@cloud-officer
 ```
 
-After install:
+**Optional — install only what you use.**
+
+GitHub skills (one of the two is enough; the MCP is preferred):
 
 ```bash
-# Browser automation (Playwright MCP) — first run only
-npx playwright install chromium
+brew install github-mcp-server # GitHub's official MCP server binary — verified against v1.12.2
+brew install gh
 ```
 
-Optional service CLIs — install only what you need (each maps to a skill in the [Skills](#skills) table below):
+Browsers:
 
 ```bash
-brew install awscli google-cloud-sdk heroku newrelic-cli # cloud
-brew tap ankitpokhrel/jira-cli && brew install jira-cli # jira
-brew install mint && mint install zelentsov-dev/asc-mcp@v4.1.6 # iOS App Store Connect + Xcode Cloud (MCP)
-brew install asc # iOS App Store Connect + Xcode Cloud (CLI fallback)
+brew install --cask google-chrome # chrome-devtools MCP (review-seo, review-design)
+npx playwright install chromium # playwright MCP
 ```
+
+Service CLIs (each maps to a skill in the [Skills](#skills) table below):
+
+```bash
+brew install awscli heroku newrelic-cli # aws, review-aws-cost, heroku, newrelic
+brew install --cask gcloud-cli # gcloud; also provides bq for crashlytics and query-db on BigQuery
+brew tap ankitpokhrel/jira-cli && brew install jira-cli # Jira CLI fallback (create-issue, sprint-summary, …)
+brew install mint && mint install zelentsov-dev/asc-mcp@v4.1.6 # appstore (MCP)
+brew install asc # appstore (CLI fallback)
+```
+
+Database CLIs — only for the engines you point `query-db` / `analyze-db` at:
+
+```bash
+brew install libpq mysql-client mongosh redis # psql, mysql, mongosh, redis-cli
+brew link --force libpq mysql-client # both are keg-only; this puts psql and mysql on PATH
+```
+
+`sqlite3` and `curl` (used for Elasticsearch) ship with macOS; `bq` comes with `gcloud-cli` above.
 
 The bundled `xcode` MCP server needs **Xcode 27 or later** and one extra toggle — see
 [Enable the Xcode MCP](#enable-the-xcode-mcp-macos) below. On Linux and Windows it simply fails to start and the rest of
 the plugin is unaffected.
 
-Language servers (LSPs) — only what you write. The plugin declares LSPs for many languages, but each binary needs to be on your PATH for that language to activate:
+Language servers (LSPs) — only what you write. Each binary needs to be on your PATH for that language to activate:
 
 ```bash
 # JavaScript/TypeScript (covers .ts/.tsx/.js/.jsx/.mts/.cts/.mjs/.cjs)
@@ -117,15 +154,18 @@ npm i -g typescript typescript-language-server
 brew install pyright
 
 # Ruby (covers .rb/.rake/.gemspec/.ru)
+brew install ruby
 gem install ruby-lsp
 
 # Go (covers .go)
-go install golang.org/x/tools/gopls@latest
+brew install go
+go install golang.org/x/tools/gopls@latest # lands in ~/go/bin — add it to PATH
 
 # Bash/shell (covers .sh/.bash/.zsh)
 npm i -g bash-language-server
 
 # Rust (covers .rs)
+brew install rustup && rustup default stable
 rustup component add rust-analyzer
 
 # YAML (covers .yml/.yaml; provides GitHub Actions/k8s schema validation)
@@ -136,16 +176,16 @@ npm i -g yaml-language-server
 # PHP (covers .php)
 npm i -g intelephense
 
-# Kotlin (covers .kt/.kts) — JetBrains' official LSP, requires Java 17+
+# Kotlin (covers .kt/.kts) — JetBrains' official LSP, bundles its own Java runtime
 brew install JetBrains/utils/kotlin-lsp
 
-# Java (covers .java)
+# Java (covers .java) — pulls in openjdk
 brew install jdtls
 
-# C/C++/Objective-C (covers .c/.cpp/.h/.hpp/.m/.mm) — bundled with llvm
-brew install llvm
+# C/C++/Objective-C (covers .c/.cpp/.h/.hpp/.m/.mm) — llvm is keg-only, so link just clangd onto PATH
+brew install llvm && ln -sf "$(brew --prefix llvm)/bin/clangd" "$(brew --prefix)/bin/clangd"
 
-# Perl (covers .pl/.pm/.t)
+# Perl (covers .pl/.pm/.t) — perl itself ships with macOS
 npm i -g perlnavigator-server
 ```
 
@@ -154,61 +194,145 @@ types.
 
 #### Linux (Debian/Ubuntu)
 
+**Required:**
+
 ```bash
-# Core (required)
-sudo apt update && sudo apt install -y curl jq git nodejs npm
+curl -fsSL https://claude.ai/install.sh | bash
+sudo apt update && sudo apt install -y curl git jq direnv nodejs npm
 curl -LsSf https://astral.sh/uv/install.sh | sh
-# gh: https://github.com/cli/cli/blob/trunk/docs/install_linux.md
-# github-mcp-server: https://github.com/github/github-mcp-server/releases (verified against v1.12.2)
+echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
 ```
 
-In Claude Code:
+**Install the plugin** — in Claude Code:
 
 ```text
 claude plugin marketplace add cloud-officer/claude-code-plugin-dev
 claude plugin install co-dev@cloud-officer
 ```
 
-After install:
+**Optional — install only what you use:**
 
-```bash
-npx playwright install chromium
-```
-
-Optional service CLIs: each tool ships its own Linux installer — see official docs for `aws`, `gcloud`, `heroku`,
-`newrelic`, `jira-cli`. App Store Connect is macOS-only.
-
-Language servers (LSPs): the `npm`, `gem`, `go install`, and `rustup`
-install commands listed under the macOS section are cross-platform. Use your distro's package manager for
-`clangd` (often `clang-tools` or `llvm`) and `pyright` (or
-`pip install pyright`). Swift LSP requires Xcode (macOS only).
+* GitHub skills: [`github-mcp-server`](https://github.com/github/github-mcp-server/releases) (verified against v1.12.2)
+  and/or [`gh`](https://github.com/cli/cli/blob/trunk/docs/install_linux.md).
+* Browsers: Google Chrome for the `chrome-devtools` MCP; `npx playwright install --with-deps chromium` for the
+  `playwright` MCP.
+* Service CLIs: each tool ships its own Linux installer — see official docs for `aws`, `gcloud`, `heroku`, `newrelic`,
+  `jira-cli`. App Store Connect is macOS-only.
+* Database CLIs: `sudo apt install -y postgresql-client default-mysql-client redis-tools sqlite3`, plus
+  [`mongosh`](https://www.mongodb.com/docs/mongodb-shell/install/).
+* Language servers (LSPs): the `npm`, `gem`, `go install`, and `rustup` install commands listed under the macOS section
+  are cross-platform. Use your distro's package manager for `clangd` (often `clang-tools` or `llvm`) and `pyright` (or
+  `pip install pyright`). Swift LSP requires Xcode (macOS only).
 
 #### Windows (Scoop)
 
+**Required.** Git for Windows is required here, not just recommended: Claude Code runs its Bash tool through Git Bash,
+the skills' shell commands rely on the `bash`, `curl`, `sed`, and `awk` it ships, and direnv uses its `bash` to evaluate
+`.envrc` files — without it Claude Code falls back to PowerShell and those commands break. PowerShell 7 is required
+because direnv's PowerShell hook needs 7.2+; the built-in Windows PowerShell 5.1 is too old.
+
 ```powershell
-# Core (required)
-scoop install nodejs uv gh jq
-# github-mcp-server: https://github.com/github/github-mcp-server/releases (verified against v1.12.2)
+# From the built-in Windows PowerShell: install PowerShell 7, then reopen the terminal as "PowerShell 7"
+winget install --id Microsoft.PowerShell -e
+
+# Git for Windows (default install path C:\Program Files\Git, which Claude Code and direnv expect)
+winget install --id Git.Git -e
+
+# Scoop (package manager, no admin rights needed)
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+irm get.scoop.sh | iex
+
+# Claude Code, then the rest of the required tools
+irm https://claude.ai/install.ps1 | iex
+scoop install nodejs-lts uv jq direnv
 ```
 
-In Claude Code:
+Then set up the direnv hook with the Windows steps in [Multi-Account Setups (direnv)](#multi-account-setups-direnv).
+
+If Claude Code reports it can't find Git Bash, point it at `C:\Program Files\Git\bin\bash.exe` with
+`CLAUDE_CODE_GIT_BASH_PATH` in the `env` block of `~/.claude/settings.json`.
+
+**Install the plugin** — in Claude Code:
 
 ```text
 claude plugin marketplace add cloud-officer/claude-code-plugin-dev
 claude plugin install co-dev@cloud-officer
 ```
 
-After install:
+**Optional — install only what you use.**
+
+GitHub skills (one of the two is enough; the MCP is preferred):
 
 ```powershell
-npx playwright install chromium
+scoop install github-mcp-server # GitHub's official MCP server binary — verified against v1.12.2
+scoop install gh
 ```
 
-Optional service CLIs: install via `scoop`, `winget`, or each tool's installer. App Store Connect is macOS-only.
+Browsers:
 
-Language servers (LSPs): the `npm`, `gem`, `go install`, and `rustup`
-install commands listed under the macOS section work on Windows under their respective toolchains. Use
-`scoop install llvm` for `clangd`. Swift LSP is macOS-only (requires Xcode).
+```powershell
+winget install --id Google.Chrome -e # chrome-devtools MCP (review-seo, review-design)
+npx playwright install chromium # playwright MCP
+```
+
+Service CLIs (each maps to a skill in the [Skills](#skills) table below):
+
+```powershell
+scoop bucket add extras
+scoop install aws heroku-cli # aws, review-aws-cost, heroku
+scoop install gcloud # gcloud; also provides bq for crashlytics and query-db on BigQuery
+scoop install jira-cli # Jira CLI fallback (create-issue, sprint-summary, …)
+scoop bucket add newrelic-cli https://github.com/newrelic/newrelic-cli.git; scoop install newrelic-cli # newrelic
+```
+
+`appstore` (App Store Connect) and `xcode` are macOS-only.
+
+Database CLIs — only for the engines you point `query-db` / `analyze-db` at:
+
+```powershell
+scoop bucket add extras # mongosh lives here
+scoop install postgresql mysql mongosh redis sqlite # psql, mysql, mongosh, redis-cli, sqlite3
+```
+
+The `postgresql`, `mysql`, and `redis` packages also contain the servers, but nothing starts unless you run it — the
+skills only use the clients. `curl` (used for Elasticsearch) ships with Windows 10+ and Git Bash; `bq` comes with
+`gcloud` above.
+
+Language servers (LSPs) — only what you write:
+
+```powershell
+# JavaScript/TypeScript, Python, Bash, YAML, PHP
+npm i -g typescript typescript-language-server pyright bash-language-server yaml-language-server intelephense
+
+# Ruby — the MSYS2 toolchain is needed to build ruby-lsp's native extensions
+scoop install ruby msys2
+ridk install
+gem install ruby-lsp
+
+# Go
+scoop install go
+go install golang.org/x/tools/gopls@latest
+
+# Rust
+scoop install rustup
+rustup component add rust-analyzer
+
+# Java
+scoop bucket add java
+scoop install temurin21-jdk jdtls
+
+# C/C++/Objective-C
+scoop install llvm
+
+# Perl
+scoop install perl
+npm i -g perlnavigator-server
+```
+
+Kotlin has no package: download the Windows zip from the
+[kotlin-lsp releases](https://github.com/Kotlin/kotlin-lsp/releases), unpack it, and add the unpacked folder (the one
+containing `kotlin-lsp.cmd`) to your user `PATH`. It bundles its own Java runtime. Swift LSP is macOS-only (requires
+Xcode).
 
 ### Enable the Xcode MCP (macOS)
 
@@ -316,19 +440,9 @@ same Client ID cannot be reused across orgs.
 
 #### Step 2 — Per-machine install
 
-**macOS:**
-
-```bash
-brew install uv direnv
-```
-
-Hook direnv into your shell — add to `~/.zshrc` (once, then `source ~/.zshrc`):
-
-```bash
-eval "$(direnv hook zsh)"
-```
-
-Then in the directory where you'll launch Claude Code, create an `.envrc` file with everything workspace-mcp needs:
+`uv` and `direnv` are part of the required [Quick Start](#quick-start) tools, and the direnv hook is set up
+in [Multi-Account Setups (direnv)](#multi-account-setups-direnv). In the directory where you'll launch Claude
+Code, create an `.envrc` file with everything workspace-mcp needs — the same file works on macOS and Windows:
 
 ```bash
 export GOOGLE_OAUTH_CLIENT_ID="your-client-id"
@@ -341,22 +455,6 @@ Approve it with `direnv allow` (run from that directory). direnv loads the vars 
 `cd` in and unloads them when you `cd` out — keep one
 `.envrc` per workspace org / per concurrently-running session, each with its own `USER_GOOGLE_EMAIL` and
 `PORT`. See [Multi-Account Setups (direnv)](#multi-account-setups-direnv) below for the caveats around switching mid-session.
-
-**Windows (PowerShell, no admin needed):**
-
-```powershell
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-[System.Environment]::SetEnvironmentVariable("GOOGLE_OAUTH_CLIENT_ID", "your-client-id", "User")
-[System.Environment]::SetEnvironmentVariable("GOOGLE_OAUTH_CLIENT_SECRET", "your-client-secret", "User")
-[System.Environment]::SetEnvironmentVariable("USER_GOOGLE_EMAIL", "you@yourdomain.com", "User")
-[System.Environment]::SetEnvironmentVariable("PORT", "8765", "User")
-```
-
-Close and reopen PowerShell so the new env vars take effect. Git for Windows must also be installed (Claude Code uses Git Bash internally) — get it from [git-scm.com](https://git-scm.com/download/win) with default options.
-
-User-scope env vars are global on Windows, so if you need a second workspace account or run multiple Claude sessions concurrently, override
-`USER_GOOGLE_EMAIL` and `PORT` per session before launching Claude (
-`$env:USER_GOOGLE_EMAIL="..."; $env:PORT="8766"; claude`).
 
 #### Step 3 — Add the MCP server
 
@@ -390,7 +488,7 @@ running concurrently on the machine needs a unique port.** There are two scenari
 anticipate the first but not the second:
 
 1. **Multiple accounts on the same machine** (e.g. personal + company in different folders). Each folder's
-   `.envrc` (macOS/direnv) — or each session's PowerShell overrides (Windows) — needs its own
+   `.envrc` needs its own
    `PORT`, otherwise both instances try to bind `8000` and the second one fails.
 2. **Multiple Claude Code sessions running at the same time, even from different directories.** Per-directory env vars
    don't help if two sessions still resolve to the same `PORT` — every running Claude Code session spawns its own MCP
@@ -400,7 +498,7 @@ anticipate the first but not the second:
 
 Pick ports above 8000 (e.g. `8765`, `8766`, `8767`, …) and assign one per account
 *and* per concurrently-running session. The setup is then **one `.envrc` per directory** plus a single
-`claude mcp add` from each. Example with two accounts on macOS:
+`claude mcp add` from each. Example with two accounts:
 
 ```bash
 # ~/work/personal-stuff/.envrc
@@ -469,33 +567,39 @@ These official plugins from the `claude-plugins-official` marketplace pair well 
 > The `stripe` plugin bundles Stripe's own MCP and agent tools, so you do **not** need a separate
 > `claude mcp add stripe`. For local webhook
 > testing you can optionally add the Stripe CLI (used by Stripe's plugin and your app dev, not by `co-dev`
-> itself): `brew install stripe/stripe-cli/stripe` then `stripe login` (`stripe listen`, `stripe trigger`).
+> itself): `brew install stripe/stripe-cli/stripe` (macOS) or
+> `scoop bucket add stripe https://github.com/stripe/scoop-stripe-cli.git; scoop install stripe` (Windows), then
+> `stripe login` (`stripe listen`, `stripe trigger`).
 >
 > The `vercel` plugin bundles the Vercel MCP, so no separate `claude mcp add vercel` is needed. That MCP is
 > read-only (docs, list projects/deployments, logs); write operations (`deploy`, `promote`, env changes) run
-> through the `vercel` CLI — install it too: `brew install vercel-cli` then `vercel login`.
+> through the `vercel` CLI — install it too: `brew install vercel` (macOS) or `npm i -g vercel` (Windows), then
+> `vercel login`.
 >
 > The `huggingface-skills` plugin's Hub operations use the Hugging Face CLI — install it with
-> `brew install hf` then `hf auth login`. Its training and evaluation skills additionally need a Python ML
+> `brew install hf` (macOS) or `powershell -ExecutionPolicy ByPass -c "irm https://hf.co/cli/install.ps1 | iex"`
+> (Windows), then `hf auth login`. Its training and evaluation skills additionally need a Python ML
 > environment (torch, transformers, TRL) specific to your project.
 >
 > The `sentry` plugin is skill-based (SDK setup + debug workflows). For CLI operations — release tracking and
-> source-map uploads — install the Sentry CLI: `brew install sentry-cli` (also packaged as the `sentry-cli`
-> plugin).
+> source-map uploads — install the Sentry CLI: `brew install getsentry/tools/sentry-cli` (macOS) or
+> `scoop install sentry-cli` (Windows). It is also packaged as the `sentry-cli` plugin.
 >
 > The `azure` plugin bundles the Azure MCP (`@azure/mcp`), so no separate `claude mcp add` is needed. It
-> authenticates with your Azure CLI credentials — install it with `brew install azure-cli` then `az login`.
+> authenticates with your Azure CLI credentials — install it with `brew install azure-cli` (macOS) or
+> `scoop install azure-cli` (Windows), then `az login`.
 >
 > The `firebase` plugin bundles the Firebase MCP, so no separate `claude mcp add` is needed. Its CLI
 > operations (deploy, emulators, security rules) use the Firebase CLI — install it with
-> `brew install firebase-cli` then `firebase login`. It complements `co-dev`'s `crashlytics` skill (crash
+> `brew install firebase-cli` (macOS) or `npm i -g firebase-tools` (Windows), then `firebase login`. It complements `co-dev`'s `crashlytics` skill (crash
 > data via BigQuery) rather than replacing it.
 >
 > The `slack` plugin bundles Slack's hosted MCP (`https://mcp.slack.com/mcp`), so no separate
 > `claude mcp add slack` is needed. It authenticates by OAuth on first use and inherits **your** Slack
 > permissions — but your workspace admin must approve MCP integration before that OAuth succeeds. Its
 > app-development skills additionally need the Slack CLI:
-> `curl -fsSL https://downloads.slack-edge.com/slack-cli/install.sh | bash` then `slack login`.
+> `curl -fsSL https://downloads.slack-edge.com/slack-cli/install.sh | bash` (macOS) or
+> `irm https://downloads.slack-edge.com/slack-cli/install-windows.ps1 | iex` (Windows), then `slack login`.
 >
 > **One Slack workspace per machine.** The plugin registers the server under the fixed name `slack`, and
 > that name owns exactly one OAuth grant (see [Naming caveat for multi-tenant setups](#configure-remote-mcps-optional)) — per-folder
@@ -504,10 +608,8 @@ These official plugins from the `claude-plugins-official` marketplace pair well 
 > folders under distinct names and add a permission entry for each:
 >
 > ```bash
-> cd ~/work/companya && claude mcp add slack-companya --transport http https://mcp.slack.com/mcp \
->   --client-id 1601185624273.8899143856786 --callback-port 3118
-> cd ~/work/companyb && claude mcp add slack-companyb --transport http https://mcp.slack.com/mcp \
->   --client-id 1601185624273.8899143856786 --callback-port 3118
+> cd ~/work/companya && claude mcp add slack-companya --transport http https://mcp.slack.com/mcp --client-id 1601185624273.8899143856786 --callback-port 3118
+> cd ~/work/companyb && claude mcp add slack-companyb --transport http https://mcp.slack.com/mcp --client-id 1601185624273.8899143856786 --callback-port 3118
 > ```
 >
 > Both flags are mandatory. `mcp.slack.com` does **not** support dynamic client registration, so a plain
@@ -548,6 +650,66 @@ Every account-bound MCP server in this plugin reads its credentials from environ
 `.mcp.json`. This makes [direnv](https://direnv.net/) a natural fit for switching between accounts (different AWS profiles, separate Postgres instances, multiple GitHub orgs, etc.) by setting per-directory env vars in an
 `.envrc` file.
 
+#### Setup on macOS
+
+`brew install direnv` (part of the required [Quick Start](#macos-homebrew) tools), then add the hook to `~/.zshrc` once and
+`source ~/.zshrc`:
+
+```bash
+eval "$(direnv hook zsh)"
+```
+
+#### Setup on Windows
+
+direnv supports PowerShell 7.2+ natively (both are part of the required [Quick Start](#windows-scoop) tools). It
+still evaluates `.envrc` with bash, so it needs Git for Windows' bash and a couple of path variables it would otherwise
+not find on Windows.
+
+1. Create direnv's config, data, and cache folders:
+
+   ```powershell
+   New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.config\direnv", "$env:USERPROFILE\.local\share\direnv", "$env:USERPROFILE\.cache\direnv"
+   ```
+
+2. Point direnv at Git Bash — create `%USERPROFILE%\.config\direnv\direnv.toml` containing:
+
+   ```toml
+   [global]
+   bash_path = "C:\\Program Files\\Git\\bin\\bash.exe"
+   ```
+
+   Don't rely on whichever `bash` is first on `PATH`: `C:\Windows\System32\bash.exe` is the WSL launcher, and direnv
+   fails with exit status 127 when it picks that one.
+
+3. Add the hook to your PowerShell profile (`notepad $PROFILE`; create the file if it doesn't exist), then open a new
+   PowerShell 7 window:
+
+   ```powershell
+   $env:XDG_CONFIG_HOME = "$env:USERPROFILE\.config"
+   $env:XDG_DATA_HOME = "$env:USERPROFILE\.local\share"
+   $env:XDG_CACHE_HOME = "$env:USERPROFILE\.cache"
+   Invoke-Expression "$(direnv hook pwsh)"
+   ```
+
+4. Check it: `cd` into a folder with an `.envrc`, run `direnv allow`, and confirm a variable is set (e.g.
+   `$env:GITHUB_TOKEN`).
+
+`.envrc` files are bash on every platform, so they are shared between macOS and Windows unchanged. Write any file
+paths in them with forward slashes (`export GOOGLE_APPLICATION_CREDENTIALS="C:/Users/you/keys/play.json"`).
+
+**Fallback if the hook misbehaves.** direnv's PowerShell support is newer than its bash/zsh support, and there are open
+reports of it emitting invalid PowerShell for some system variables. If that happens to you, skip the hook and keep a
+small launcher per directory instead — the variables only need to exist when `claude` starts:
+
+```powershell
+# start-claude.ps1 (keep it out of git)
+$env:GITHUB_TOKEN = "ghp_..."
+$env:JIRA_URL = "https://yourcompany.atlassian.net"
+claude
+```
+
+#### Switching accounts
+
 **Important caveat:** Claude Code spawns MCP servers **once, at startup**, and they inherit the shell environment at
 that moment. The implication:
 
@@ -556,8 +718,8 @@ that moment. The implication:
 * ✗ Does not work: starting Claude Code in one project, then
   `cd`-ing to another mid-session. The already-running MCP servers keep the original env vars and continue talking to the original account.
 
-**Bottom line:** to switch accounts, quit Claude Code and relaunch it from the target directory. direnv handles the
-rest.
+**Bottom line:** to switch accounts, quit Claude Code and relaunch it from the target directory. direnv (or the
+launcher script) handles the rest.
 
 ### Recommended Permissions
 
@@ -734,7 +896,7 @@ agents) becomes meaningfully more accurate.
 | C / C++ / Objective-C   | `clangd`                             | `.c`, `.cpp`, `.cc`, `.cxx`, `.h`, `.hpp`, `.hh`, `.hxx`, `.m`, `.mm` |
 | Perl                    | `perlnavigator`                      | `.pl`, `.pm`, `.t`                                                    |
 
-Install commands per LSP are in the [macOS Quick Start](#macos-homebrew) section. **Install only the LSPs for languages
+Install commands per LSP are in the [macOS](#macos-homebrew) and [Windows](#windows-scoop) Quick Start sections. **Install only the LSPs for languages
 you actually write** — each one adds a small startup cost only when its file types appear in a workspace.
 
 ### Local Development
