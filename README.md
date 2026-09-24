@@ -68,8 +68,8 @@ install works across multiple accounts and tenants.
 
 ### Quick Start
 
-Only four tools are required. Everything else is only needed if you use the skills that call it, so install the
-**required** set, add the plugin, then pick from the **optional** list below.
+Install the **required** set on every machine, add the plugin, then pick from the **optional** list — those are only
+needed if you use the skills that call them.
 
 | Component                               | Required?    | Needed for                                                                                                                                                                                                                                                                             |
 |-----------------------------------------|--------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -78,8 +78,8 @@ Only four tools are required. Everything else is only needed if you use the skil
 | `node` (`npm` / `npx`)                  | **Required** | Bundled MCP servers started with `npx` (`context7`, `chrome-devtools`, `playwright`, the database and `gcloud` MCPs) and npm-installed LSPs                                                                                                                                            |
 | `uv` (`uvx`)                            | **Required** | Bundled MCP servers started with `uvx` (`fetch`, `aws`, `redis`, `playstore`)                                                                                                                                                                                                          |
 | `jq`                                    | **Required** | JSON parsing in `code-review-deep`, `review-readme`, and the GitHub, Jira, and Loco skills                                                                                                                                                                                             |
+| `direnv` (plus PowerShell 7 on Windows) | **Required** | Loading each repo's credentials (`GITHUB_TOKEN`, `JIRA_*`, database and cloud variables) from its `.envrc` — see [Multi-Account Setups (direnv)](#multi-account-setups-direnv)                                                                                                         |
 | `github-mcp-server` and/or `gh`         | Optional     | GitHub skills: `create-pr`, `create-issue`, `work-issue`, `verify-resolved-issues`, `weekly-dev-report`, `code-review-deep`. The MCP is preferred and `gh` is the fallback — either one is enough. Without the MCP binary, the bundled `github` server just shows as failed to connect |
-| `direnv` (plus PowerShell 7 on Windows) | Optional     | Per-directory credentials when you work across several accounts — see [Multi-Account Setups (direnv)](#multi-account-setups-direnv)                                                                                                                                                    |
 | Google Chrome                           | Optional     | The bundled `chrome-devtools` MCP, used by `review-seo` and `review-design` for rendered-page checks                                                                                                                                                                                   |
 | Playwright Chromium                     | Optional     | The bundled `playwright` MCP, for ad-hoc browser automation — no skill requires it                                                                                                                                                                                                     |
 | Service CLIs                            | Optional     | The matching skill — see the **Setup** column in the [Skills](#skills) table                                                                                                                                                                                                           |
@@ -93,8 +93,10 @@ Only four tools are required. Everything else is only needed if you use the skil
 
 ```bash
 brew install --cask claude-code
-brew install git node uv jq
+brew install git node uv jq direnv
 ```
+
+Then add the direnv shell hook from [Multi-Account Setups (direnv)](#multi-account-setups-direnv).
 
 **Install the plugin** — in Claude Code:
 
@@ -110,12 +112,6 @@ GitHub skills (one of the two is enough; the MCP is preferred):
 ```bash
 brew install github-mcp-server # GitHub's official MCP server binary — verified against v1.12.2
 brew install gh
-```
-
-Per-directory credentials — then add the shell hook from [Multi-Account Setups (direnv)](#multi-account-setups-direnv):
-
-```bash
-brew install direnv
 ```
 
 Browsers:
@@ -202,8 +198,9 @@ types.
 
 ```bash
 curl -fsSL https://claude.ai/install.sh | bash
-sudo apt update && sudo apt install -y curl git jq nodejs npm
+sudo apt update && sudo apt install -y curl git jq direnv nodejs npm
 curl -LsSf https://astral.sh/uv/install.sh | sh
+echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
 ```
 
 **Install the plugin** — in Claude Code:
@@ -217,7 +214,6 @@ claude plugin install co-dev@cloud-officer
 
 * GitHub skills: [`github-mcp-server`](https://github.com/github/github-mcp-server/releases) (verified against v1.12.2)
   and/or [`gh`](https://github.com/cli/cli/blob/trunk/docs/install_linux.md).
-* Per-directory credentials: `sudo apt install -y direnv`, then add `eval "$(direnv hook bash)"` to `~/.bashrc`.
 * Browsers: Google Chrome for the `chrome-devtools` MCP; `npx playwright install --with-deps chromium` for the
   `playwright` MCP.
 * Service CLIs: each tool ships its own Linux installer — see official docs for `aws`, `gcloud`, `heroku`, `newrelic`,
@@ -230,12 +226,16 @@ claude plugin install co-dev@cloud-officer
 
 #### Windows (Scoop)
 
-**Required.** Run these in PowerShell. Git for Windows is required here, not just recommended: Claude Code runs its
-Bash tool through Git Bash, and the skills' shell commands rely on the `bash`, `curl`, `sed`, and `awk` it ships —
-without it Claude Code falls back to PowerShell and those commands break.
+**Required.** Git for Windows is required here, not just recommended: Claude Code runs its Bash tool through Git Bash,
+the skills' shell commands rely on the `bash`, `curl`, `sed`, and `awk` it ships, and direnv uses its `bash` to evaluate
+`.envrc` files — without it Claude Code falls back to PowerShell and those commands break. PowerShell 7 is required
+because direnv's PowerShell hook needs 7.2+; the built-in Windows PowerShell 5.1 is too old.
 
 ```powershell
-# Git for Windows (default install path C:\Program Files\Git, which Claude Code expects)
+# From the built-in Windows PowerShell: install PowerShell 7, then reopen the terminal as "PowerShell 7"
+winget install --id Microsoft.PowerShell -e
+
+# Git for Windows (default install path C:\Program Files\Git, which Claude Code and direnv expect)
 winget install --id Git.Git -e
 
 # Scoop (package manager, no admin rights needed)
@@ -244,8 +244,10 @@ irm get.scoop.sh | iex
 
 # Claude Code, then the rest of the required tools
 irm https://claude.ai/install.ps1 | iex
-scoop install nodejs-lts uv jq
+scoop install nodejs-lts uv jq direnv
 ```
+
+Then set up the direnv hook with the Windows steps in [Multi-Account Setups (direnv)](#multi-account-setups-direnv).
 
 If Claude Code reports it can't find Git Bash, point it at `C:\Program Files\Git\bin\bash.exe` with
 `CLAUDE_CODE_GIT_BASH_PATH` in the `env` block of `~/.claude/settings.json`.
@@ -264,14 +266,6 @@ GitHub skills (one of the two is enough; the MCP is preferred):
 ```powershell
 scoop install github-mcp-server # GitHub's official MCP server binary — verified against v1.12.2
 scoop install gh
-```
-
-Per-directory credentials — direnv's PowerShell hook needs PowerShell 7.2+, not the built-in Windows PowerShell 5.1.
-Install both, then follow the Windows steps in [Multi-Account Setups (direnv)](#multi-account-setups-direnv):
-
-```powershell
-winget install --id Microsoft.PowerShell -e
-scoop install direnv
 ```
 
 Browsers:
@@ -446,7 +440,7 @@ same Client ID cannot be reused across orgs.
 
 #### Step 2 — Per-machine install
 
-`uv` is part of the required [Quick Start](#quick-start) tools. Install direnv from the optional list and set up its hook
+`uv` and `direnv` are part of the required [Quick Start](#quick-start) tools, and the direnv hook is set up
 in [Multi-Account Setups (direnv)](#multi-account-setups-direnv). In the directory where you'll launch Claude
 Code, create an `.envrc` file with everything workspace-mcp needs — the same file works on macOS and Windows:
 
@@ -658,7 +652,7 @@ Every account-bound MCP server in this plugin reads its credentials from environ
 
 #### Setup on macOS
 
-`brew install direnv` (see the optional list in the [Quick Start](#macos-homebrew)), then add the hook to `~/.zshrc` once and
+`brew install direnv` (part of the required [Quick Start](#macos-homebrew) tools), then add the hook to `~/.zshrc` once and
 `source ~/.zshrc`:
 
 ```bash
@@ -667,7 +661,7 @@ eval "$(direnv hook zsh)"
 
 #### Setup on Windows
 
-direnv supports PowerShell 7.2+ natively (install both from the optional list in the [Quick Start](#windows-scoop)). It
+direnv supports PowerShell 7.2+ natively (both are part of the required [Quick Start](#windows-scoop) tools). It
 still evaluates `.envrc` with bash, so it needs Git for Windows' bash and a couple of path variables it would otherwise
 not find on Windows.
 
