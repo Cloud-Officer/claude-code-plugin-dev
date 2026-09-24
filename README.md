@@ -24,8 +24,8 @@ Claude Code plugin for development workflow automation.
 ## Introduction
 
 `claude-code-plugin-dev` is the source repository for **`co-dev`**, a Claude Code plugin that automates day-to-day
-development workflows. It bundles 33 skills — issue tracking, PR creation, deep code review, test generation, linting,
-documentation reviews, cloud cost audits, cloud, Xcode and app-store operations, and reporting — alongside 13 language servers and 14 MCP servers
+development workflows. It bundles 34 skills — issue tracking, PR creation, deep code review, test generation, linting,
+documentation reviews, cloud cost audits, cloud, email-marketing, Xcode and app-store operations, and reporting — alongside 13 language servers and 14 MCP servers
 that Claude Code loads automatically once the plugin is installed.
 
 It is aimed at engineering teams that want these workflows available in every repository without wiring up each
@@ -51,6 +51,7 @@ install works across multiple accounts and tenants.
 * Tracker coverage checks — verify a planning doc's items exist in monday.com and/or Jira
 * Translation asset management via Loco (localise.biz) API, including Apple String Catalogs (`.xcstrings`)
 * monday.com board, item, and work-management operations
+* Ongage email marketing — contacts, lists, segments, campaigns, transactional email/SMS, and analytics, with full read/write access
 * Firebase Crashlytics crash analysis via BigQuery
 * Figma design-to-code review for Android, iOS, and web — rendering the real UI on iOS (SwiftUI previews or the simulator) and web (headless browser) rather than comparing the design against source alone
 * PayPal payment management
@@ -799,6 +800,7 @@ vars, one-time auth commands, or remote MCP additions. Skills with no setup work
 | `monday`                 | Manage monday.com boards, items, groups, columns, and updates                                                           | `claude mcp add monday` with a `${MONDAY_TOKEN}` Bearer header — see [Configure Remote MCPs](#configure-remote-mcps-optional). Token from avatar → Developers → My access tokens. MCP-only, no CLI fallback                                                                                                                               |
 | `monday-weekly-report`   | Weekly project-status report from monday.com board(s)                                                                   | `claude mcp add monday` with a `${MONDAY_TOKEN}` Bearer header (see `monday` above). For attribution enable dynamic API. Optional env: `MONDAY_WEEKLY_REPORT_BOARDS`, `MONDAY_WEEKLY_REPORT_TO` (required for `--send`), `MONDAY_WEEKLY_REPORT_CC`, `MONDAY_WEEKLY_REPORT_ROLES` / `MONDAY_WEEKLY_REPORT_STATUSES` (cache path overrides) |
 | `newrelic`               | Query New Relic observability data, alerts, and logs                                                                    | newrelic remote MCP *(or)* `newrelic profile add --name default --apiKey NRAK-... --accountId ...`                                                                                                                                                                                                                                        |
+| `ongage`                 | Manage Ongage email marketing — contacts, lists, segments, campaigns, transactional sends, and analytics (read/write)   | Env: `ONGAGE_API_KEY` (Ongage → API Keys; the plan must include API access), optional `ONGAGE_LIST_ID`. Calls the REST API with `curl` + `jq` — no MCP. Asks before every write, and before deletes and sends shows the exact target                                                                                                      |
 | `paypal`                 | Manage PayPal invoices, payments, and disputes                                                                          | paypal remote MCP **(required — no CLI fallback)**                                                                                                                                                                                                                                                                                        |
 | `playstore`              | Fetch, analyze, and respond to Google Play reviews                                                                      | Env: `GOOGLE_APPLICATION_CREDENTIALS` (path to service-account JSON; needs Google Play Developer API + Play Console access). Requires `uv`/`uvx` on PATH.                                                                                                                                                                                 |
 | `query-db`               | Query databases using natural language via CLI                                                                          | Per DB: PG (`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`) · MySQL (`MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASS`, `MYSQL_DB`) · Mongo (`MONGODB_URI`) · Redis (`REDIS_URL`) · SQLite (`SQLITE_DB`) · BigQuery (`BQ_PROJECT`, `BQ_DATASETS`) · ES (`ES_URL`, `ES_API_KEY`)                                            |
