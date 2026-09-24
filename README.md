@@ -672,24 +672,16 @@ not find on Windows.
    New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.config\direnv", "$env:USERPROFILE\.local\share\direnv", "$env:USERPROFILE\.cache\direnv"
    ```
 
-2. Point direnv at Git Bash — create `%USERPROFILE%\.config\direnv\direnv.toml` containing:
-
-   ```toml
-   [global]
-   bash_path = "C:\\Program Files\\Git\\bin\\bash.exe"
-   ```
-
-   Don't rely on whichever `bash` is first on `PATH`: `C:\Windows\System32\bash.exe` is the WSL launcher, and direnv
-   fails with exit status 127 when it picks that one.
-
-3. Add the hook to your PowerShell profile (`notepad $PROFILE`; create the file if it doesn't exist), then open a new
-   PowerShell 7 window:
+2. Point direnv at the Git Bash that ships with your `git`:
 
    ```powershell
-   $env:XDG_CONFIG_HOME = "$env:USERPROFILE\.config"
-   $env:XDG_DATA_HOME = "$env:USERPROFILE\.local\share"
-   $env:XDG_CACHE_HOME = "$env:USERPROFILE\.cache"
-   Invoke-Expression "$(direnv hook pwsh)"
+   $bash = Join-Path (Split-Path (Split-Path (Get-Command git).Source)) 'bin\bash.exe'; Set-Content -Path "$env:USERPROFILE\.config\direnv\direnv.toml" -Value "[global]`nbash_path = '$bash'"
+   ```
+
+3. Add the hook to your PowerShell profile (safe to re-run), then open a new PowerShell 7 window:
+
+   ```powershell
+   if (!(Test-Path $PROFILE)) { New-Item -ItemType File -Force -Path $PROFILE | Out-Null }; if (!(Select-String -Path $PROFILE -Pattern 'direnv hook pwsh' -Quiet)) { Add-Content -Path $PROFILE -Value '$env:XDG_CONFIG_HOME = "$env:USERPROFILE\.config"', '$env:XDG_DATA_HOME = "$env:USERPROFILE\.local\share"', '$env:XDG_CACHE_HOME = "$env:USERPROFILE\.cache"', 'Invoke-Expression "$(direnv hook pwsh)"' }
    ```
 
 4. Check it: `cd` into a folder with an `.envrc`, run `direnv allow`, and confirm a variable is set (e.g.
