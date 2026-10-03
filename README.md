@@ -88,6 +88,10 @@ needed if you use the skills that call them.
 | Language servers (LSPs)                 | Optional     | Real type information for the languages you write — see [Language Servers (LSPs)](#language-servers-lsps)                                                                                                                                                                              |
 | Xcode 27+ (macOS)                       | Optional     | The `xcode` skill and MCP — see [Enable the Xcode MCP](#enable-the-xcode-mcp-macos)                                                                                                                                                                                                    |
 
+To verify the install, start Claude Code and run `/plugin` to confirm `co-dev` is installed, then `/mcp` to see which
+bundled MCP servers connected — servers whose optional tool or credentials are missing show as failed and only affect
+the skills that use them.
+
 #### macOS (Homebrew)
 
 **Required.** Install [Homebrew](https://brew.sh) first if you don't have it, then:
@@ -99,7 +103,7 @@ brew install git node uv jq direnv
 
 Then add the direnv shell hook from [Multi-Account Setups (direnv)](#multi-account-setups-direnv).
 
-**Install the plugin** — in Claude Code:
+**Install the plugin** — from a terminal (or run the same steps as `/plugin marketplace add` and `/plugin install` inside Claude Code):
 
 ```text
 claude plugin marketplace add cloud-officer/claude-code-plugin-dev
@@ -204,7 +208,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
 ```
 
-**Install the plugin** — in Claude Code:
+**Install the plugin** — from a terminal (or run the same steps as `/plugin marketplace add` and `/plugin install` inside Claude Code):
 
 ```text
 claude plugin marketplace add cloud-officer/claude-code-plugin-dev
@@ -253,7 +257,7 @@ Then set up the direnv hook with the Windows steps in [Multi-Account Setups (dir
 If Claude Code reports it can't find Git Bash, point it at `C:\Program Files\Git\bin\bash.exe` with
 `CLAUDE_CODE_GIT_BASH_PATH` in the `env` block of `~/.claude/settings.json`.
 
-**Install the plugin** — in Claude Code:
+**Install the plugin** — from a terminal (or run the same steps as `/plugin marketplace add` and `/plugin install` inside Claude Code):
 
 ```text
 claude plugin marketplace add cloud-officer/claude-code-plugin-dev
@@ -897,6 +901,14 @@ you actually write** — each one adds a small startup cost only when its file t
 
 ```bash
 claude --plugin-dir /path/to/claude-code-plugin-dev
+```
+
+Run the same checks as CI before opening a pull request:
+
+```bash
+node scripts/check-workflow-syntax.js
+node scripts/check-repo-consistency.js
+npm test
 ```
 
 ## Contributing
