@@ -268,7 +268,7 @@ if (mode === 'plan') {
     '     that is NOT there (a dropped construct, an omission, a rule complied with) and never to justify a',
     '     translation choice — that belongs in the rulebook, not in every ported file. Source comments that',
     '     violate this are NOT carried over. `TODO(migrate):` markers are exempt: they are work items, not',
-    '     explanations, and the verify phase removes them.',
+    '     explanations, and each one is resolved by a human before the migration is called complete (Step 5).',
     '   - what to do when there is NO clean equivalent (the escalation rule: flag with `TODO(migrate): …`)',
     '   - a short "DO NOT" list of tempting-but-wrong translations',
     '   Write it so it can be applied mechanically to one file at a time, without re-deriving any decision.',

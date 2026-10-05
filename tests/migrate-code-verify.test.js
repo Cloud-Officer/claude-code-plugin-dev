@@ -77,3 +77,9 @@ test('SKILL report lists every verify item that is not faithful', () => {
   assert.match(bullet, /not `faithful`/)
   assert.match(bullet, /`uncertain`/)
 })
+
+test('rulebook prompt hands TODO(migrate) markers to a human, not to the read-only verify phase', () => {
+  const source = fs.readFileSync(workflowPath, 'utf8')
+  assert.doesNotMatch(source, /verify phase removes/)
+  assert.match(source, /resolved by a human before the migration is called complete \(Step 5\)/)
+})
