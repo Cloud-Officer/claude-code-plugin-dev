@@ -96,6 +96,32 @@ describe('review-aws-cost helpers', () => {
   })
 })
 
+describe('review-aws-cost window length', () => {
+  const PROMPT_NAMES = ['input', 'windows', 'windowMonths', 'months', 'account', 'clean', 'scope', 'awsBlock', 'A_TREND']
+  const prompts = windows => loadHelpers(workflowScript('review-aws-cost'), PROMPT_NAMES, { args: { windows } })
+
+  it('tells the agents the window length passed in windows.months', () => {
+    const { awsBlock, A_TREND } = prompts({ months: 6 })
+
+    assert.match(awsBlock, /same 6 calendar months/)
+    assert.match(A_TREND.prompt, /6 months now versus the same 6 calendar months/)
+    assert.doesNotMatch(awsBlock + A_TREND.prompt, /\b3 (calendar )?months\b/)
+  })
+
+  it('falls back to three months when windows.months is missing or invalid', () => {
+    for (const value of [undefined, 0, -2, 2.5, 'six', null]) {
+      const { months, awsBlock } = prompts({ months: value })
+
+      assert.equal(months, 3, String(value))
+      assert.match(awsBlock, /same 3 calendar months/, String(value))
+    }
+  })
+
+  it('accepts a numeric string for windows.months', () => {
+    assert.equal(prompts({ months: '12' }).months, 12)
+  })
+})
+
 describe('code-review-deep helpers', () => {
   const { joinVerdicts } = loadHelpers(workflowScript('code-review-deep'), ['joinVerdicts'])
   const verdict = (finding_id, confirmation_evidence) => ({ finding_id, decision: 'CONFIRM', confidence_score: 90, confirmation_evidence })
