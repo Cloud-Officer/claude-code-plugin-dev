@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict')
 const { describe, it } = require('node:test')
-const { loadHelpers, workflowScript } = require('../scripts/workflow-helpers.js')
+const fs = require('node:fs')
+const path = require('node:path')
+const { ROOT, loadHelpers, workflowScript } = require('../scripts/workflow-helpers.js')
 
 describe('review-aws-cost helpers', () => {
   const { normSev, keepFinding, chunk, num, clean, joinVerdicts } = loadHelpers(workflowScript('review-aws-cost'), ['SEV_THRESHOLDS', 'normSev', 'keepFinding', 'chunk', 'num', 'clean', 'joinVerdicts'])
@@ -136,6 +138,23 @@ describe('code-review-deep helpers', () => {
       assert.equal(ambiguous.size, 0, c.name)
       assert.equal(byId.size, c.matched, c.name)
     }
+  })
+
+  it('quality agent carries the code-standards comment rule verbatim', () => {
+    const { A_QUALITY } = loadHelpers(workflowScript('code-review-deep'), ['A_QUALITY'])
+    const standards = fs.readFileSync(path.join(ROOT, 'skills', 'code-standards', 'SKILL.md'), 'utf8')
+    const block = /## For workflow authors[\s\S]*?```text\n([\s\S]*?)```/.exec(standards)[1]
+    const squash = text => text.replace(/\s+/g, ' ').trim()
+
+    assert.ok(squash(A_QUALITY.prompt).includes(squash(block)))
+  })
+
+  it('quality agent does not exempt multi-line or rationale comments', () => {
+    const { A_QUALITY } = loadHelpers(workflowScript('code-review-deep'), ['A_QUALITY'])
+
+    assert.doesNotMatch(A_QUALITY.prompt, /3\+ lines/)
+    assert.doesNotMatch(A_QUALITY.prompt, /WHY in a line or two/)
+    assert.match(A_QUALITY.prompt, /longer than one line is a violation/)
   })
 })
 
