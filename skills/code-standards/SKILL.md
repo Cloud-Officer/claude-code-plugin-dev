@@ -81,10 +81,12 @@ A densely-commented file is not a licence to add more. Match the surrounding *st
 Every added comment line must pass the one-line test above, or be deleted:
 
 ```bash
-git diff -U0 | grep -E '^\+[[:space:]]*(#|//|/\*|\*)'
+git diff -U0 HEAD | grep -E '^\+[[:space:]]*(#|//|/\*|\*)'
 ```
 
-Scope it to the files at hand when the diff is large (`git diff -U0 -- <paths>`). Run it before committing, before opening a PR, and before telling the user the work is done.
+Scope it to the files at hand when the diff is large (`git diff -U0 HEAD -- <paths>`). Run it before committing, before opening a PR, and before telling the user the work is done.
+
+If the sweep command errors, or the change includes untracked files (`git add -N` them first), stop and say so. Never treat its empty output as a pass without that check.
 
 For each line the sweep returns, in order:
 
