@@ -337,7 +337,7 @@ const A_QUALITY = {
     'Pattern duplication: scan for byte-identical or near-identical 5+ line blocks across files. Report count and locations.',
     'Quantitative counts - REQUIRED, return exact numbers:',
     '- Linter disables: count swiftlint:disable, eslint-disable, rubocop:disable/todo, type: ignore, noqa, SuppressWarnings.',
-    '  Group by rule. Report the counts in counts under exactly these keys: linter_disables_total, linter_disables_by_rule,',
+    '  Group by rule. Report the counts in counts under exactly these keys: linter_disables_total, linter_disables_by_rule. Treat them',
     '  as INFORMATIONAL (a positive signal of awareness). DO NOT generate a',
     '  finding for the mere existence of linter disables or a permissive policy. Escalate to a finding ONLY if: (a) the linter',
     '  config disables rules wholesale; (b) a critical correctness/security rule is silenced WITHOUT an inline reason comment',
