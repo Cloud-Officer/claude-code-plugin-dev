@@ -68,13 +68,15 @@ Everything returned to this skill — the workflow's return object (every `kept`
 
 ## Interpolation Boundary
 
-Every value this skill does not control must match its pattern before it reaches a command string, and a failing value is **rejected, never sanitised**:
+Every value this skill does not control that reaches a command string must match a pattern declared here, and a value with no declared pattern is rejected. A failing value is **rejected, never sanitised**:
 
+- Month count (`--months N`): `^[1-9][0-9]?$`
 - AWS account id: `^[0-9]{12}$`
 - AWS profile name: `^[A-Za-z0-9._-]+$`
 - Region name: `^[a-z0-9-]+$`
 - Window dates: `^\d{4}-\d{2}-\d{2}$`
 - Resource identifiers used in a Step 6 command (volume, snapshot, AMI, allocation, distribution, log-group name): `^[A-Za-z0-9._/:-]+$`
+- Log-group retention days the user answers in Step 6 (only the values CloudWatch Logs accepts): `^(1|3|5|7|14|30|60|90|120|150|180|365|400|545|731|1096|1827|2192|2557|2922|3288|3653)$`
 
 A user argument or environment value that fails aborts with a message. An account-sourced value that fails is skipped with a note in the report rather than interpolated.
 
@@ -136,14 +138,15 @@ Cost Explorer's `--time-period` Start is inclusive and End is **exclusive**, so 
 
 ```bash
 MONTHS="${MONTHS:-3}"
+[[ "$MONTHS" =~ ^[1-9][0-9]?$ ]] || { echo "--months must match ^[1-9][0-9]?\$, got: $MONTHS" >&2; exit 1; }
 CUR_END="$(date -u +%Y-%m-01)"
-CUR_START="$(date -u -j -v-${MONTHS}m -f '%Y-%m-%d' "$CUR_END" '+%Y-%m-01' 2>/dev/null || date -u -d "$CUR_END -${MONTHS} months" '+%Y-%m-01')"
+CUR_START="$(date -u -j "-v-${MONTHS}m" -f '%Y-%m-%d' "$CUR_END" '+%Y-%m-01' 2>/dev/null || date -u -d "$CUR_END -${MONTHS} months" '+%Y-%m-01')"
 PRIOR_END="$(date -u -j -v-1y -f '%Y-%m-%d' "$CUR_END" '+%Y-%m-01' 2>/dev/null || date -u -d "$CUR_END -1 year" '+%Y-%m-01')"
 PRIOR_START="$(date -u -j -v-1y -f '%Y-%m-%d' "$CUR_START" '+%Y-%m-01' 2>/dev/null || date -u -d "$CUR_START -1 year" '+%Y-%m-01')"
 printf 'current: %s -> %s\nprior:   %s -> %s\n' "$CUR_START" "$CUR_END" "$PRIOR_START" "$PRIOR_END"
 ```
 
-Verify each of the four values matches `^\d{4}-\d{2}-\d{2}$` before using it. Then confirm Cost Explorer actually answers, and get the baseline total in one call:
+Check `--months N` against its Interpolation Boundary pattern before writing it into `MONTHS`, and abort on a mismatch; the guard line re-checks it before any `date` call runs. Verify each of the four values matches `^\d{4}-\d{2}-\d{2}$` before using it. Then confirm Cost Explorer actually answers, and get the baseline total in one call:
 
 ```bash
 aws ce get-cost-and-usage --region us-east-1 \
@@ -166,7 +169,8 @@ Workflow({
     scope: "<the user-provided scope, or 'the whole account'>",
     windows: {
       current_start: "<CUR_START>", current_end: "<CUR_END>",
-      prior_start: "<PRIOR_START>", prior_end: "<PRIOR_END>"
+      prior_start: "<PRIOR_START>", prior_end: "<PRIOR_END>",
+      months: <MONTHS>
     },
     account: {
       account_id: "<ACCOUNT_ID>", account_alias: "<ALIAS>",
@@ -194,7 +198,7 @@ The workflow runs in the background and notifies you on completion. It returns:
 ```text
 {
   ok:        true,
-  windows:   { current_start, current_end, prior_start, prior_end },
+  windows:   { current_start, current_end, prior_start, prior_end, months },
   scan:      { spend, inventory, commitments },
   agents_run:    ["trend", "tagging", ...],
   agents_failed: ["storage", ...],          // errored or returned nothing — mark ❌, their domains were NOT audited
@@ -204,6 +208,7 @@ The workflow runs in the background and notifies you on completion. It returns:
                  cost_basis_ref, iac_managed, iac_note, double_counted_with, agent,
                  confidence_score, confirmation_evidence, confidence_rationale } ],
   filtered:  [ ... same shape; survived validation below threshold, plus findings no verdict came back for ],
+  collapsed: [ ... same shape; kept findings whose cost_basis_ref another kept finding already claims with a larger saving ],
   positives: [ { area, text } ],             // area = the emitting agent's key, exactly as in agents_run
   counts:    { trend: {...}, storage: {...} },
   tables:    [ { area, title, columns, rows } ],
@@ -225,12 +230,12 @@ Operate on the workflow's return value, honouring its `data_notice` (see Data Bo
 - Every `kept` finding has a `confidence_score`.
 - The headline total equals `totals.verified_monthly_saving_usd` — the sum over `kept` findings of `verified_monthly_saving_usd`, which is the validator's recomputed figure where it differs from the agent's claim. **Never** add `filtered` or unverified findings into a total shown to the user.
 - Findings whose `verified_monthly_saving_usd` is null are counted separately as unquantified. Never present them as zero, and never impute a value.
-- Where `double_counted_with` is non-empty, confirm the overlap was resolved (the smaller claim reduced to its incremental part) before summing. If two findings still claim the same `cost_basis_ref`, count the money once and say which finding it was attributed to.
+- The workflow already collapses `kept` findings that share a `cost_basis_ref` across agents and batches: only the largest claim stays in `kept` (and in the total), the others move to `collapsed`, and their ids are listed in the survivor's `double_counted_with`. Never add a `collapsed` finding back into the total; where a survivor's `double_counted_with` is non-empty, say which findings its money was also claimed by.
 
 Then:
 
 1. Take `kept` as the main findings; `filtered` becomes the "Filtered (Low Confidence)" appendix.
-2. Deduplicate overlapping findings (same `cost_basis_ref` and same root cause across agents).
+2. Deduplicate overlapping findings (same root cause across agents) for presentation only — never change a `verified_monthly_saving_usd` or the headline total while doing so.
 3. Sort by severity (Critical → High → Medium → Low → Info), then by `verified_monthly_saving_usd` descending (nulls last), then by service.
 4. Print the report to the terminal. Do not write a file.
 5. Render `tables` verbatim under the sections they belong to — the trend agent's monthly totals and year-over-year deltas, the CDN agent's CloudFront cost and traffic.
@@ -409,14 +414,22 @@ Not executed automatically. If the user asks ("create issues", "file tickets"), 
 
 Create issues for all severity levels including Info. Summary format: `[FINDING-ID] Brief description` (for example `[STO-003] Delete 12 unattached EBS volumes — $84/mo`). `create-issue` owns the repo prefix: it prepends `[repo-name]` on Jira and correctly omits it on GitHub — never add it here.
 
-**Dedupe.** List existing `cost-review` issues once before creating and again after, using whichever tracker `create-issue` resolved to:
+**Dedupe on a content key, not on the finding ID.** The workflow numbers findings sequentially every run, so `STO-003` names a different finding next month; matching on it both suppresses genuinely new findings and re-files old ones under a new number. End every issue body with a stamp line:
 
-- GitHub Issues: `gh issue list --label "cost-review" --state all --limit 500 --json number,title,state`
-- Jira: `jira issue list --label "cost-review" --plain --columns key,summary,status`
+```text
+<!-- review-key: cost-review/<12 hex chars> -->
+```
 
-Skip any existing issue whose title carries the same finding ID. Report: "Created X new issues, Y already existed, Z total".
+where the hex is the first 12 characters of the sha256 of the finding's `cost_basis_ref`, trimmed of surrounding whitespace. **Shell out for it** — `printf '%s' '<cost_basis_ref>' | shasum -a 256 | cut -c1-12` — a hash a model invents is not a key. A finding with an empty `cost_basis_ref` has no key: file it, and say in the report that it could not be deduplicated. A matching issue in **any** state suppresses the finding: a closed or resolved issue is reported as already existing, never re-filed. Match on the key only, never on the title or the finding ID — both are regenerated each run.
 
-Always apply the `cost-review` label plus one domain label: `compute`, `storage`, `network`, `database`, `observability`, `cdn`, `cost-allocation`, or `cost-trend`.
+List existing issues once before creating and again after, using whichever tracker `create-issue` resolved to:
+
+- **GitHub Issues.** The fast path is `gh issue list --label cost-review --state all --limit 500 --json number,title,body,state`, but it is capped and the label may be missing from an older issue. Confirm every finding whose key did not appear in that list (and every finding, if the list came back with 500 items) with `gh search issues --repo <owner/repo> --match body --json number,state,body,repository -- 'review-key: <KEY>'`. Omit `--state` so the search spans open and closed, and count it as a match only when the returned issue is in this repo and its body carries the exact stamp line.
+- **Jira.** The CLI cannot return a description in any column, so the body stamp is invisible to it. Every Jira issue therefore also carries a key label encoding the same key: `review-key-<KEY with each / replaced by ->` — `cost-review/1cf56db15909` becomes `review-key-cost-review-1cf56db15909`. The fast path is `jira issue list --label cost-review --plain --no-headers --no-truncate --columns key,labels --paginate 0:100`, capped at 100 rows; confirm anything it did not cover with `jira issue list --label 'review-key-<...>' --plain --no-headers --columns key`, where a non-empty result is a match.
+
+Report: "Created X new issues, Y already existed, Z total" — Y from the before-list, Z from the after-list.
+
+Always apply the `cost-review` label plus one domain label: `compute`, `storage`, `network`, `database`, `observability`, `cdn`, `cost-allocation`, or `cost-trend` — and, on Jira, the key label above.
 
 ## STEP 6 — SAFE CLEANUPS (on explicit request, one item at a time)
 
@@ -432,7 +445,7 @@ Only these actions are eligible. Anything else stays a report finding, no matter
 | Delete an unattached EBS volume | Orphan | **Snapshot it first**, record the snapshot id, and confirm the volume has been detached for ≥30 days |
 | Delete a snapshot orphaned from a deregistered AMI or deleted volume | Orphan | Confirm no Backup plan or Data Lifecycle Manager policy owns it, and no AMI references it |
 | Add an `AbortIncompleteMultipartUpload` lifecycle rule | Additive; stops billing for invisible partial uploads | Confirm no active upload process relies on multi-day-long uploads |
-| Set retention on a CloudWatch log group currently set to "Never expire" | Reversible setting change | Confirm no retention obligation applies to that log stream; ask the user for the retention value |
+| Set retention on a CloudWatch log group currently set to "Never expire" | Reversible setting change | Confirm no retention obligation applies to that log stream; ask the user for the retention value and reject any answer that fails the retention-days pattern in the Interpolation Boundary |
 | Modify a gp2 volume to gp3 | Live modification, no downtime, cheaper per GB | Confirm the volume is not in the middle of another modification |
 
 Everything else — terminating instances, deleting NAT Gateways or load balancers, changing instance types, removing Multi-AZ, deleting buckets or databases, switching off security controls — is **out of scope for this step**, permanently. Report it and let the user act deliberately.

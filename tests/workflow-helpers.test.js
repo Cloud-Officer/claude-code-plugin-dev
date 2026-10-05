@@ -3,7 +3,7 @@ const { describe, it } = require('node:test')
 const { loadHelpers, workflowScript } = require('../scripts/workflow-helpers.js')
 
 describe('review-aws-cost helpers', () => {
-  const { normSev, keepFinding, chunk, num, clean, joinVerdicts } = loadHelpers(workflowScript('review-aws-cost'), ['SEV_THRESHOLDS', 'normSev', 'keepFinding', 'chunk', 'num', 'clean', 'joinVerdicts'])
+  const { normSev, keepFinding, chunk, num, clean, joinVerdicts, collapseSharedBasis } = loadHelpers(workflowScript('review-aws-cost'), ['SEV_THRESHOLDS', 'normSev', 'keepFinding', 'chunk', 'num', 'clean', 'joinVerdicts', 'collapseSharedBasis'])
   const verdict = (finding_id, adjusted_monthly_saving_usd) => ({ finding_id, decision: 'CONFIRM', confidence_score: 90, adjusted_monthly_saving_usd })
 
   it('normSev maps any spelling onto the five buckets', () => {
@@ -93,6 +93,69 @@ describe('review-aws-cost helpers', () => {
       assert.equal(ambiguous.size, 0, c.name)
       assert.equal(byId.size, c.matched, c.name)
     }
+  })
+
+  const finding = (id, cost_basis_ref, verified_monthly_saving_usd, double_counted_with = []) => ({ id, cost_basis_ref, verified_monthly_saving_usd, double_counted_with })
+  const total = list => list.reduce((s, f) => s + (num(f.verified_monthly_saving_usd) || 0), 0)
+
+  it('collapseSharedBasis keeps only the largest claim on a shared cost_basis_ref across agents', () => {
+    const kept = [
+      finding('CMP-001', 'EC2|BoxUsage|i-1', 300),
+      finding('STO-001', 'EC2|BoxUsage|i-1', 500),
+      finding('STO-002', 'S3|TimedStorage|b-1', 40),
+    ]
+    const { kept: out, dropped } = collapseSharedBasis(kept)
+
+    assert.deepEqual(out.map(f => f.id), ['STO-001', 'STO-002'])
+    assert.deepEqual(out[0].double_counted_with, ['CMP-001'])
+    assert.deepEqual(dropped.map(f => f.id), ['CMP-001'])
+    assert.equal(total(out), 540)
+  })
+
+  it('collapseSharedBasis merges dropped ids into an existing double_counted_with without repeats', () => {
+    const { kept: out } = collapseSharedBasis([
+      finding('A-001', 'ref', 100, ['B-001']),
+      finding('B-001', ' ref ', 50),
+      finding('C-001', 'ref', null),
+    ])
+
+    assert.deepEqual(out.map(f => f.id), ['A-001'])
+    assert.deepEqual(out[0].double_counted_with, ['B-001', 'C-001'])
+  })
+
+  it('collapseSharedBasis leaves findings with no or distinct cost_basis_ref untouched', () => {
+    const kept = [finding('A-001', '', 10), finding('B-001', undefined, 20), finding('C-001', 'x', 30), finding('D-001', 'y', 40)]
+    const { kept: out, dropped } = collapseSharedBasis(kept)
+
+    assert.deepEqual(out, kept)
+    assert.deepEqual(dropped, [])
+    assert.deepEqual(collapseSharedBasis([]), { kept: [], dropped: [] })
+  })
+})
+
+describe('review-aws-cost window length', () => {
+  const PROMPT_NAMES = ['input', 'windows', 'windowMonths', 'months', 'account', 'clean', 'scope', 'awsBlock', 'A_TREND']
+  const prompts = windows => loadHelpers(workflowScript('review-aws-cost'), PROMPT_NAMES, { args: { windows } })
+
+  it('tells the agents the window length passed in windows.months', () => {
+    const { awsBlock, A_TREND } = prompts({ months: 6 })
+
+    assert.match(awsBlock, /same 6 calendar months/)
+    assert.match(A_TREND.prompt, /6 months now versus the same 6 calendar months/)
+    assert.doesNotMatch(awsBlock + A_TREND.prompt, /\b3 (calendar )?months\b/)
+  })
+
+  it('falls back to three months when windows.months is missing or invalid', () => {
+    for (const value of [undefined, 0, -2, 2.5, 'six', null]) {
+      const { months, awsBlock } = prompts({ months: value })
+
+      assert.equal(months, 3, String(value))
+      assert.match(awsBlock, /same 3 calendar months/, String(value))
+    }
+  })
+
+  it('accepts a numeric string for windows.months', () => {
+    assert.equal(prompts({ months: '12' }).months, 12)
   })
 })
 

@@ -2,7 +2,7 @@ export const meta = {
   name: 'review-aws-cost',
   description: 'AWS cost optimization audit: scan spend -> analyze per cost domain -> adversarially verify every saving estimate -> confidence-filter',
   phases: [
-    { title: 'Scan', detail: '3 Explore scouts: spend shape (3 months + same 3 months last year), account inventory, existing commitments' },
+    { title: 'Scan', detail: '3 Explore scouts: spend shape (current window + same calendar months last year), account inventory, existing commitments' },
     { title: 'Analyze', detail: 'Core + conditional cost agents (trend, compute, storage, network, databases, observability, CDN, tagging)' },
     { title: 'Verify', detail: 'Adversarial validation of every finding: does the dollar figure reconcile, is the change safe, is it a commitment in disguise' },
   ],
@@ -12,6 +12,12 @@ export const meta = {
 
 const input = args || {}
 const windows = input.windows || {}
+const windowMonths = w => {
+  const n = Number(w && w.months)
+
+  return Number.isInteger(n) && n > 0 ? n : 3
+}
+const months = windowMonths(windows)
 const account = input.account || {}
 // Every caller-supplied value entering a fenced <...> block is stripped of
 // angle brackets by construction, so a value carrying '</aws_context>' cannot
@@ -76,6 +82,30 @@ function joinVerdicts(issues, verdicts) {
   return { byId, ambiguous }
 }
 
+function collapseSharedBasis(findings) {
+  const winners = new Map()
+  for (const f of findings) {
+    const ref = String(f.cost_basis_ref || '').trim()
+    if (!ref) continue
+    const best = winners.get(ref)
+    if (!best || (num(f.verified_monthly_saving_usd) ?? -Infinity) > (num(best.verified_monthly_saving_usd) ?? -Infinity)) winners.set(ref, f)
+  }
+  const merged = new Map()
+  const dropped = []
+  for (const f of findings) {
+    const ref = String(f.cost_basis_ref || '').trim()
+    const winner = ref ? winners.get(ref) : f
+    if (winner === f) continue
+    dropped.push(f)
+    if (!merged.has(winner)) merged.set(winner, new Set(winner.double_counted_with || []))
+    merged.get(winner).add(f.id)
+  }
+  const kept = findings
+    .filter(f => !dropped.includes(f))
+    .map(f => (merged.has(f) ? { ...f, double_counted_with: [...merged.get(f)] } : f))
+  return { kept, dropped }
+}
+
 // --- Shared context block injected into every agent prompt -----------------
 // Values in here come from the user (scope) and
 // from `aws sts get-caller-identity` / `aws ec2 describe-regions`. This one
@@ -98,7 +128,8 @@ const awsBlock = [
       : (account.regions || 'not supplied — use by_region_current from the scan baseline')
   ),
   '- current window (CE start inclusive, end exclusive): ' + clean(windows.current_start) + ' .. ' + clean(windows.current_end),
-  '- prior-year window (same 3 calendar months): ' + clean(windows.prior_start) + ' .. ' + clean(windows.prior_end),
+  '- window length: ' + months + ' complete month(s) per window',
+  '- prior-year window (same ' + months + ' calendar months): ' + clean(windows.prior_start) + ' .. ' + clean(windows.prior_end),
   '- audit scope: ' + clean(scope),
   '</aws_context>',
 ].join('\n')
@@ -217,7 +248,9 @@ const EVIDENCE_RULES = [
   '- `evidence_command` is the exact read-only command that produced the figure, runnable as written.',
   '- `evidence_value` quotes the relevant number or output excerpt verbatim.',
   '- `cost_basis_ref` is a stable key for the dollars you are claiming — `service|usage_type|resource-ids` —',
-  '  so two findings claiming the same money can be detected. If your fix overlaps another finding\'s fix, say',
+  '  so two findings claiming the same money can be detected, and so the same finding gets the same key on every',
+  '  run. List the resource ids sorted and comma-separated; never put a dollar figure, date, count or finding id',
+  '  in it. If your fix overlaps another finding\'s fix, say',
   '  so in `estimate_basis` and claim only the incremental part.',
   '- Round to whole dollars above $100/mo; two decimals below that. Always state the currency as USD.',
   '',
@@ -407,7 +440,7 @@ const P1_COMMITMENTS = P1_PREFIX + [
 const A_TREND = {
   key: 'trend', idPrefix: 'TREND',
   prompt: [
-    'You own the comparison: 3 months now versus the same 3 calendar months a year ago. Your job is to explain',
+    'You own the comparison: ' + months + ' months now versus the same ' + months + ' calendar months a year ago. Your job is to explain',
     'the difference honestly — what grew, what shrank, what is new, what vanished, and WHY — before anyone',
     'reasons about optimization. A wrong explanation here poisons the whole report.',
     '',
@@ -1188,7 +1221,8 @@ for (const item of reviewed.filter(Boolean)) {
   }
 }
 
-const kept = confirmed.filter(f => keepFinding(f.severity, f.confidence_score))
+const { kept, dropped: collapsed } = collapseSharedBasis(confirmed.filter(f => keepFinding(f.severity, f.confidence_score)))
+if (collapsed.length) log('Collapsed ' + collapsed.length + ' kept finding(s) that claimed an already-counted cost_basis_ref: ' + collapsed.map(f => f.id).join(', '))
 const filtered = confirmed.filter(f => !keepFinding(f.severity, f.confidence_score)).concat(unverified)
 
 // Only kept findings contribute to the headline total. A figure that did not
@@ -1200,12 +1234,13 @@ log('Confirmed ' + confirmed.length + ' findings; ' + kept.length + ' cleared th
 
 return {
   ok: true,
-  windows,
+  windows: { ...windows, months },
   scan: { spend, inventory, commitments },
   agents_run: selected.map(a => a.key),
   agents_failed,
   kept,
   filtered,
+  collapsed,
   positives,
   counts,
   tables,
