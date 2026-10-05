@@ -1,7 +1,7 @@
 ---
 name: appstore
 description: Manage App Store Connect apps, builds, distribution, or Xcode Cloud. Use when the user wants to check builds, manage TestFlight beta groups and testers, read or respond to App Store reviews, manage in-app purchases and their price schedules, list app versions, check app status, list Xcode Cloud workflows or build runs, start an Xcode Cloud build, or investigate Xcode Cloud build failures, logs, and test results.
-allowed-tools: Bash(jq:*), Bash(curl:*), Bash(mktemp:*), Bash(unzip:*), Bash(xcrun:*), Bash(command -v asc:*), Bash(env ASC_TELEMETRY_DISABLED=1 asc:*), mcp__appstore__*
+allowed-tools: Bash(jq:*), Bash(curl:*), Bash(mktemp:*), Bash(unzip:*), Bash(find:*), Bash(xcrun:*), Bash(command -v asc:*), Bash(env ASC_TELEMETRY_DISABLED=1 asc:*), mcp__appstore__*
 ---
 
 # App Store Connect
@@ -88,9 +88,10 @@ unzip -q -d "$DIR/out" "$DIR/artifact.zip"
 ```
 
 - **Log bundle**: read the text logs under `$DIR/out` (search for `error:` and `** BUILD FAILED **` / `** TEST FAILED **`).
-- **Result bundle**: pass the extracted `.xcresult` to `xcresulttool`:
+- **Result bundle**: set `XCRESULT` by glob only, never by typing a name read from the archive or its unzip listing, then pass it to `xcresulttool` in the same Bash call, since shell variables do not persist between calls. If `XCRESULT` is empty, report that the artifact holds no `.xcresult` and stop.
 
 ```bash
+XCRESULT=$(find "$DIR/out" -maxdepth 3 -name '*.xcresult' -print -quit)
 xcrun xcresulttool get test-results summary --path "$XCRESULT"
 xcrun xcresulttool get test-results tests --path "$XCRESULT"
 xcrun xcresulttool get build-results --path "$XCRESULT"
