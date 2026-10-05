@@ -409,14 +409,22 @@ Not executed automatically. If the user asks ("create issues", "file tickets"), 
 
 Create issues for all severity levels including Info. Summary format: `[FINDING-ID] Brief description` (for example `[STO-003] Delete 12 unattached EBS volumes — $84/mo`). `create-issue` owns the repo prefix: it prepends `[repo-name]` on Jira and correctly omits it on GitHub — never add it here.
 
-**Dedupe.** List existing `cost-review` issues once before creating and again after, using whichever tracker `create-issue` resolved to:
+**Dedupe on a content key, not on the finding ID.** The workflow numbers findings sequentially every run, so `STO-003` names a different finding next month; matching on it both suppresses genuinely new findings and re-files old ones under a new number. End every issue body with a stamp line:
 
-- GitHub Issues: `gh issue list --label "cost-review" --state all --limit 500 --json number,title,state`
-- Jira: `jira issue list --label "cost-review" --plain --columns key,summary,status`
+```text
+<!-- review-key: cost-review/<12 hex chars> -->
+```
 
-Skip any existing issue whose title carries the same finding ID. Report: "Created X new issues, Y already existed, Z total".
+where the hex is the first 12 characters of the sha256 of the finding's `cost_basis_ref`, trimmed of surrounding whitespace. **Shell out for it** — `printf '%s' '<cost_basis_ref>' | shasum -a 256 | cut -c1-12` — a hash a model invents is not a key. A finding with an empty `cost_basis_ref` has no key: file it, and say in the report that it could not be deduplicated. A matching issue in **any** state suppresses the finding: a closed or resolved issue is reported as already existing, never re-filed. Match on the key only, never on the title or the finding ID — both are regenerated each run.
 
-Always apply the `cost-review` label plus one domain label: `compute`, `storage`, `network`, `database`, `observability`, `cdn`, `cost-allocation`, or `cost-trend`.
+List existing issues once before creating and again after, using whichever tracker `create-issue` resolved to:
+
+- **GitHub Issues.** The fast path is `gh issue list --label cost-review --state all --limit 500 --json number,title,body,state`, but it is capped and the label may be missing from an older issue. Confirm every finding whose key did not appear in that list (and every finding, if the list came back with 500 items) with `gh search issues --repo <owner/repo> --match body --json number,state,body,repository -- 'review-key: <KEY>'`. Omit `--state` so the search spans open and closed, and count it as a match only when the returned issue is in this repo and its body carries the exact stamp line.
+- **Jira.** The CLI cannot return a description in any column, so the body stamp is invisible to it. Every Jira issue therefore also carries a key label encoding the same key: `review-key-<KEY with each / replaced by ->` — `cost-review/1cf56db15909` becomes `review-key-cost-review-1cf56db15909`. The fast path is `jira issue list --label cost-review --plain --no-headers --no-truncate --columns key,labels --paginate 0:100`, capped at 100 rows; confirm anything it did not cover with `jira issue list --label 'review-key-<...>' --plain --no-headers --columns key`, where a non-empty result is a match.
+
+Report: "Created X new issues, Y already existed, Z total" — Y from the before-list, Z from the after-list.
+
+Always apply the `cost-review` label plus one domain label: `compute`, `storage`, `network`, `database`, `observability`, `cdn`, `cost-allocation`, or `cost-trend` — and, on Jira, the key label above.
 
 ## STEP 6 — SAFE CLEANUPS (on explicit request, one item at a time)
 
