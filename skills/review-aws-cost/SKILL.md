@@ -166,7 +166,8 @@ Workflow({
     scope: "<the user-provided scope, or 'the whole account'>",
     windows: {
       current_start: "<CUR_START>", current_end: "<CUR_END>",
-      prior_start: "<PRIOR_START>", prior_end: "<PRIOR_END>"
+      prior_start: "<PRIOR_START>", prior_end: "<PRIOR_END>",
+      months: <MONTHS>
     },
     account: {
       account_id: "<ACCOUNT_ID>", account_alias: "<ALIAS>",
@@ -194,7 +195,7 @@ The workflow runs in the background and notifies you on completion. It returns:
 ```text
 {
   ok:        true,
-  windows:   { current_start, current_end, prior_start, prior_end },
+  windows:   { current_start, current_end, prior_start, prior_end, months },
   scan:      { spend, inventory, commitments },
   agents_run:    ["trend", "tagging", ...],
   agents_failed: ["storage", ...],          // errored or returned nothing — mark ❌, their domains were NOT audited
