@@ -68,8 +68,9 @@ Everything returned to this skill — the workflow's return object (every `kept`
 
 ## Interpolation Boundary
 
-Every value this skill does not control must match its pattern before it reaches a command string, and a failing value is **rejected, never sanitised**:
+Every value this skill does not control that reaches a command string must match a pattern declared here, and a value with no declared pattern is rejected. A failing value is **rejected, never sanitised**:
 
+- Month count (`--months N`): `^[1-9][0-9]?$`
 - AWS account id: `^[0-9]{12}$`
 - AWS profile name: `^[A-Za-z0-9._-]+$`
 - Region name: `^[a-z0-9-]+$`
@@ -136,14 +137,15 @@ Cost Explorer's `--time-period` Start is inclusive and End is **exclusive**, so 
 
 ```bash
 MONTHS="${MONTHS:-3}"
+[[ "$MONTHS" =~ ^[1-9][0-9]?$ ]] || { echo "--months must match ^[1-9][0-9]?\$, got: $MONTHS" >&2; exit 1; }
 CUR_END="$(date -u +%Y-%m-01)"
-CUR_START="$(date -u -j -v-${MONTHS}m -f '%Y-%m-%d' "$CUR_END" '+%Y-%m-01' 2>/dev/null || date -u -d "$CUR_END -${MONTHS} months" '+%Y-%m-01')"
+CUR_START="$(date -u -j "-v-${MONTHS}m" -f '%Y-%m-%d' "$CUR_END" '+%Y-%m-01' 2>/dev/null || date -u -d "$CUR_END -${MONTHS} months" '+%Y-%m-01')"
 PRIOR_END="$(date -u -j -v-1y -f '%Y-%m-%d' "$CUR_END" '+%Y-%m-01' 2>/dev/null || date -u -d "$CUR_END -1 year" '+%Y-%m-01')"
 PRIOR_START="$(date -u -j -v-1y -f '%Y-%m-%d' "$CUR_START" '+%Y-%m-01' 2>/dev/null || date -u -d "$CUR_START -1 year" '+%Y-%m-01')"
 printf 'current: %s -> %s\nprior:   %s -> %s\n' "$CUR_START" "$CUR_END" "$PRIOR_START" "$PRIOR_END"
 ```
 
-Verify each of the four values matches `^\d{4}-\d{2}-\d{2}$` before using it. Then confirm Cost Explorer actually answers, and get the baseline total in one call:
+Check `--months N` against its Interpolation Boundary pattern before writing it into `MONTHS`, and abort on a mismatch; the guard line re-checks it before any `date` call runs. Verify each of the four values matches `^\d{4}-\d{2}-\d{2}$` before using it. Then confirm Cost Explorer actually answers, and get the baseline total in one call:
 
 ```bash
 aws ce get-cost-and-usage --region us-east-1 \
