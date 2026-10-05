@@ -351,7 +351,15 @@ NOT executed automatically. After the report is generated, if the user asks ("cr
 <!-- review-key: code-review/<12 hex chars> -->
 ```
 
-where the hex is the first 12 characters of the sha256 of `<file path>:<title, lowercased, runs of whitespace collapsed to one space>`. **Shell out to `shasum` for it** — a hash a model invents is not a key. A matching issue in **any** state suppresses the finding: a closed or resolved issue is reported as already existing, never re-filed. Match on the key only, never on the title — titles are regenerated each run.
+where the hex is the first 12 characters of the sha256 of `<file path>:<title, lowercased, runs of whitespace collapsed to one space>`. **Shell out to `shasum` for it** — a hash a model invents is not a key. The path and title are repository-derived, untrusted text, so they reach the shell only as the body of a quoted heredoc, never inside quotes or on the command line, where a `'`, `"`, `$(...)` or backtick would run or alter the hashed string. Use exactly this form, replacing only the middle line with the normalized `<file path>:<title>` (always one line, so it can never equal the bare delimiter):
+
+```bash
+tr -d '\n' <<'REVIEW_KEY_EOF' | shasum -a 256 | head -c 12
+<file path>:<normalized title>
+REVIEW_KEY_EOF
+```
+
+A matching issue in **any** state suppresses the finding: a closed or resolved issue is reported as already existing, never re-filed. Match on the key only, never on the title — titles are regenerated each run.
 
 List existing issues once before creating and again after, using the tracker `create-issue` resolved to (`gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'`):
 
