@@ -3,7 +3,7 @@ const { describe, it } = require('node:test')
 const { loadHelpers, workflowScript } = require('../scripts/workflow-helpers.js')
 
 describe('review-aws-cost helpers', () => {
-  const { normSev, keepFinding, chunk, num, clean, joinVerdicts } = loadHelpers(workflowScript('review-aws-cost'), ['SEV_THRESHOLDS', 'normSev', 'keepFinding', 'chunk', 'num', 'clean', 'joinVerdicts'])
+  const { normSev, keepFinding, chunk, num, clean, joinVerdicts, collapseSharedBasis } = loadHelpers(workflowScript('review-aws-cost'), ['SEV_THRESHOLDS', 'normSev', 'keepFinding', 'chunk', 'num', 'clean', 'joinVerdicts', 'collapseSharedBasis'])
   const verdict = (finding_id, adjusted_monthly_saving_usd) => ({ finding_id, decision: 'CONFIRM', confidence_score: 90, adjusted_monthly_saving_usd })
 
   it('normSev maps any spelling onto the five buckets', () => {
@@ -93,6 +93,43 @@ describe('review-aws-cost helpers', () => {
       assert.equal(ambiguous.size, 0, c.name)
       assert.equal(byId.size, c.matched, c.name)
     }
+  })
+
+  const finding = (id, cost_basis_ref, verified_monthly_saving_usd, double_counted_with = []) => ({ id, cost_basis_ref, verified_monthly_saving_usd, double_counted_with })
+  const total = list => list.reduce((s, f) => s + (num(f.verified_monthly_saving_usd) || 0), 0)
+
+  it('collapseSharedBasis keeps only the largest claim on a shared cost_basis_ref across agents', () => {
+    const kept = [
+      finding('CMP-001', 'EC2|BoxUsage|i-1', 300),
+      finding('STO-001', 'EC2|BoxUsage|i-1', 500),
+      finding('STO-002', 'S3|TimedStorage|b-1', 40),
+    ]
+    const { kept: out, dropped } = collapseSharedBasis(kept)
+
+    assert.deepEqual(out.map(f => f.id), ['STO-001', 'STO-002'])
+    assert.deepEqual(out[0].double_counted_with, ['CMP-001'])
+    assert.deepEqual(dropped.map(f => f.id), ['CMP-001'])
+    assert.equal(total(out), 540)
+  })
+
+  it('collapseSharedBasis merges dropped ids into an existing double_counted_with without repeats', () => {
+    const { kept: out } = collapseSharedBasis([
+      finding('A-001', 'ref', 100, ['B-001']),
+      finding('B-001', ' ref ', 50),
+      finding('C-001', 'ref', null),
+    ])
+
+    assert.deepEqual(out.map(f => f.id), ['A-001'])
+    assert.deepEqual(out[0].double_counted_with, ['B-001', 'C-001'])
+  })
+
+  it('collapseSharedBasis leaves findings with no or distinct cost_basis_ref untouched', () => {
+    const kept = [finding('A-001', '', 10), finding('B-001', undefined, 20), finding('C-001', 'x', 30), finding('D-001', 'y', 40)]
+    const { kept: out, dropped } = collapseSharedBasis(kept)
+
+    assert.deepEqual(out, kept)
+    assert.deepEqual(dropped, [])
+    assert.deepEqual(collapseSharedBasis([]), { kept: [], dropped: [] })
   })
 })
 
