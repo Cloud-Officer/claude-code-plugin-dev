@@ -235,7 +235,7 @@ Summarize concisely:
 - **Deterministic and isolated.** No real time, network, randomness, or shared mutable state between tests. Tests must pass run in any order and in parallel.
 - **Never edit framework/config to bypass failures** (`jest.config`, `phpunit.xml`, `.rspec`, coverage thresholds) to make a run go green. Same spirit as `run-linters`.
 - **Hit the coverage floor.** Default line ≥ 80% and branch ≥ 80% (or the language equivalent) unless the user specifies otherwise or the repo configures a different/higher bar — respect the repo's and never lower it. Report the real numbers; don't game the metric with assertion-free tests.
-- **No narrative comments in test files** — per the `code-standards` skill. Sweep before reporting: `git diff -U0 -- <test paths> | grep -E '^\+[[:space:]]*(#|//|/\*|\*)'` and delete what fails its one-line test.
+- **No narrative comments in test files** — per the `code-standards` skill. Sweep before reporting: `git diff -U0 HEAD -- <test paths> | grep -E '^\+[[:space:]]*(#|//|/\*|\*)'` and delete what fails its one-line test.
 - **Assert behavior, not implementation.** Prefer public API + observable output/`testTag` selectors over internal call counts and exact-text matching, so tests survive refactors.
 - **Regression tests must actually catch the regression.** For a bug fix, ensure the test fails on the old behavior before it passes on the new.
 - **Never guess an Xcode scheme, destination or test plan.** They are project state; read them (Step 1) and report which you used. Announce any switch before making it — the user's Xcode window changes with it.

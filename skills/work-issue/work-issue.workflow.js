@@ -117,7 +117,7 @@ function buildImplementPrompt(issue) {
     '   intent. Rationale belongs in the PR body, not the source. Test of necessity:',
     '   delete it and reread — if nothing got harder to UNDERSTAND, it was never needed.',
     '   This applies to test files too; your PR body is written from `summary` and `assumptions[]`.',
-    '   Before you finish, sweep your own diff: `git diff -U0 | grep -E \'^\\+[[:space:]]*(#|//|/\\*|\\*)\'` and',
+    '   Before you finish, sweep your own diff: `git diff -U0 HEAD | grep -E \'^\\+[[:space:]]*(#|//|/\\*|\\*)\'` and',
     '   delete every added comment line that fails these rules.',
     '',
     '4. Tests are a HARD GATE — apply the `write-tests` skill (same rules as sequential mode). Any',

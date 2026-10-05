@@ -28,6 +28,6 @@ for (const issue of [{ tracker: 'github', ref: '42' }, { tracker: 'jira', ref: '
   })
 
   test('implement prompt keeps the added-comment sweep (' + issue.tracker + ')', () => {
-    assert.ok(buildImplementPrompt(issue).includes("git diff -U0 | grep -E '^\\+[[:space:]]*(#|//|/\\*|\\*)'"))
+    assert.ok(buildImplementPrompt(issue).includes("git diff -U0 HEAD | grep -E '^\\+[[:space:]]*(#|//|/\\*|\\*)'"))
   })
 }
