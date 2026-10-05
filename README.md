@@ -718,6 +718,56 @@ that moment. The implication:
 **Bottom line:** to switch accounts, quit Claude Code and relaunch it from the target directory. direnv (or the
 launcher script) handles the rest.
 
+#### Database environments and tunnels (beta / rc / prod)
+
+When a repo's databases exist once per environment, declare them all in the same `.envrc` instead of commenting lines
+in and out. `query-db` and `analyze-db` pick the environment you name in the request (`how many orders yesterday on
+beta?`), fall back to `DB_ENV`, then to the only entry of `DB_ENVS`, and otherwise ask. They open the
+environment's tunnel themselves when its port is closed, check it again before every query (SSM sessions time out after about 20 idle minutes) and reopen it if it dropped, and close it when you are done.
+
+* `DB_ENVS` lists the environments (`beta rc prod`); `DB_ENV` optionally sets the default.
+* `<VAR>_<ENV>` overrides any connection variable for one environment (`MYSQL_PORT_BETA`, `MYSQL_PASS_PROD`,
+  `MONGODB_URI_RC`, `REDIS_URL_BETA`, `PGPORT_PROD`, `ES_URL_RC`); the plain `<VAR>` holds what every environment
+  shares.
+* `<ENGINE>_TUNNEL_<ENV>` (`MYSQL`, `PG`, `MONGODB`, `REDIS` or `ES`) is the `ssm-jump` command that opens the tunnel.
+  Add `-a` so it never stops to ask which instance to use. Its `--forward host:remote_port:local_port` local port must
+  match the port the connection variable uses.
+* Point these at the **read** endpoint (replica) so queries spread over the read replicas. When a writer exists,
+  add `<VAR>_<ENV>_WRITE` and `<ENGINE>_TUNNEL_<ENV>_WRITE` on their own local port (reader port + 100); `query-db`
+  uses them only for a write you confirmed, and `analyze-db` never does. Without them, one endpoint serves both.
+* Give every environment its own local port so all tunnels can be up at once. Convention: prod keeps the service's
+  port, rc adds 10000, beta adds 20000 (MySQL 4306 / 14306 / 24306).
+* `CACHE_DSN` / `CACHE_DSN_<ENV>` are accepted for Redis when `REDIS_URL` is unset.
+
+```bash
+export DB_ENVS="beta prod"
+export MYSQL_HOST="127.0.0.1"
+export MYSQL_USER="app"
+export MYSQL_DB="app"
+
+export MYSQL_PORT_BETA="24306"
+export MYSQL_PASS_BETA="..."
+export MYSQL_TUNNEL_BETA="ssm-jump --profile acme -a api-beta-standalone --forward api-db-read-beta.example.com:4306:24306"
+export MYSQL_PORT_BETA_WRITE="24406"
+export MYSQL_TUNNEL_BETA_WRITE="ssm-jump --profile acme -a api-beta-standalone --forward api-db-beta.example.com:4306:24406"
+export REDIS_URL_BETA="redis://127.0.0.1:26379"
+export REDIS_TUNNEL_BETA="ssm-jump --profile acme -a api-beta-standalone --forward api-cache-beta.example.com:6379:26379"
+
+export MYSQL_PORT_PROD="4306"
+export MYSQL_PASS_PROD="..."
+export MYSQL_TUNNEL_PROD="ssm-jump --profile acme -a api-prod-standalone --forward api-db-prod.example.com:4306:4306"
+export REDIS_URL_PROD="redis://127.0.0.1:6379"
+export REDIS_TUNNEL_PROD="ssm-jump --profile acme -a api-prod-standalone --forward api-cache-prod.example.com:6379:6379"
+
+# Plain variables: what the app and the database MCP servers use
+export MYSQL_PORT="$MYSQL_PORT_PROD"
+export MYSQL_PASS="$MYSQL_PASS_PROD"
+export REDIS_URL="$REDIS_URL_PROD"
+```
+
+The database MCP servers connect once, at startup, to the plain variables, so when `DB_ENVS` is set both skills query
+PostgreSQL, MySQL, MongoDB and Redis through their CLIs, which can target any environment mid-session.
+
 ### Recommended Permissions
 
 This plugin bundles several MCP servers. By default, Claude Code will prompt for permission each time an MCP tool is called. To auto-approve these tools, add the following entries to the

@@ -1,7 +1,7 @@
 ---
 name: analyze-db
 description: Analyze, document, map, or scan the database schema. Use when the user wants to analyze the database, document the database, generate schema docs, map the database, create DB documentation, or inspect the database structure. Generates a docs/db.md file with complete database schema documentation. Auto-detects language/framework. Supports MySQL, PostgreSQL, SQLite, MongoDB, Elasticsearch, Redis, and BigQuery.
-allowed-tools: Bash(php:*), Bash(python:*), Bash(ruby:*), Bash(npm:*), Bash(npx:*), Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Glob, Grep, mcp__postgres__execute_sql, mcp__postgres__search_objects, mcp__mysql__execute_sql, mcp__mysql__search_objects, mcp__mongodb__find, mcp__mongodb__aggregate, mcp__mongodb__count, mcp__mongodb__list-databases, mcp__mongodb__list-collections, mcp__mongodb__collection-schema, mcp__redis__scan_keys, mcp__redis__scan_all_keys, mcp__redis__type, mcp__redis__get, mcp__redis__hgetall, mcp__redis__lrange, mcp__redis__zrange, mcp__redis__smembers, mcp__redis__llen, mcp__redis__json_get, mcp__redis__dbsize, mcp__redis__info, mcp__bigquery__query, mcp__bigquery__list_tables, mcp__bigquery__get_table_schema
+allowed-tools: Bash(printenv:*), Bash(nc:*), Bash(ssm-jump:*), Bash(lsof:*), Bash(seq:*), Bash(sleep:*), AskUserQuestion, TaskStop, Bash(php:*), Bash(python:*), Bash(ruby:*), Bash(npm:*), Bash(npx:*), Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Glob, Grep, mcp__postgres__execute_sql, mcp__postgres__search_objects, mcp__mysql__execute_sql, mcp__mysql__search_objects, mcp__mongodb__find, mcp__mongodb__aggregate, mcp__mongodb__count, mcp__mongodb__list-databases, mcp__mongodb__list-collections, mcp__mongodb__collection-schema, mcp__redis__scan_keys, mcp__redis__scan_all_keys, mcp__redis__type, mcp__redis__get, mcp__redis__hgetall, mcp__redis__lrange, mcp__redis__zrange, mcp__redis__smembers, mcp__redis__llen, mcp__redis__json_get, mcp__redis__dbsize, mcp__redis__info, mcp__bigquery__query, mcp__bigquery__list_tables, mcp__bigquery__get_table_schema
 ---
 
 # Analyze Database Schema
@@ -14,7 +14,7 @@ Analyze the project and generate `docs/db.md` with **complete database schema do
 
 ## MCP Tools with Fallbacks
 
-Prefer MCP tools when available — they handle connection management. On an MCP error, report it, then retry once via the CLI form (the Rules failure policy applies if that also fails).
+Prefer MCP tools when available — they handle connection management — except when `DB_ENVS` is set, where PostgreSQL, MySQL, MongoDB and Redis use the CLI only (see [Environments and Tunnels](#environments-and-tunnels)). On an MCP error, report it, then retry once via the CLI form (the Rules failure policy applies if that also fails).
 
 | Database | MCP Tools | CLI Fallback |
 | --- | --- | --- |
@@ -37,8 +37,50 @@ PostgreSQL and MySQL are both served by DBHub, which exposes exactly two tools p
 | SQLite | `SQLITE_DB` (path to the database file, e.g. `./db/development.sqlite3`) |
 | MongoDB | `MONGODB_URI` |
 | Elasticsearch | `ES_URL`, `ES_API_KEY` (optional) |
-| Redis | `REDIS_URL` |
+| Redis | `REDIS_URL` (or `CACHE_DSN`) |
 | BigQuery | `BQ_PROJECT`, `BQ_DATASETS` (comma-separated list, e.g. `archive_2023,archive_2024,archive_2025`) |
+
+## Environments and Tunnels
+
+A repo whose databases exist once per deployment environment (beta, rc, prod, …) declares every environment side by side in its `.envrc`, each on its own local tunnel port, instead of commenting lines in and out. When `DB_ENVS` is unset or empty, skip this section: every command uses the plain variables exactly as written in this file.
+
+| Variable | Meaning |
+| --- | --- |
+| `DB_ENVS` | Space-separated environment names, e.g. `beta rc prod`; each must match `^[a-z0-9]+$` |
+| `DB_ENV` | Optional default environment, one of `DB_ENVS` |
+| `<VAR>_<ENV>` | That environment's value of any connection variable above, `<ENV>` upper-cased: `MYSQL_PORT_BETA`, `MYSQL_PASS_PROD`, `PGPORT_RC`, `MONGODB_URI_BETA`, `REDIS_URL_PROD`, `ES_URL_RC` — pointing at the read endpoint when there is one |
+| `<VAR>` | Fallback when `<VAR>_<ENV>` is unset — values every environment shares (`MYSQL_HOST`, `MYSQL_USER`, `MYSQL_DB`) |
+| `<ENGINE>_TUNNEL_<ENV>` | The `ssm-jump` command that opens that engine's tunnel for that environment, to its **read** endpoint (replica) when it has one; `<ENGINE>` is `MYSQL`, `PG`, `MONGODB`, `REDIS` or `ES` |
+| `<VAR>_<ENV>_WRITE`, `<ENGINE>_TUNNEL_<ENV>_WRITE` | Writer-endpoint values; never used here — this skill only reads |
+| `CACHE_DSN`, `CACHE_DSN_<ENV>` | Accepted as Redis URLs when the matching `REDIS_URL` variable is unset |
+
+Never print a connection variable's value. List which are defined by name only: `printenv | cut -d= -f1 | grep -E '^(DB_ENVS?|MYSQL_|PG|MONGODB_|REDIS_|CACHE_DSN|ES_)' | sort`. `DB_ENVS`, `DB_ENV` and the `*_TUNNEL_*` variables hold no secret and may be read with `printenv <NAME>`.
+
+**1. Pick the environment** — once, before the first connection: an environment the user named (`on prod`, `beta`, `/co-dev:analyze-db rc`); else `DB_ENV`; else the only entry of `DB_ENVS`; else ask with `AskUserQuestion`, one option per `DB_ENVS` entry. A name not listed in `DB_ENVS` is refused, never guessed. Analyze one environment per run; Step 9 records it in the "Last verified" line.
+
+**2. Use that environment's variables.** In every command in this file, write each connection variable `$VAR` as `${VAR_<ENV>:-$VAR}`, and the Redis URL as `${REDIS_URL_<ENV>:-${CACHE_DSN_<ENV>:-${REDIS_URL:-$CACHE_DSN}}}`. For beta:
+
+```bash
+MYSQL_PWD="${MYSQL_PASS_BETA:-$MYSQL_PASS}" mysql -h "${MYSQL_HOST_BETA:-$MYSQL_HOST}" -P "${MYSQL_PORT_BETA:-$MYSQL_PORT}" -u "${MYSQL_USER_BETA:-$MYSQL_USER}" "${MYSQL_DB_BETA:-$MYSQL_DB}" <<'SQL'
+SQL_QUERY
+SQL
+```
+
+`psql` reads its connection from the environment, so set it on the command: `PGHOST="${PGHOST_BETA:-$PGHOST}" PGPORT="${PGPORT_BETA:-$PGPORT}" PGUSER="${PGUSER_BETA:-$PGUSER}" PGPASSWORD="${PGPASSWORD_BETA:-$PGPASSWORD}" PGDATABASE="${PGDATABASE_BETA:-$PGDATABASE}" psql -f - <<'SQL'`. An environment whose resolved value is empty is an unobtainable value: name the missing `<VAR>_<ENV>` and stop.
+
+**3. CLI only for PostgreSQL, MySQL, MongoDB and Redis.** Their MCP servers connected once, at Claude Code startup, to whatever the plain variables pointed at, so they cannot reach a chosen environment. When `DB_ENVS` is set, run every query for these engines through the CLI form and never call their `mcp__*` tools.
+
+**4. Bring the tunnel up when needed** — before Step 6, per engine:
+
+1. `printenv <ENGINE>_TUNNEL_<ENV>` (e.g. `MYSQL_TUNNEL_BETA`). Empty means this skill manages no tunnel for it — go straight to the connectivity test.
+2. The value must match `^ssm-jump( +[A-Za-z0-9._:@/=-]+)+$` and carry `--forward <host>:<remote_port>:<local_port>`; anything else is reported and never run. `<local_port>` must be the port the connection uses — the resolved `MYSQL_PORT`/`PGPORT`, or the port in the URL, checked without printing it (`printenv MONGODB_URI_BETA | grep -cE ':48017([/?]|$)'` returns `1`). A mismatch is reported and stops the step.
+3. `nc -z -w 2 127.0.0.1 <local_port>` — open means a tunnel is already up (the user's or an earlier one): use it, start nothing.
+4. Otherwise run the tunnel command, written out literally, as a background Bash command (`run_in_background: true`) and note its task id. Wait for the port: `for i in $(seq 1 30); do nc -z -w 1 127.0.0.1 <local_port> && echo open && break; sleep 1; done`. Still closed after 30 s → read the task's output and report it (expired SSO session: ask the user to run `aws sso login --profile <profile>`; an instance-selection prompt: the command needs `-a`), then stop.
+5. Tell the user which tunnel was opened, e.g. `Opened beta MySQL tunnel on 127.0.0.1:24306`.
+
+**5. Keep it up.** SSM sessions close on their own after about 20 idle minutes (the Session Manager idle timeout default) or when AWS drops them, so a tunnel that worked earlier may be gone. Before each step that queries the database (Steps 6, 7 and 8), run `nc -z -w 2 127.0.0.1 <local_port>` again. If it is closed and the `<ENGINE>_TUNNEL_<ENV>` variable exists, stop the old background task if it is still listed, rerun item 4's sub-steps 4–5 to reopen it, and tell the user, e.g. `Reopened beta MySQL tunnel (it had timed out)`. If a command fails with a connection error (connection refused, `Lost connection to MySQL server`, `server closed the connection unexpectedly`, `ECONNRESET`, a MongoDB server-selection timeout), check the port, reopen the tunnel if it is closed, and retry that same command once; a second failure falls under the failure policy.
+
+**6. Close what you opened.** Tunnels this skill started stay up until Step 9 finishes; then stop each background task, then if `nc -z -w 1 127.0.0.1 <local_port>` still succeeds run `lsof -ti tcp:<local_port> -sTCP:LISTEN | xargs kill`. Never close a tunnel that was already open before this skill ran.
 
 ## CLI Command Reference
 
@@ -156,7 +198,7 @@ Write the initial draft using the per-DB template (see "Document Templates" belo
 
 ### Step 6 — Verify connectivity
 
-Test connectivity using the simplest CLI ping per DB:
+When `DB_ENVS` is set, first pick the environment and bring its tunnel up ([Environments and Tunnels](#environments-and-tunnels), items 1 and 4), and write each ping with that environment's variables. Test connectivity using the simplest CLI ping per DB:
 
 | Database | Test command |
 | -------- | ------------ |
@@ -217,7 +259,7 @@ Use safe sampling depending on table size:
 
 **"Last verified" line at top of `docs/db.md`:**
 
-- Live DB verified: `> **Last verified**: YYYY-MM-DD — verified against live database`
+- Live DB verified: `> **Last verified**: YYYY-MM-DD — verified against live database` (when `DB_ENVS` is set, append the environment: `verified against live database (beta)`)
 - Live DB verified but some objects errored in Steps 7-8: `> **Last verified**: YYYY-MM-DD — verified against live database (partial: N objects unreadable)`
 - Code-only (Steps 7-8 skipped): `> **Last verified**: YYYY-MM-DD — derived from code analysis only (not verified against live database)`
 
