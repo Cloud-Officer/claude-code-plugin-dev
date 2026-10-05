@@ -182,5 +182,6 @@ xcrun simctl list devices available
 ```
 
 Use `-project` in place of `-workspace` for a bare `.xcodeproj`. Every interpolated value is untrusted: assign it to a
-shell variable and pass it double-quoted, reject a scheme or destination containing a quote, backtick, `$` or newline,
-and keep result bundles in a `mktemp -d` directory rather than the working tree.
+shell variable and pass it double-quoted, reject any interpolated value (workspace or project path, scheme,
+destination) containing a quote, backtick, `$` or newline, and keep result bundles in a `mktemp -d` directory rather
+than the working tree.
