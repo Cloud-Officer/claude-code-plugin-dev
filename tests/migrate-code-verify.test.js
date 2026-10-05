@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
 const path = require('node:path')
 const { test } = require('node:test')
 const { extractWorkflowFunctions } = require('../scripts/extract-workflow-functions.js')
@@ -54,4 +55,25 @@ test('verifyCoverage partitions the candidate list exactly once', () => {
 
 test('verifyCoverage does not count cap-dropped files as unverified', () => {
   assert.deepEqual(verifyCoverage(100, 40, 40), { verify_files: 60, unverified_files: 0 })
+})
+
+const skillPath = path.join(__dirname, '..', 'skills', 'migrate-code', 'SKILL.md')
+
+const returnedCountKeys = () => {
+  const source = fs.readFileSync(workflowPath, 'utf8')
+  const block = source.slice(source.lastIndexOf('\n  counts: {')).match(/counts: \{([\s\S]*?)\n {2}\}/)[1]
+  return [...block.matchAll(/^\s{4}(\w+):/gm)].map(m => m[1])
+}
+
+test('SKILL documents every count the workflow returns', () => {
+  const skill = fs.readFileSync(skillPath, 'utf8')
+  const documented = skill.match(/counts:\s*\{([^}]*)\}/)[1].split(',').map(k => k.trim())
+  assert.deepEqual(documented, returnedCountKeys())
+})
+
+test('SKILL report lists every verify item that is not faithful', () => {
+  const skill = fs.readFileSync(skillPath, 'utf8')
+  const bullet = skill.split('\n').find(line => line.startsWith('- **Behavioral mismatches**'))
+  assert.match(bullet, /not `faithful`/)
+  assert.match(bullet, /`uncertain`/)
 })
