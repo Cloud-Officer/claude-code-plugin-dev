@@ -82,6 +82,30 @@ function joinVerdicts(issues, verdicts) {
   return { byId, ambiguous }
 }
 
+function collapseSharedBasis(findings) {
+  const winners = new Map()
+  for (const f of findings) {
+    const ref = String(f.cost_basis_ref || '').trim()
+    if (!ref) continue
+    const best = winners.get(ref)
+    if (!best || (num(f.verified_monthly_saving_usd) ?? -Infinity) > (num(best.verified_monthly_saving_usd) ?? -Infinity)) winners.set(ref, f)
+  }
+  const merged = new Map()
+  const dropped = []
+  for (const f of findings) {
+    const ref = String(f.cost_basis_ref || '').trim()
+    const winner = ref ? winners.get(ref) : f
+    if (winner === f) continue
+    dropped.push(f)
+    if (!merged.has(winner)) merged.set(winner, new Set(winner.double_counted_with || []))
+    merged.get(winner).add(f.id)
+  }
+  const kept = findings
+    .filter(f => !dropped.includes(f))
+    .map(f => (merged.has(f) ? { ...f, double_counted_with: [...merged.get(f)] } : f))
+  return { kept, dropped }
+}
+
 // --- Shared context block injected into every agent prompt -----------------
 // Values in here come from the user (scope) and
 // from `aws sts get-caller-identity` / `aws ec2 describe-regions`. This one
@@ -1195,7 +1219,8 @@ for (const item of reviewed.filter(Boolean)) {
   }
 }
 
-const kept = confirmed.filter(f => keepFinding(f.severity, f.confidence_score))
+const { kept, dropped: collapsed } = collapseSharedBasis(confirmed.filter(f => keepFinding(f.severity, f.confidence_score)))
+if (collapsed.length) log('Collapsed ' + collapsed.length + ' kept finding(s) that claimed an already-counted cost_basis_ref: ' + collapsed.map(f => f.id).join(', '))
 const filtered = confirmed.filter(f => !keepFinding(f.severity, f.confidence_score)).concat(unverified)
 
 // Only kept findings contribute to the headline total. A figure that did not
@@ -1213,6 +1238,7 @@ return {
   agents_failed,
   kept,
   filtered,
+  collapsed,
   positives,
   counts,
   tables,

@@ -208,6 +208,7 @@ The workflow runs in the background and notifies you on completion. It returns:
                  cost_basis_ref, iac_managed, iac_note, double_counted_with, agent,
                  confidence_score, confirmation_evidence, confidence_rationale } ],
   filtered:  [ ... same shape; survived validation below threshold, plus findings no verdict came back for ],
+  collapsed: [ ... same shape; kept findings whose cost_basis_ref another kept finding already claims with a larger saving ],
   positives: [ { area, text } ],             // area = the emitting agent's key, exactly as in agents_run
   counts:    { trend: {...}, storage: {...} },
   tables:    [ { area, title, columns, rows } ],
@@ -229,12 +230,12 @@ Operate on the workflow's return value, honouring its `data_notice` (see Data Bo
 - Every `kept` finding has a `confidence_score`.
 - The headline total equals `totals.verified_monthly_saving_usd` — the sum over `kept` findings of `verified_monthly_saving_usd`, which is the validator's recomputed figure where it differs from the agent's claim. **Never** add `filtered` or unverified findings into a total shown to the user.
 - Findings whose `verified_monthly_saving_usd` is null are counted separately as unquantified. Never present them as zero, and never impute a value.
-- Where `double_counted_with` is non-empty, confirm the overlap was resolved (the smaller claim reduced to its incremental part) before summing. If two findings still claim the same `cost_basis_ref`, count the money once and say which finding it was attributed to.
+- The workflow already collapses `kept` findings that share a `cost_basis_ref` across agents and batches: only the largest claim stays in `kept` (and in the total), the others move to `collapsed`, and their ids are listed in the survivor's `double_counted_with`. Never add a `collapsed` finding back into the total; where a survivor's `double_counted_with` is non-empty, say which findings its money was also claimed by.
 
 Then:
 
 1. Take `kept` as the main findings; `filtered` becomes the "Filtered (Low Confidence)" appendix.
-2. Deduplicate overlapping findings (same `cost_basis_ref` and same root cause across agents).
+2. Deduplicate overlapping findings (same root cause across agents) for presentation only — never change a `verified_monthly_saving_usd` or the headline total while doing so.
 3. Sort by severity (Critical → High → Medium → Low → Info), then by `verified_monthly_saving_usd` descending (nulls last), then by service.
 4. Print the report to the terminal. Do not write a file.
 5. Render `tables` verbatim under the sections they belong to — the trend agent's monthly totals and year-over-year deltas, the CDN agent's CloudFront cost and traffic.
