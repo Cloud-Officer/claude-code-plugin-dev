@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
 const path = require('node:path')
 const { test } = require('node:test')
 const { extractWorkflowFunctions } = require('../scripts/extract-workflow-functions.js')
@@ -54,4 +55,17 @@ test('verifyCoverage partitions the candidate list exactly once', () => {
 
 test('verifyCoverage does not count cap-dropped files as unverified', () => {
   assert.deepEqual(verifyCoverage(100, 40, 40), { verify_files: 60, unverified_files: 0 })
+})
+
+test('SKILL documents every counts key the workflow returns', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8')
+  const skill = fs.readFileSync(path.join(__dirname, '..', 'skills', 'migrate-code', 'SKILL.md'), 'utf8')
+  const returned = workflow.match(/\n {2}counts: \{\n([\s\S]*?)\n {2}\},/)[1]
+    .split('\n')
+    .map(line => line.match(/^ {4}(\w+):/))
+    .filter(Boolean)
+    .map(m => m[1])
+  const documented = skill.match(/^ {2}counts: +\{([^}]*)\}/m)[1].split(',').map(k => k.trim())
+  assert.ok(returned.includes('behavioral_uncertain'))
+  assert.deepEqual([...documented].sort(), [...returned].sort())
 })
