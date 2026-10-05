@@ -75,6 +75,7 @@ Every value this skill does not control must match its pattern before it reaches
 - Region name: `^[a-z0-9-]+$`
 - Window dates: `^\d{4}-\d{2}-\d{2}$`
 - Resource identifiers used in a Step 6 command (volume, snapshot, AMI, allocation, distribution, log-group name): `^[A-Za-z0-9._/:-]+$`
+- Log-group retention days the user answers in Step 6 (only the values CloudWatch Logs accepts): `^(1|3|5|7|14|30|60|90|120|150|180|365|400|545|731|1096|1827|2192|2557|2922|3288|3653)$`
 
 A user argument or environment value that fails aborts with a message. An account-sourced value that fails is skipped with a note in the report rather than interpolated.
 
@@ -432,7 +433,7 @@ Only these actions are eligible. Anything else stays a report finding, no matter
 | Delete an unattached EBS volume | Orphan | **Snapshot it first**, record the snapshot id, and confirm the volume has been detached for ≥30 days |
 | Delete a snapshot orphaned from a deregistered AMI or deleted volume | Orphan | Confirm no Backup plan or Data Lifecycle Manager policy owns it, and no AMI references it |
 | Add an `AbortIncompleteMultipartUpload` lifecycle rule | Additive; stops billing for invisible partial uploads | Confirm no active upload process relies on multi-day-long uploads |
-| Set retention on a CloudWatch log group currently set to "Never expire" | Reversible setting change | Confirm no retention obligation applies to that log stream; ask the user for the retention value |
+| Set retention on a CloudWatch log group currently set to "Never expire" | Reversible setting change | Confirm no retention obligation applies to that log stream; ask the user for the retention value and reject any answer that fails the retention-days pattern in the Interpolation Boundary |
 | Modify a gp2 volume to gp3 | Live modification, no downtime, cheaper per GB | Confirm the volume is not in the middle of another modification |
 
 Everything else — terminating instances, deleting NAT Gateways or load balancers, changing instance types, removing Multi-AZ, deleting buckets or databases, switching off security controls — is **out of scope for this step**, permanently. Report it and let the user act deliberately.
