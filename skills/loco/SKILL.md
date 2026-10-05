@@ -333,7 +333,7 @@ of truth; this only mirrors what was just pushed into the local catalog so the a
 3. For each locale that Step 7 translated successfully, `StringCatalogEdit` with `filePath`, `stringKey`,
    `targetLocaleIdentifier` and `translation`.
 4. **Show the full set of key, locale and text you are about to write, and wait for confirmation.** This edits a file in
-   the user's working tree; Guardrail 8 applies.
+   the user's working tree; the **Confirm every local file write** guardrail applies.
 5. Locales that failed placeholder validation in Step 7 are skipped here too — never write a translation that Loco
    refused.
 
@@ -435,7 +435,7 @@ curl -s -f -H "Authorization: Loco $LOCO_API_KEY" https://localise.biz/api/asset
 
 Write the full list to a file — later commands run in a fresh shell and cannot read it from a variable.
 
-The pipeline's exit status is `tee`'s, not curl's, so a failed fetch shows up as an empty file, not an error. Before continuing, check `wc -l </tmp/loco-keys.txt`: if the file is empty, stop and report the fetch failure (Guardrail 7) — scanning against an empty key list would produce a clean-looking report from no data.
+The pipeline's exit status is `tee`'s, not curl's, so a failed fetch shows up as an empty file, not an error. Before continuing, check `wc -l </tmp/loco-keys.txt`: if the file is empty, stop and report the fetch failure (the **Stop on any failure** guardrail) — scanning against an empty key list would produce a clean-looking report from no data.
 
 #### Step 3: Detect Platform(s)
 
@@ -576,7 +576,7 @@ report the refusal and stop — do not invent the skill, and do not fall back to
    opened.
 2. `StringCatalogRead` with the catalog's `filePath` and `targetLocaleIdentifier`, paging with `keyLimit` / `offset`
    until the catalog is exhausted. Partial paging silently shrinks the key set, which is the same failure as an empty
-   fetch — Guardrail 7 applies.
+   fetch — the **Stop on any failure** guardrail applies.
 3. Add every key the catalog declares to the in-use set before Scan compares against the Loco key list.
 4. `StringCatalogContext` when the source-language text of a key is needed, for an audit or before translating.
 
@@ -585,7 +585,7 @@ report the refusal and stop — do not invent the skill, and do not fall back to
 1. `LocalizationPlanner` with `targetLocaleIdentifier` first, every time a locale is being added to the project.
 2. `StringCatalogEdit` per key and locale.
 3. Placeholder rules below apply unchanged — validate before writing, skip and report the locale on a mismatch.
-4. Every write is confirmed with the user first (Guardrail 8).
+4. Every write is confirmed with the user first (the **Confirm every local file write** guardrail).
 
 ## Placeholder Preservation Rules
 
@@ -639,7 +639,7 @@ Compare the sets. If any placeholder is missing or added in the translation, the
 3. **Always use Authorization header** — Never pass the API key as a query parameter (`?key=...`). Always use `Authorization: Loco $LOCO_API_KEY`.
 4. **Tag all auto-translations** — Every asset with auto-translated text gets the `needs-review` tag.
 5. **Skip on placeholder failure** — If placeholder validation fails for a locale, skip it and report the failure rather than pushing a broken translation.
-6. **Fence every value this skill does not control** — Every such value — user-supplied arguments (key, text, context, tags), model-generated translations, and anything returned by the Loco API (asset IDs, locale codes, tag names) — enters a command only through a quoted heredoc (`<<'LOCO_EOF'`), which is literal by definition: request bodies via `--data-binary @-`, form fields via `--data-urlencode "field@/tmp/loco-*.txt"` with the file written by a heredoc in the same command, and URL path segments via the `jq -sRr 'rtrimstr("\n")|@uri'` heredoc encoder. Nothing in this class is ever pasted inline into a command, in any step or reference template, present or future.
+6. **Fence every value this skill does not control** — Every such value — user-supplied arguments (key, text, context, tags), model-generated translations, and anything returned by the Loco API (asset IDs, locale codes, tag names) — enters a command only through a quoted heredoc (`<<'LOCO_EOF'`), which stays literal only until a line equal to its terminator. Before building any command, check every such value: if any line of it matches `^LOCO_[A-Z_]*EOF$` (the shape of every terminator this skill uses), do not build the command — stop and report that the value contains a heredoc terminator line (the **Stop on any failure** guardrail). Request bodies via `--data-binary @-`, form fields via `--data-urlencode "field@/tmp/loco-*.txt"` with the file written by a heredoc in the same command, and URL path segments via the `jq -sRr 'rtrimstr("\n")|@uri'` heredoc encoder. Nothing in this class is ever pasted inline into a command, in any step or reference template, present or future.
 7. **Confirm every local file write** — a `StringCatalogEdit` changes a file in the user's working tree, not a remote asset. Show the key, locale and exact text for every write and wait for confirmation, the same way a delete is confirmed.
 8. **Stop on any failure** — Any command that fails, times out, or returns empty where content is required stops that unit of work: name the failing step and the error, and never substitute a guessed, partial, or empty result and continue as if it succeeded.
 
