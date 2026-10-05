@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
 const path = require('node:path')
 const { test } = require('node:test')
 const { extractWorkflowFunctions } = require('../scripts/extract-workflow-functions.js')
@@ -54,4 +55,10 @@ test('verifyCoverage partitions the candidate list exactly once', () => {
 
 test('verifyCoverage does not count cap-dropped files as unverified', () => {
   assert.deepEqual(verifyCoverage(100, 40, 40), { verify_files: 60, unverified_files: 0 })
+})
+
+test('rulebook prompt hands TODO(migrate) markers to a human, not to the read-only verify phase', () => {
+  const source = fs.readFileSync(workflowPath, 'utf8')
+  assert.doesNotMatch(source, /verify phase removes/)
+  assert.match(source, /resolved by a human before the migration is called complete \(Step 5\)/)
 })
