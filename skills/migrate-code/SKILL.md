@@ -143,7 +143,7 @@ The workflow runs in the background and notifies you on completion. It **returns
 
 ```text
 {
-  counts:     { files, ported, blocked, needs_human, todos, behavioral_mismatches },
+  counts:     { files, ported, blocked, needs_human, todos, verified, behavioral_mismatches, behavioral_uncertain },
   capped:     { error_groups, test_failures, verify_files, unverified_files },
   translated: [ { source_file, target_file, status, review_verdict, todo_count, block_reason } ],
   build:      { ran, clean, marker, summary },
@@ -152,6 +152,8 @@ The workflow runs in the background and notifies you on completion. It **returns
   rule_gaps:  [ { pattern, proposed_rule } ]
 }
 ```
+
+`counts.verified` is how many files the adversarial reviewers scored. `behavioral_mismatches` and `behavioral_uncertain` are `null` — never `0` — when `verified` is `0`: `null` means nothing was checked, not that nothing was wrong. Each `verify[].verdict` is one of `faithful`, `mismatch`, or `uncertain` (the reviewers could not clear the file).
 
 **"Fix the loop, not the code."** The returned `rule_gaps` are recurring mistranslations the fixers hit. Surface them to the user: the right response to a repeated failure is usually to **amend the rulebook and re-run the affected files**, not to hand-patch each site. Offer to do exactly that.
 
@@ -183,12 +185,12 @@ The engine treats the existing portable suite as the referee, but that suite may
 
 Operate on the workflow's return value — the failed-call Guardrail applies here as everywhere: no return, `ok: false`, or missing `counts` means stop and say so rather than inventing results. Write `docs/migration/report.md`:
 
-- **Progress** — the `counts` (files ported / blocked / needing human, TODO markers, behavioral mismatches).
+- **Progress** — the `counts` (files ported / blocked / needing human, TODO markers, files verified, behavioral mismatches, inconclusive verifications). `behavioral_mismatches` and `behavioral_uncertain` are `null` when nothing was verified — report that as "not verified", never as zero.
 - **Build & Test** — `ran`/`clean`/`green` plus the pasted `marker`. Never claim green without the runner's own marker.
 - **Lint & coverage backfill (Step 4.5)** — the `run-linters` outcome (clean / fixed / remaining), whether the suite was re-run after autofixes, and, if `write-tests` ran, the coverage numbers and its pass marker.
 - **Blocked & needs-human files** — list them with reasons; these need the user's attention.
-- **Behavioral mismatches** — every `verify` item with `verdict: "mismatch"`, quoting the source-vs-port evidence, sorted by `mismatches[].severity` — the workflow's closed set `high`, `medium`, `low`, in that order — then by `target_file` bytewise ascending. These are the highest-priority follow-ups.
-- **Verification coverage** — state how many ported files were adversarially verified out of how many were ported, and name what the `capped` counts deferred: unverified files (selected by TODO marker count, so a clean-looking file can be skipped entirely), plus any error groups or failing tests the per-round caps dropped (`capped.error_groups` and `capped.test_failures` sum deferral events across rounds — a group deferred in two rounds counts twice, so read them as deferral volume, not distinct defects). Unverified is not verified — never let the mismatch list read as a full sweep.
+- **Behavioral mismatches** — every `verify` item whose `verdict` is not `faithful` (`mismatch` or `uncertain`), in two groups. `mismatch` first, quoting the source-vs-port evidence, sorted by `mismatches[].severity` — the workflow's closed set `high`, `medium`, `low`, in that order — then by `target_file` bytewise ascending; these are the highest-priority follow-ups. Then `uncertain` (a 2-of-3 split or votes that could not prove equivalence), sorted by `target_file` bytewise ascending and flagged as **not verified** — each needs a human review before it can count as faithful.
+- **Verification coverage** — state how many ported files were adversarially verified out of how many were ported (verified means `verdict: "faithful"` or `"mismatch"`: `counts.verified` minus `counts.behavioral_uncertain`, since an `uncertain` file was reviewed but not verified), and name what the `capped` counts deferred: unverified files (selected by TODO marker count, so a clean-looking file can be skipped entirely), plus any error groups or failing tests the per-round caps dropped (`capped.error_groups` and `capped.test_failures` sum deferral events across rounds — a group deferred in two rounds counts twice, so read them as deferral volume, not distinct defects). Unverified is not verified — never let the mismatch list read as a full sweep.
 - **Outstanding TODO(migrate) markers** — remind the user to grep for them: `grep -rn "TODO(migrate)" '<scope>'`.
 - **Rule gaps** — the deduped `rule_gaps`, framed as rulebook amendments to apply before a re-run.
 

@@ -268,7 +268,7 @@ if (mode === 'plan') {
     '     that is NOT there (a dropped construct, an omission, a rule complied with) and never to justify a',
     '     translation choice — that belongs in the rulebook, not in every ported file. Source comments that',
     '     violate this are NOT carried over. `TODO(migrate):` markers are exempt: they are work items, not',
-    '     explanations, and the verify phase removes them.',
+    '     explanations, and each one is resolved by a human before the migration is called complete (Step 5).',
     '   - what to do when there is NO clean equivalent (the escalation rule: flag with `TODO(migrate): …`)',
     '   - a short "DO NOT" list of tempting-but-wrong translations',
     '   Write it so it can be applied mechanically to one file at a time, without re-deriving any decision.',
@@ -373,6 +373,43 @@ function safeRepoPath(p) {
     parts.push(seg)
   }
   return parts.length ? parts.join('/') : null
+}
+
+function buildFixerPrompt(g, context) {
+  const rawFiles = g.files || []
+  const safeFiles = rawFiles.map(safeRepoPath).filter(Boolean)
+  const dropped = safeFiles.length < rawFiles.length
+  const droppedNote = dropped ? ' (paths outside the repo root were dropped)' : ''
+  return [
+    'You are a FIXER. Resolve ONE class of build error across the files it affects — batched, not one-off.',
+    context,
+    '',
+    'Error signature: ' + fence('error_signature', g.signature),
+    'Affected files: ' + (safeFiles.length ? fence('affected_files', safeFiles.join(', ')) + droppedNote : '(none listed — locate them in the build output' + (dropped ? '; paths outside the repo root were dropped' : '') + ')'),
+    'Write scope: edit only files inside the repo root; if the cause lies in a file outside it, touch nothing there and return fixed=false with the path in notes.',
+    '',
+    'Fix the underlying cause consistently across all affected files, following the rulebook. If this error',
+    'class reveals a RULEBOOK GAP (the same mistranslation happened many times), fix the files AND return a',
+    '`rule_gap` so the rulebook can be amended — do not just paper over each site. Do NOT run the full build',
+    'yourself (the daemon owns that). Report which files you touched and whether you fixed it.',
+  ].join('\n')
+}
+
+function testFixerPrompt(fl, context) {
+  const safeFile = safeRepoPath(fl.file)
+  return [
+    'You are a FIXER chasing a behavioral test failure in the ported code.',
+    context,
+    '',
+    'Failing test: ' + fence('test', fl.test) + (safeFile ? '  (file: ' + fence('file', safeFile) + ')' : (fl.file ? '  (its reported file path was outside the repo root and was dropped)' : '')),
+    'Reported cause: ' + (fl.why ? fence('why', fl.why) : '(investigate)'),
+    'Write scope: edit only files inside the repo root; if the cause lies in a file outside it, touch nothing there and return fixed=false with the path in notes.',
+    '',
+    'The test suite is the referee — it must pass against the PORT the same way it passed against the original.',
+    'Fix the ported CODE (not the test) so behavior matches the source, following the rulebook. If the failure',
+    'reflects a systemic mistranslation, return a `rule_gap` too. Do NOT run the whole suite (the runner owns',
+    'that). Report the files you touched and whether you believe it is fixed.',
+  ].join('\n')
 }
 const oneLine = (s) => String(s == null ? '' : s).replace(/[\r\n]+/g, ' ')
 const pathBlocked = []
@@ -549,23 +586,7 @@ const compileLoop = await runFixLoop({
   doneLog: (round) => 'Build clean after ' + round + ' round(s).',
   itemsOf: (s) => s.error_groups,
   fixerLabel: (g) => 'fix:' + String(g.signature).slice(0, 32),
-  fixerPrompt: (g) => {
-    // g.files rides the same rail as dependency_order: out-of-repo paths are dropped.
-    const safeFiles = (g.files || []).map(safeRepoPath).filter(Boolean)
-    const droppedNote = safeFiles.length < (g.files || []).length ? ' (paths outside the repo root were dropped; discover from the build output)' : ''
-    return [
-      'You are a FIXER. Resolve ONE class of build error across the files it affects — batched, not one-off.',
-      CONTEXT,
-      '',
-      'Error signature: ' + fence('error_signature', g.signature),
-      'Affected files: ' + (safeFiles.length ? fence('affected_files', safeFiles.join(', ')) + droppedNote : '(discover from the build output' + (droppedNote ? '; paths outside the repo root were dropped' : '') + ')'),
-      '',
-      'Fix the underlying cause consistently across all affected files, following the rulebook. If this error',
-      'class reveals a RULEBOOK GAP (the same mistranslation happened many times), fix the files AND return a',
-      '`rule_gap` so the rulebook can be amended — do not just paper over each site. Do NOT run the full build',
-      'yourself (the daemon owns that). Report which files you touched and whether you fixed it.',
-    ].join('\n')
-  },
+  fixerPrompt: (g) => buildFixerPrompt(g, CONTEXT),
   noProgressLog: 'No progress this round — stopping the compile loop for human intervention.',
 })
 const build = compileLoop.state
@@ -596,22 +617,7 @@ const testLoop = await runFixLoop({
   doneLog: (round) => 'Test suite green after ' + round + ' round(s).',
   itemsOf: (s) => s.failures,
   fixerLabel: (fl) => 'testfix:' + String(fl.test).slice(0, 32),
-  fixerPrompt: (fl) => {
-    // fl.file rides the same rail as dependency_order: an out-of-repo path is dropped.
-    const safeFile = safeRepoPath(fl.file)
-    return [
-      'You are a FIXER chasing a behavioral test failure in the ported code.',
-      CONTEXT,
-      '',
-      'Failing test: ' + fence('test', fl.test) + (safeFile ? '  (file: ' + fence('file', safeFile) + ')' : (fl.file ? '  (its reported file path was outside the repo root and was dropped; discover from the test output)' : '')),
-      'Reported cause: ' + (fl.why ? fence('why', fl.why) : '(investigate)'),
-      '',
-      'The test suite is the referee — it must pass against the PORT the same way it passed against the original.',
-      'Fix the ported CODE (not the test) so behavior matches the source, following the rulebook. If the failure',
-      'reflects a systemic mistranslation, return a `rule_gap` too. Do NOT run the whole suite (the runner owns',
-      'that). Report the files you touched and whether you believe it is fixed.',
-    ].join('\n')
-  },
+  fixerPrompt: (fl) => testFixerPrompt(fl, CONTEXT),
   noProgressLog: 'No progress on tests this round — stopping for human intervention.',
 })
 const test = testLoop.state
