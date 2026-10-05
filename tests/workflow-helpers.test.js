@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
-const { describe, it } = require('node:test')
 const fs = require('node:fs')
 const path = require('node:path')
+const { describe, it } = require('node:test')
 const { ROOT, loadHelpers, workflowScript } = require('../scripts/workflow-helpers.js')
 
 describe('review-aws-cost helpers', () => {
@@ -247,6 +247,37 @@ describe('safeAgent dispatch failure policy', () => {
       assert.equal(await safeAgent('prompt', opts), returned)
       assert.deepEqual(seen, [['prompt', opts]])
       assert.deepEqual(logs, [])
+    })
+  }
+})
+
+describe('code-review-deep quantitative requirements', () => {
+  const skill = fs.readFileSync(path.join(ROOT, 'skills', 'code-review-deep', 'SKILL.md'), 'utf8')
+  const agents = Object.values(loadHelpers(workflowScript('code-review-deep'), ['A_SECURITY', 'A_QUALITY', 'A_BUGS', 'A_TESTING', 'A_DEPS']))
+  const section = skill.slice(skill.indexOf('## QUANTITATIVE REQUIREMENTS'), skill.indexOf('If a count is partial'))
+  const lines = section.split('\n').filter(l => /^- .*\(`counts\.[\w-]+`\)/.test(l))
+
+  it('lists a count line for each counting agent', () => {
+    assert.equal(lines.length, 6)
+  })
+
+  for (const line of lines) {
+    const agent = /`counts\.([\w-]+)`/.exec(line)[1]
+    const template = /: "([^"]+)"/.exec(line)[1]
+    const placeholders = [...new Set(template.match(/\b[A-Z]\b/g))]
+    const mapping = Object.fromEntries([...line.matchAll(/\b([A-Z]) = ([^,]+)/g)].map(m => [m[1], m[2].trim()]))
+
+    it(agent + ' line maps every placeholder in "' + template + '" to a count the agent returns', () => {
+      const prompt = agents.find(a => a.key === agent).prompt
+
+      for (const p of placeholders) {
+        assert.ok(mapping[p], 'placeholder ' + p + ' has no source key')
+
+        const key = /^`(\w+)`$/.exec(mapping[p])
+
+        if (key) assert.match(prompt, new RegExp('\\b' + key[1] + '\\b'), agent + ' never returns ' + key[1])
+        else assert.match(mapping[p], /^[A-Z ÷×\d]+$/, 'placeholder ' + p + ' must be a key or derived from other placeholders')
+      }
     })
   }
 })

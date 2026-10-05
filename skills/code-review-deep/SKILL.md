@@ -177,16 +177,16 @@ The detailed severity guidance (version-lag table, code-quality thresholds), exc
 
 ## QUANTITATIVE REQUIREMENTS
 
-Reports MUST include specific counts. The workflow returns them in `counts`, keyed by agent key; each line below names the key it is read from:
+Reports MUST include specific counts. The workflow returns them in `counts`, keyed by agent key; each line below names the agent key it is read from and the exact count key behind every placeholder:
 
-- Dependencies (`counts.deps`): "X total, Y outdated, Z vulnerable, W duplicate"
-- Test coverage (`counts.testing`): "X of Y services tested (Z%)"
-- Linter disables (`counts.quality`): "X disables across Y files"
-- Silent failures (`counts.bugs`): "X try?/empty catch patterns"
-- Resource leaks (`counts.quality`): "X added, Y removed, Z potential leaks" (the observer add/remove tally is A_QUALITY's required count)
-- Secrets (`counts.security`): "Searched X files, found Y hardcoded secrets"
+- Dependencies (`counts.deps`): "X total, Y outdated, Z vulnerable, W duplicate" — X = `total`, Y = `outdated`, Z = `vulnerable`, W = `duplicate`
+- Test coverage (`counts.testing`): "X of Y services tested (Z%)" — X = `services_tested`, Y = `services_total`, Z = X ÷ Y × 100, rounded
+- Linter disables (`counts.quality`): "X disables, by rule: R" — X = `linter_disables_total`, R = `linter_disables_by_rule`
+- Silent failures (`counts.bugs`): "X try?/empty catch patterns, by type: T" — X = `silent_failures_total`, T = `silent_failures_by_type`
+- Resource leaks (`counts.quality`): "X observers added, Y removed" — X = `observers_added`, Y = `observers_removed`
+- Secrets (`counts.security`): "Searched X files, found Y hardcoded secrets" — X = `files_searched`, Y = `hardcoded_secrets_found`
 
-When the named key is absent from `counts` (its agent failed or returned none), write `not measured — <agent> agent returned no counts` for that line rather than a number.
+Report only these placeholders; never add a count the workflow did not return. When a named count key is absent (its agent failed or returned no counts), write `not measured — <agent> agent returned no counts` in place of that number.
 
 If a count is partial, state scope (e.g. "sampled 50 of 200 files"), mark partial counts with a `~` prefix, and never use vague language like "some tests exist".
 
