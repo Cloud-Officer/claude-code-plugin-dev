@@ -151,6 +151,8 @@ Write a bounded poll (~30s between polls) over `gh api "repos/{owner}/{repo}/act
 - **No run for the SHA after ~2 minutes:** there is no CI to wait on — say so and stop. The grace period covers the seconds between the push and the run registering, so a just-queued run is not missed.
 - **Still not `completed` after ~30 minutes:** stop and report the run as stuck rather than polling on.
 
+**Write the poll so it works in zsh as well as bash.** The Bash tool may run zsh, which does not word-split an unquoted `$VAR`, so `set -- $RUN; STATUS=$2` leaves `STATUS` empty and the poll never sees `completed`; it then spins for the whole 30 minutes. Split fields with `read -r RUN_ID STATUS CONCLUSION <<< "$RUN"`, or have `--jq` return just the one field you test, e.g. `--jq '.workflow_runs[0].status // empty'`.
+
 > **Xcode Cloud:** its result only surfaces as a *check run*, which the fine-grained PAT cannot read — so it does **not** appear in `actions/runs`. For Xcode Cloud pass/fail and logs, use the `appstore` skill.
 
 When the background watch completes:
