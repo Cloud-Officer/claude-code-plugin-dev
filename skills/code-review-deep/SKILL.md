@@ -24,18 +24,6 @@ cd /path/to/repo-under-review        # or, when already inside it: cd "$(git rev
 
 Run the `cd` as a **separate** call — never chain it as `cd … && gh …`. direnv reloads `.envrc` on the next prompt, so the *following* calls get the right token; a command on the same line as the `cd` still runs with the old environment.
 
-## Sync to the default branch and pull latest
-
-Review the up-to-date default branch, not whatever was last checked out. Once the repo is the working directory (and after direnv has reloaded), switch to the default branch if not already on it and fast-forward to the remote:
-
-```bash
-DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@')
-git switch "$DEFAULT_BRANCH"
-git pull --ff-only
-```
-
-If the working tree is dirty or the pull can't fast-forward, **stop and tell the user** rather than discarding or merging their changes — they may want the review to run against the current state. Skip the switch when the user explicitly scoped the review to a feature branch or specific path.
-
 ## MCP Tools with Fallbacks
 
 Prefer MCP tools (`mcp__github__*`, `mcp__context7__*`) when available; fall back to `gh` CLI / `WebSearch` on errors. Don't let MCP failures block the review.
