@@ -101,14 +101,14 @@ many agents run at once.
 | Marketplace manifest | `.claude-plugin/marketplace.json` | Distribution entry; `name`, `version` and `description` must match `plugin.json` | `plugin.json` |
 | MCP manifest | `.mcp.json` | 14 stdio MCP servers and the environment variables their credentials come from | host `node`/`uv`, external packages |
 | Skills | `skills/<name>/SKILL.md` (34) | One self-contained procedure each: frontmatter trigger + tool grant, body procedure. Templates and rules live in the single file | the tools listed in `allowed-tools` |
-| Shared authoring standard | `skills/code-standards/SKILL.md` | The one skill other skills delegate *to* rather than being invoked directly by a user: comment discipline and the diff sweep that enforces it, for every change to source or test files. `write-tests`, `work-issue` and `migrate-code` route to it | `Read`, `Grep`, `Glob`, `Bash(git:*)` |
-| Workflow scripts | `skills/<name>/<name>.workflow.js` (5) | Multi-phase agent orchestration for the five heavy skills. 3,445 lines total; `review-aws-cost` (1,223) and `code-review-deep` (1,010) are the largest | harness globals only |
+| Shared authoring standard | `skills/code-standards/SKILL.md` | The one skill other skills delegate *to* rather than being invoked directly by a user: comment discipline and the diff sweep that enforces it, for every change to source or test files. `write-tests`, `work-issue` and `migrate-code` route to it | `Read`, `Grep`, `Glob`, `Bash(git:*)`, `Bash(grep:*)` |
+| Workflow scripts | `skills/<name>/<name>.workflow.js` (5) | Multi-phase agent orchestration for the five heavy skills. 3,496 lines total; `review-aws-cost` (1,258) and `code-review-deep` (1,013) are the largest | harness globals only |
 | Harness/slicing library | `scripts/workflow-helpers.js` | The one `require()`-able shared module. Discovers workflow scripts, emulates the harness wrapper (`harnessSource`), and slices named declarations out of workflow source (`declarationSource`, `loadHelpers`) | `node:fs`, `node:path` |
-| Secondary slicer | `scripts/extract-workflow-functions.js` | Brace-counting slicer used only by `tests/migrate-code-verify.test.js` | `node:fs` |
+| Secondary slicer | `scripts/extract-workflow-functions.js` | Brace-counting slicer used only by the two `migrate-code` tests (`tests/migrate-code-verify.test.js`, `tests/migrate-code-fixer-scope.test.js`) | `node:fs` |
 | Syntax gate | `scripts/check-workflow-syntax.js` | Wraps each workflow script in the harness shape and runs `node --check` on it; fails if zero scripts are found | `workflow-helpers.js` |
-| Consistency gate | `scripts/check-repo-consistency.js` | Cross-checks the three manifests, every skill's frontmatter, every `${CLAUDE_PLUGIN_ROOT}` path in docs and skills, and every `plugin.json` keyword against the repo's own text | `node:fs`, `node:path` |
-| Tests | `tests/*.test.js` (2 files, 5 suites, 39 tests) | Pure-function tests over sliced workflow declarations, plus the `safeAgent` failure policy for all five scripts | `node:test`, both slicers |
-| CI | `.github/workflows/build.yml` | The `js_unit_tests` job runs the two gates and `node --test 'tests/*.test.js'`; separate jobs run actionlint, ESLint, markdownlint, Semgrep and yamllint | GitHub Actions |
+| Consistency gate | `scripts/check-repo-consistency.js` | Cross-checks the three manifests, every skill's frontmatter, every `${CLAUDE_PLUGIN_ROOT}` path in docs and skills, and every `plugin.json` keyword (unique, and present in the repo's own text) | `workflow-helpers.js` (`ROOT`), `node:fs`, `node:path` |
+| Tests | `tests/*.test.js` (9 files, 12 suites, 151 tests) | Pure-function tests over sliced workflow declarations, the `safeAgent` failure policy for all five scripts, and contract tests that read `SKILL.md` text — guardrail cross-references, heredoc fencing, interpolation-boundary patterns — two of which extract a skill's `bash` block and execute it | `node:test`, `node:assert`, both slicers, host `bash` |
+| CI | `.github/workflows/build.yml` | The `js_unit_tests` job runs `npm ci`, the two gates and `node --test 'tests/*.test.js'`; separate jobs run actionlint, ESLint, markdownlint, Semgrep and yamllint | GitHub Actions |
 
 ### Why workflow scripts are not modules
 
@@ -135,7 +135,8 @@ globals replaced by test doubles. No test copy of the logic exists to drift.
 
 This repository has **no `soup.json` and no `soup.md`**, and `package-lock.json` declares zero runtime dependencies —
 `package.json` exists only as a marker so the CI generator emits the `js_unit_tests` job. Everything the scripts use is
-in the Node standard library (`node:fs`, `node:path`, `node:test`, `node:child_process`, `node:os`).
+in the Node standard library (`node:fs`, `node:path`, `node:test`, `node:assert`, `node:child_process`, `node:crypto`,
+`node:os`).
 
 The real third-party surface is the **14 MCP servers declared in `.mcp.json`**, which Claude Code spawns at session
 start. They are listed here because nothing else in the repository lists them, and because the PR template's SOUP
@@ -211,42 +212,63 @@ const safeAgent = (p, o) => agent(p, o).catch(e => { log('WARNING: agent ' + o.l
 ```
 
 A rejected dispatch becomes `null`, logged with the agent's label. Nothing throws, so one refused or crashed agent never
-takes down a run of twelve. Every call site then has to deal with a falsy return, and the scripts do so in one of four
+takes down a run of twelve. Every call site then has to deal with a falsy return, and the scripts do so in one of five
 documented ways — this is the part that matters when changing a script:
 
 | Policy | Where | Behaviour |
 | --- | --- | --- |
-| Abort the run | `code-review-deep`, stack scout | The Phase 1 stack scout gates every conditional agent, so an empty return stops the review with `{ ok: false, reason: 'stack-scout-failed' }` rather than silently disabling the backend, infra, i18n and prompt analysis |
-| Degrade and warn | `code-review-deep`, configs/structure scouts | Falls back to `{}`, logs a warning, continues |
+| Abort the run | `code-review-deep` stack scout; `review-aws-cost` spend scout | The gating scout decides which conditional agents run, so an empty return stops the run — `{ ok: false, reason: 'stack-scout-failed' }` rather than silently disabling the backend, infra, i18n and prompt analysis, and `{ ok: false, reason: 'spend-scout-failed' }` rather than sizing findings against no Cost Explorer baseline |
+| Degrade and warn | `code-review-deep` configs/structure scouts; `review-aws-cost` inventory/commitments scouts | Falls back to `{}`, logs a warning, continues |
 | Substitute a failure record | `work-issue` | Returns a synthetic `success: false` result carrying `block_reason: 'agent did not return a result (skipped or errored)'`, so the issue is reported, not lost |
-| Report as unreviewed | `code-review-deep` Phase 3.5 | Findings with no validator verdict go to the appendix marked `unverified: no validator verdict returned` — never counted as rejected, never dropped |
+| Report as unreviewed | `code-review-deep` and `review-aws-cost` Phase 3.5 | Findings with no validator verdict go to the appendix marked `unverified: no validator verdict returned` — never counted as rejected, never dropped. `review-aws-cost` also nulls the saving, so an unchecked figure cannot enter a total |
+| Count as errored | `verify-resolved-issues` | A candidate whose agent returned nothing is left out of `results` and counted in `counts.errored` (`candidates.length` minus the results that came back) |
 
-The rule underneath all four: **a failed agent is always attributable in the output**. `code-review-deep` computes
-`agents_failed` by diffing the agents it selected against the ones that returned, and logs "their areas were NOT
-reviewed". A missing area is reported as missing rather than read as a clean bill of health. This is the single
+The rule underneath all five: **a failed agent is always accounted for in the output**. Both audit scripts compute
+`agents_failed` by diffing the agents they selected against the ones that returned; `code-review-deep` logs "their
+areas were NOT reviewed". A missing area is reported as missing rather than read as a clean bill of health. This is the single
 behaviour the test suite covers for all five scripts: `tests/workflow-helpers.test.js` slices each script's real
 `safeAgent` and asserts both that a rejected dispatch resolves to `null` with the label logged, and that a resolved one
 passes through untouched.
 
 ### Finding reduction (`code-review-deep`, `review-aws-cost`)
 
-Both audit scripts reduce agent output through the same four steps, in this order:
+Both audit scripts run analysis and validation as one `pipeline()` and then apply the same confidence threshold. They
+differ in what reaches a validator, and a maintainer should not assume one script's steps exist in the other.
 
-1. **Severity gate.** Only `critical`, `high` and `medium` are worth an adversarial validator; `low` and `info` skip
-   validation and go straight to the appendix, marked as unverified rather than rejected.
+`code-review-deep` selects before it validates:
+
+1. **Severity gate.** `VERIFY_SEVERITIES` holds `critical`, `high` and `medium` — the only severities worth an
+   adversarial validator. `low` and `info` skip validation and go straight to the appendix, marked as unverified
+   rather than rejected.
 2. **Cross-agent dedup.** `findingKey(f)` (file + normalised description) is checked against a `seenKeys` set shared
    across agents. The selection loop is deliberately synchronous and sits *before the first `await`* — a comment in the
    source says so — because nothing may interleave between a key's check and its insertion.
 3. **File-grouped batching.** Survivors are sorted by file, then chunked five at a time, so every finding in one file
    lands in one validator batch and that file is opened and quoted once. Sorting by severity first would scatter a
    file's findings across batches and re-read it in each.
-4. **Confidence threshold.** Validators score on a five-point anchor grid — `confidence_score` is pinned by the JSON
-   schema to `enum [0, 25, 50, 75, 100]`, so a free-form number cannot arrive. `keepFinding(sev, score)` then compares
-   against `SEV_THRESHOLDS`, which differ per script: `code-review-deep` uses `{critical: 25, high: 50, medium: 50,
-   low: 50, info: 75}` (a critical finding is cheap to keep and expensive to miss), `review-aws-cost` uses
-   `{critical: 50, high: 50, medium: 50, low: 75, info: 75}`.
 
-Everything filtered out is returned in `filtered` alongside `kept`, so the appendix is a complete account.
+`review-aws-cost` has none of those three. Every finding is validated, whatever its severity, in batches of four in
+emission order — smaller than five because each cost verdict re-runs a Cost Explorer or CloudWatch query. Its
+deduplication happens *after* the threshold instead: `collapseSharedBasis(findings)` groups kept findings by
+`cost_basis_ref`, keeps the one with the largest `verified_monthly_saving_usd`, records the others' ids in the winner's
+`double_counted_with`, and returns the losers as `collapsed`, so the same dollars are never summed twice into `totals`.
+The validator's `adjusted_monthly_saving_usd`, when present, replaces the analysis agent's own figure.
+
+The shared steps:
+
+- **Verdict join.** `joinVerdicts(issues, verdicts)` matches verdicts to findings by id. An id that repeats on either
+  side is ambiguous, and every finding under it is reported unverified rather than risk attaching another finding's
+  verdict and evidence.
+- **Confidence threshold.** Validators score on a five-point anchor grid — `confidence_score` is pinned by the JSON
+  schema to `enum [0, 25, 50, 75, 100]`, so a free-form number cannot arrive. `keepFinding(sev, score)` then compares
+  against `SEV_THRESHOLDS`, which differ per script: `code-review-deep` uses `{critical: 25, high: 50, medium: 50,
+  low: 50, info: 75}` (a critical finding is cheap to keep and expensive to miss), `review-aws-cost` uses
+  `{critical: 50, high: 50, medium: 50, low: 75, info: 75}` (a confidently wrong dollar figure is worse than a missed
+  saving).
+
+Everything that was confirmed but fell below the threshold, or was never verified, is returned in `filtered` alongside
+`kept`, so the appendix accounts for it. Findings a validator rejected are dropped, and `code-review-deep`'s
+cross-agent duplicates are dropped and counted in the log.
 
 ### Two-of-three adversarial consensus (`migrate-code`)
 
@@ -280,8 +302,9 @@ Declarations are sliced in two modes — `block` (balance braces, used for `func
 brackets, stop at a newline at depth zero, used for `const name = ...`).
 
 `scripts/extract-workflow-functions.js` does the same job far more simply, counting braces with no awareness of strings
-or comments at all. It works today because the two functions it slices from `migrate-code.workflow.js` contain no braces
-inside string literals. **This is a latent duplication:** a maintainer adding a `{` inside a string in a function that
+or comments at all. It works today because the six functions it slices from `migrate-code.workflow.js` (`fence`,
+`safeRepoPath`, `buildFixerPrompt`, `testFixerPrompt`, `tallyVerdict`, `verifyCoverage`) contain no braces inside
+string literals. **This is a latent duplication:** a maintainer adding a `{` inside a string in a function that
 file slices will get an "unbalanced braces" error or a truncated slice, with no hint that the better scanner exists a
 file away.
 
@@ -300,11 +323,13 @@ sanitise**:
 
 | Control | Location | What it does |
 | --- | --- | --- |
-| `fence(id, value)` | `migrate-code.workflow.js` | Wraps a value in `<untrusted id="...">…</untrusted>` after stripping any `</untrusted>` tag from the value itself, so it cannot close its own fence |
+| `fence(id, value)` | `migrate-code.workflow.js` | Wraps a value in `<untrusted id="...">…</untrusted>` after stripping any opening or closing `untrusted` tag from the value itself, so it cannot close its own fence |
+| `fact(v)` | `migrate-code.workflow.js` | The same stripping for the user-supplied source, target and scope inside the `<migration-facts>` block |
 | `clean(v)` | `code-review-deep`, `review-aws-cost` | Strips `<` and `>` from any caller-supplied value entering a fenced block, so a value carrying `</aws_context>` cannot end the fence early |
+| Scan-baseline escaping | `review-aws-cost.workflow.js` | The scout returns are serialised once into `<scan_baseline>` with every `</` rewritten to `<\/`, so account-derived text cannot close that fence |
 | `REF_PATTERN` / `TRACKER_REF` | `work-issue.workflow.js` | An issue ref is a GitHub number or a Jira key and nothing else. A malformed ref throws, failing only its own issue; the rest of the batch runs |
 | `defaultBranch` guard | `work-issue.workflow.js` | Validated against `^[A-Za-z0-9][A-Za-z0-9._/-]*$` before it is spliced into any shell command; a failure returns an empty result set rather than running |
-| `safeRepoPath(p)` | `migrate-code.workflow.js` | Every agent-returned path is normalised and rejected if it is absolute, carries a drive letter or a newline, or escapes the repo root via `..`. Rejected paths become `blocked` records with a reason, not silent drops |
+| `safeRepoPath(p)` | `migrate-code.workflow.js` | Every agent-returned path is normalised and rejected if it is absolute, carries a drive letter or a newline, or escapes the repo root via `..`. A rejected file to translate becomes a `blocked` record with a reason; a rejected path in a fixer's file list is dropped and the prompt says so (`buildFixerPrompt`, `testFixerPrompt`) |
 | `oneLine(s)` | `migrate-code.workflow.js` | Collapses newlines in values that are logged or reported |
 | Caller-validated identity fields | `work-issue.workflow.js` | After an agent returns, `ref`, `tracker` and `branch` are overwritten from the caller's validated values — an agent's return can never rename its own branch |
 | `enum`-pinned schemas | both audit scripts | `confidence_score` is `enum [0, 25, 50, 75, 100]` and `decision` is `enum ['REJECT', 'CONFIRM']`, so out-of-grid values cannot enter the reduction |
@@ -359,7 +384,9 @@ control; the keyword scan around it is a model obligation.
 | Failure mode | Impact | Mitigation |
 | --- | --- | --- |
 | A dispatched agent is refused or crashes | An area goes unreviewed | `safeAgent` resolves `null`; the label is logged; the gap appears in `agents_failed` or as an `unverified` record — never as a pass |
-| The gating scout fails | Conditional agents would silently never run | `code-review-deep` aborts the run with `stack-scout-failed` rather than continuing with a blank map |
+| The gating scout fails | Conditional agents would silently never run | `code-review-deep` aborts the run with `stack-scout-failed`, and `review-aws-cost` with `spend-scout-failed`, rather than continuing with a blank map |
+| Two findings or verdicts share an id | A verdict lands on the wrong finding | `joinVerdicts` marks the id ambiguous; every finding under it is reported unverified |
+| Two cost findings claim the same spend | The saving is summed twice | `collapseSharedBasis` keeps one finding per `cost_basis_ref` and returns the rest as `collapsed` |
 | A verifier batch fails | A finding would vanish between phases | Findings with no verdict are routed to the appendix marked `unverified: no validator verdict returned` |
 | Fewer than two verification votes | A port would be scored on one opinion | `tallyVerdict` returns `null`; the file is counted in `unverified_files`, never `faithful` |
 | Injected content in a ref, path or fenced value | Command or prompt injection | Boundary validation rejects rather than repairs; fences strip their own delimiters |
@@ -371,8 +398,8 @@ control; the keyword scan around it is a model obligation.
 
 ## Build and verification
 
-There is nothing to build. The `js_unit_tests` job in `.github/workflows/build.yml` runs three commands, and they are
-the same three to run locally:
+There is nothing to build. After `npm ci` — the lock file declares no packages — the `js_unit_tests` job in
+`.github/workflows/build.yml` runs three commands, and they are the same three to run locally:
 
 ```bash
 node scripts/check-workflow-syntax.js
@@ -393,5 +420,7 @@ in `.semgrepignore` (which also skips `tests/`), so the two linters cover `scrip
 alone. `check-workflow-syntax.js` — which parses them in the harness shape they actually run in — is the replacement
 gate, and it is the reason the exclusion is safe rather than a hole.
 
-When changing a workflow script, the checks above verify that it parses and that its `safeAgent` still behaves. They
-verify nothing about its prompts. Prompt changes are reviewed by reading them.
+When changing a workflow script, the checks above verify that it parses, that its `safeAgent` and sliced pure helpers
+still behave, and that a few pinned prompt invariants hold — `migrate-code`'s fixer prompts keep their repo-root write
+scope, and `work-issue`'s implement prompt carries the `code-standards` comment block and the added-comment sweep. They
+verify nothing else about the prompts. Prompt changes are reviewed by reading them.
