@@ -2,7 +2,7 @@
 
 `claude-code-plugin-dev` is the source repository for **`co-dev`**, a Claude Code plugin. It ships no server, no CLI and
 no runtime library. What it ships is a set of *instructions that another process executes*: 34 skill definitions, 5
-JavaScript orchestration scripts that the Claude Code **Workflow** tool runs, 14 MCP server declarations and 13 language
+JavaScript orchestration scripts that the Claude Code **Workflow** tool runs, 15 MCP server declarations and 13 language
 server declarations. The executing runtime — Claude Code itself — is not in this repository.
 
 That distinction drives everything below. The only code this repository owns that runs on a normal Node process is the
@@ -68,7 +68,7 @@ flowchart TB
     AGG -->|structured payload + data_notice| S
     S --> R([Report · PR · closed issue])
 
-    A2 -.->|"MCP + CLI (read-only for audit skills)"| EXT["14 MCP servers (.mcp.json)<br/>13 LSP servers (plugin.json)"]
+    A2 -.->|"MCP + CLI (read-only for audit skills)"| EXT["15 MCP servers (.mcp.json)<br/>13 LSP servers (plugin.json)"]
     D -.-> EXT
 ```
 
@@ -99,7 +99,7 @@ many agents run at once.
 | --- | --- | --- | --- |
 | Plugin manifest | `.claude-plugin/plugin.json` | Plugin identity, keyword index, and the 13 `lspServers` declarations (TypeScript, Pyright, Ruby, gopls, Bash, rust-analyzer, YAML, SourceKit, Intelephense, Kotlin, jdtls, clangd, perlnavigator) | — |
 | Marketplace manifest | `.claude-plugin/marketplace.json` | Distribution entry; `name`, `version` and `description` must match `plugin.json` | `plugin.json` |
-| MCP manifest | `.mcp.json` | 14 stdio MCP servers and the environment variables their credentials come from | host `node`/`uv`, external packages |
+| MCP manifest | `.mcp.json` | 15 stdio MCP servers and the environment variables their credentials come from | host `node`/`uv`, external packages |
 | Skills | `skills/<name>/SKILL.md` (34) | One self-contained procedure each: frontmatter trigger + tool grant, body procedure. Templates and rules live in the single file | the tools listed in `allowed-tools` |
 | Shared authoring standard | `skills/code-standards/SKILL.md` | The one skill other skills delegate *to* rather than being invoked directly by a user: comment discipline and the diff sweep that enforces it, for every change to source or test files. `write-tests`, `work-issue` and `migrate-code` route to it | `Read`, `Grep`, `Glob`, `Bash(git:*)`, `Bash(grep:*)` |
 | Workflow scripts | `skills/<name>/<name>.workflow.js` (5) | Multi-phase agent orchestration for the five heavy skills. 3,496 lines total; `review-aws-cost` (1,258) and `code-review-deep` (1,013) are the largest | harness globals only |
@@ -138,7 +138,7 @@ This repository has **no `soup.json` and no `soup.md`**, and `package-lock.json`
 in the Node standard library (`node:fs`, `node:path`, `node:test`, `node:assert`, `node:child_process`, `node:crypto`,
 `node:os`).
 
-The real third-party surface is the **14 MCP servers declared in `.mcp.json`**, which Claude Code spawns at session
+The real third-party surface is the **15 MCP servers declared in `.mcp.json`**, which Claude Code spawns at session
 start. They are listed here because nothing else in the repository lists them, and because the PR template's SOUP
 checkbox has to point at something. If a `soup.json` is ever added, this table moves there and this section becomes a
 reference to `soup.md`.
@@ -153,6 +153,7 @@ could do with the credentials it is handed.
 | `fetch` | `uvx mcp-server-fetch` | none | Medium | Reference fetch server; retrieves arbitrary URLs, so its output is attacker-influenceable content |
 | `context7` | `npx -y @upstash/context7-mcp` | none | Low | Vendor-maintained by Upstash; read-only documentation lookup |
 | `playwright` | `npx -y @playwright/mcp --isolated` | none | Medium | Microsoft's official server. `--isolated` keeps the browser profile out of the user's real profile |
+| `playwright-webkit` | `npx -y @playwright/mcp --isolated --browser webkit` | none | Medium | Same Microsoft server as `playwright`, driving WebKit (Safari's engine) instead of Chromium. Also `--isolated` |
 | `chrome-devtools` | `npx -y chrome-devtools-mcp@latest` | none (drives a browser) | Medium | Google's official server; drives a real browser and reads whatever it loads |
 | `postgres` | `npx -y @bytebase/dbhub` (DSN built from env) | `PGUSER`, `PGPASSWORD`, `PGHOST`, `PGPORT`, `PGDATABASE` | High | Organisation-maintained (Bytebase); holds live database credentials and can execute SQL |
 | `mysql` | `npx -y @bytebase/dbhub` (DSN built from env) | `MYSQL_USER`, `MYSQL_PASS`, `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_DB` | High | Same DBHub binary as `postgres`, different DSN scheme |
