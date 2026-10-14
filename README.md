@@ -45,7 +45,7 @@ install works across multiple accounts and tenants.
 * Database schema documentation and natural language querying
 * Project documentation review (README, architecture, user guide)
 * User-facing copy audits (microcopy, voice & tone, i18n readiness)
-* SEO / GEO and front-end web quality audits (performance, Core Web Vitals, accessibility)
+* SEO / GEO and front-end web quality audits (performance, Core Web Vitals, accessibility), plus cookie-consent banner checks via the optional CookieYes MCP
 * Sprint work summaries grouped by repository
 * Weekly development and project-status reports from Jira, GitHub, and monday.com
 * Tracker coverage checks — verify a planning doc's items exist in monday.com and/or Jira
@@ -384,6 +384,7 @@ Some skills use remote MCP servers (no local install). Add only the ones you'll 
 ```bash
 claude mcp add atlassian --transport http https://mcp.atlassian.com/v1/mcp
 claude mcp add bigquery --transport http https://bigquery.googleapis.com/mcp
+claude mcp add cookieyes --transport http https://app.cookieyes.com/mcp
 claude mcp add figma --transport http https://mcp.figma.com/mcp
 claude mcp add monday --transport http https://mcp.monday.com/mcp --header 'Authorization: Bearer ${MONDAY_TOKEN}'
 claude mcp add newrelic --transport http https://mcp.newrelic.com/mcp/
@@ -392,7 +393,8 @@ claude mcp add paypal --transport http https://mcp.paypal.com/http
 
 Most prompt for OAuth on first use. **monday** is the exception — it authenticates with a personal access token instead
 of OAuth, so it takes a Bearer header (the token stays a runtime `${MONDAY_TOKEN}` reference, never written into the
-stored config). Skills that need a remote MCP fall back to a CLI when one exists — see the **Setup** column in the
+stored config). **cookieyes** also needs the CookieYes account owner to turn on **Enable OAuth-based access** under
+profile menu → **MCP access** before the OAuth login succeeds. Skills that need a remote MCP fall back to a CLI when one exists — see the **Setup** column in the
 [Skills](#skills) table for which skill needs which.
 
 **Naming caveat for multi-tenant setups.** Each server name owns exactly one OAuth grant — Claude Code stores the access
@@ -409,7 +411,7 @@ claude mcp add atlassian-companya --transport http https://mcp.atlassian.com/v1/
 claude mcp add atlassian-companyb --transport http https://mcp.atlassian.com/v1/mcp
 ```
 
-This applies to every OAuth-at-connect remote MCP listed above (`atlassian`, `bigquery`, `figma`, `newrelic`, `paypal`) — not to stdio servers like
+This applies to every OAuth-at-connect remote MCP listed above (`atlassian`, `bigquery`, `cookieyes`, `figma`, `newrelic`, `paypal`) — not to stdio servers like
 `google-workspace`, which select identity per-call via a parameter. If you rename instances, update the [Recommended Permissions](#recommended-permissions) entries to allow each variant.
 
 ### Google Workspace MCP (optional)
@@ -804,6 +806,13 @@ If you also use remote MCP servers (see [Configure Remote MCPs](#configure-remot
     "allow": [
       "mcp__atlassian__*",
       "mcp__bigquery__*",
+      "mcp__cookieyes__get_banner_status",
+      "mcp__cookieyes__get_compliance_status",
+      "mcp__cookieyes__get_embed_code",
+      "mcp__cookieyes__get_scan_results",
+      "mcp__cookieyes__get_website_details",
+      "mcp__cookieyes__list_banners",
+      "mcp__cookieyes__list_domains",
       "mcp__figma__*",
       "mcp__monday__*",
       "mcp__newrelic__*",
@@ -813,6 +822,10 @@ If you also use remote MCP servers (see [Configure Remote MCPs](#configure-remot
   }
 }
 ```
+
+`cookieyes` is listed tool by tool rather than as `mcp__cookieyes__*` on purpose: the three tools left out
+(`update_banner_colours`, `update_banner_layout`, `trigger_cookie_scan`) change a live consent banner or consume the
+plan's monthly scan quota, so they should keep prompting.
 
 **Note:** These entries merge with your existing
 `allow` list — you don't need to replace it. Only add entries for the MCP servers you actually use.
@@ -833,7 +846,7 @@ vars, one-time auth commands, or remote MCP additions. Skills with no setup work
 | `analyze-db`             | Generate docs/db.md with database schema docs                                                                           | DB-specific env vars — see `query-db` row                                                                                                                                                                                                                                                                                                 |
 | `appstore`               | Manage App Store Connect (builds, TestFlight, reviews, IAPs, Xcode Cloud)                                               | macOS-only. MCP: `mint install zelentsov-dev/asc-mcp@v4.1.6` *(or)* CLI fallback: `brew install asc`. Env: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY_PATH` (path to `.p8`) — see **App Store Connect credentials** below. [Create API key](https://appstoreconnect.apple.com/access/integrations/api)                               |
 | `aws`                    | Manage AWS infrastructure and services                                                                                  | `aws configure`, or env: `AWS_PROFILE` *(or)* `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` + `AWS_REGION`                                                                                                                                                                                                                                |
-| `code-review-deep`       | Exhaustive multi-phase code audit using parallel agents                                                                 | None — uses bundled `github` + `context7` MCPs                                                                                                                                                                                                                                                                                            |
+| `code-review-deep`       | Exhaustive multi-phase code audit using parallel agents                                                                 | None — uses bundled `github` + `context7` MCPs; optional remote `cookieyes` MCP adds a consent-snippet check                                                                                                                                                                                                                              |
 | `code-standards`         | House standards for authoring code and tests — comment discipline and the diff sweep that enforces it                   | None — reference skill, no credentials or tools                                                                                                                                                                                                                                                                                           |
 | `create-issue`           | Create GitHub or Jira issues with proper templates                                                                      | GitHub: `gh auth login` *(or)* `GITHUB_TOKEN`. Jira: atlassian remote MCP *(or)* `jira init`                                                                                                                                                                                                                                              |
 | `create-pr`              | Generate PR content, open the PR, return to default branch                                                              | GitHub: `gh auth login` *(or)* `GITHUB_TOKEN`                                                                                                                                                                                                                                                                                             |
@@ -855,7 +868,7 @@ vars, one-time auth commands, or remote MCP additions. Skills with no setup work
 | `review-copy`            | Audit user-facing copy — microcopy, form/help text, voice & tone, i18n readiness, marketing; writes docs/copy-review.md | None — uses `git` + optional `loco` handoff for i18n keys                                                                                                                                                                                                                                                                                 |
 | `review-design`          | Compare UI code against Figma designs (Android, iOS, web)                                                               | figma remote MCP **(required — no CLI fallback)**. Optional for rendered comparison: bundled `chrome-devtools` (web) and the `xcode` MCP (iOS); without them the review falls back to source-only                                                                                                                                         |
 | `review-readme`          | Review or create README.md to match standards                                                                           | None — uses bundled `fetch` + `context7` MCPs                                                                                                                                                                                                                                                                                             |
-| `review-seo`             | Audit SEO + GEO + front-end web quality (perf, Core Web Vitals, accessibility) for a codebase and/or live URL           | None — uses `curl` + bundled `fetch` + `chrome-devtools` MCPs                                                                                                                                                                                                                                                                             |
+| `review-seo`             | Audit SEO + GEO + front-end web quality (perf, Core Web Vitals, accessibility) for a codebase and/or live URL           | None — uses `curl` + bundled `fetch` + `chrome-devtools` MCPs; optional remote `cookieyes` MCP adds consent-banner checks                                                                                                                                                                                                                 |
 | `review-user-guide`      | Review or create docs/user-guide.md with user documentation                                                             | None — uses bundled `fetch` + `context7` MCPs                                                                                                                                                                                                                                                                                             |
 | `run-linters`            | Run linters and fix any issues found                                                                                    | None — runs project linters already configured in the repo                                                                                                                                                                                                                                                                                |
 | `sprint-summary`         | Summarize sprint items grouped by repo in ~3-day blocks                                                                 | atlassian remote MCP *(or)* `jira init`                                                                                                                                                                                                                                                                                                   |
