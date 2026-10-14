@@ -1,7 +1,7 @@
 ---
 name: review-seo
 description: Review, audit, or check SEO, GEO (AI answer-engine / generative-engine optimization), and front-end web quality (performance, Core Web Vitals, accessibility). Use when the user wants an SEO audit, technical SEO check, GEO/AEO audit, AI-search optimization, llms.txt review, structured-data/schema check, meta-tag/Open-Graph audit, sitemap or robots.txt review, crawlability analysis, a Lighthouse or web-quality audit, a performance or Core Web Vitals (LCP/INP/CLS) review, or an accessibility (WCAG) audit. Audits a codebase and/or a live site URL (usually production) and writes docs/seo-audit.md.
-allowed-tools: Bash(curl:*), Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, WebSearch, WebFetch, AskUserQuestion, Skill, mcp__fetch__fetch, mcp__github__get_file_contents, mcp__chrome-devtools__*
+allowed-tools: Bash(curl:*), Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, WebSearch, WebFetch, AskUserQuestion, Skill, mcp__fetch__fetch, mcp__github__get_file_contents, mcp__chrome-devtools__*, mcp__cookieyes__list_domains, mcp__cookieyes__get_website_details, mcp__cookieyes__get_embed_code, mcp__cookieyes__list_banners, mcp__cookieyes__get_banner_status, mcp__cookieyes__get_scan_results, mcp__cookieyes__get_compliance_status
 ---
 
 # Review SEO & GEO
@@ -50,6 +50,7 @@ Prefer MCP tools when available; fall back on errors. Never let one tool failure
 | Read source file | `Read` / `cat` | `mcp__github__get_file_contents` |
 | Verify a current standard | `WebSearch` | `mcp__fetch__fetch` |
 | Core Web Vitals / Lighthouse / a11y | `mcp__chrome-devtools__*` (bundled: `lighthouse_audit`, perf traces, a11y snapshot) | note as not-run + recommend Lighthouse in Chrome DevTools |
+| Consent-banner account state (7.5) | `mcp__cookieyes__*` read-only tools (optional remote MCP) | skip the account checks; the rendered checks still run |
 
 ## Phase 2: Exemption Check
 
@@ -236,6 +237,26 @@ Engine: `mcp__chrome-devtools__lighthouse_audit` for the category scores (Perfor
 - HTTPS everywhere, no mixed content; no browser console errors; no deprecated or broken web APIs.
 - CSP present (cross-reference Phase 4 headers); images served at their correct aspect ratio; no known-vulnerable front-end libraries.
 
+### 7.5 Consent banner (CookieYes)
+
+Live or both mode only; in codebase-only mode mark this sub-section **N/A**. Findings here take Area **Best Practices**. Record facts and configuration gaps — never judge whether the site is legally compliant.
+
+**Rendered checks** — run when a sampled page loads a CookieYes script (`cdn-cookieyes.com`), whether or not the MCP is connected. Open each sampled page in a new `chrome-devtools` page with no `cookieyes-consent` cookie set, and do not interact with the banner:
+
+- The banner renders and its accept, reject and settings controls are keyboard-reachable, have accessible names and meet the 7.3 contrast thresholds.
+- `list_network_requests` before any consent: a request to an analytics, advertising or session-replay host (e.g. `google-analytics.com`, `googletagmanager.com/…/collect`, `connect.facebook.net`, `hotjar.com`) firing before consent → High.
+- The banner's own contribution to CLS and LCP is noted in 7.1 rather than double-counted here.
+
+**Account checks** — run only when the `mcp__cookieyes__*` tools are available. If they are not, record "CookieYes MCP not connected — account checks not run" and move on:
+
+1. `list_domains`, then match the `base_url` host (ignoring a leading `www.`). No match → Info finding ("domain not managed in the connected CookieYes account") and skip the rest of this list.
+2. `get_banner_status` — banner not live → High.
+3. `get_embed_code` — the snippet is in the `<head>` of every sampled page and loads before any analytics or tag-manager script. Missing on a sampled page → High; present but after a tracker → High. In both mode, also locate it in the layout template and flag drift per Important Rule 3.
+4. `get_compliance_status` — record the enabled privacy-law templates and whether geo-targeting is on. No law template enabled → Medium.
+5. `get_scan_results` — record the last scan date and cookies per category. Last scan older than 90 days → Low; any cookie in an uncategorised bucket → Medium.
+
+Never call `update_banner_colours`, `update_banner_layout` or `trigger_cookie_scan`, in this phase or in Phase 9: they change a live banner or consume the plan's scan quota. Put the change in the finding's **Fix** for the user to make in CookieYes.
+
 Fold results into the report's **Performance, CWV & Accessibility** section, tagging each finding to its pillar. If the MCP is genuinely unavailable (or codebase-only mode), mark the live-metric checks **not run** and recommend Lighthouse in Chrome DevTools — **never guess CWV numbers**.
 
 ## Phase 8: Generate Report
@@ -346,6 +367,7 @@ If any files changed, run `/co-dev:run-linters` and fix any errors (including ma
 - [ ] Performance: field data (CrUX/Search Console) preferred; INP checked specifically
 - [ ] Headings, alt text, link text, orphans, broken links checked
 - [ ] Web quality via bundled chrome-devtools MCP: performance, CWV (LCP·INP·CLS), accessibility (WCAG), best-practices audited — or marked not-run
+- [ ] Consent banner (7.5): rendered pre-consent checks run when a CookieYes script is present; account checks run or marked not-run; no CookieYes write tool called
 - [ ] Page sample listed in the report header; findings sorted before `SEO-00N` ids assigned
 - [ ] `docs/seo-audit.md` written; approval requested before fixes
 
@@ -357,9 +379,10 @@ If any files changed, run `/co-dev:run-linters` and fix any errors (including ma
 3. **Reconcile in "both" mode** — a tag present in source but absent in served HTML is a real finding (build/render drift).
 4. **Audit web quality via the bundled `chrome-devtools` MCP** — run `lighthouse_audit` + performance traces + the a11y snapshot for performance / CWV / accessibility / best-practices (Phase 7); mark not-run rather than guessing numbers.
 5. **Fix at the source** — layout/partials over per-page copies; a sitemap generator over a hand-maintained file when the stack supports it.
-6. **Respect deliberate choices** — an intentional `noindex` (staging, thin pages) or a deliberate AI-crawler block is a decision to confirm, not auto-"fix".
-7. **Verify standards, don't trust memory** — llms.txt conventions and schema types evolve; confirm with WebSearch/official docs rather than training data.
-8. **Ask before modifying.** Show findings; get approval; then apply.
-9. **GEO is first-class** — do not skip Phase 5; AI-answer visibility is a primary goal, not an afterthought.
-10. **No black-hat GEO.** Cloaking (serving AI crawlers different content than users) is a Critical finding; never fabricate authors, credentials, or any E-E-A-T signal.
-11. **Verify the fast-moving landscape** — engine↔index mappings (e.g. ChatGPT↔Bing), AI-crawler names, llms.txt conventions, and schema/rich-result support change monthly; confirm against current vendor/official docs before asserting or fixing.
+6. **Never change the consent banner** — only the read-only `mcp__cookieyes__*` tools are allowed; banner or scan changes go in the report as fixes for the user.
+7. **Respect deliberate choices** — an intentional `noindex` (staging, thin pages) or a deliberate AI-crawler block is a decision to confirm, not auto-"fix".
+8. **Verify standards, don't trust memory** — llms.txt conventions and schema types evolve; confirm with WebSearch/official docs rather than training data.
+9. **Ask before modifying.** Show findings; get approval; then apply.
+10. **GEO is first-class** — do not skip Phase 5; AI-answer visibility is a primary goal, not an afterthought.
+11. **No black-hat GEO.** Cloaking (serving AI crawlers different content than users) is a Critical finding; never fabricate authors, credentials, or any E-E-A-T signal.
+12. **Verify the fast-moving landscape** — engine↔index mappings (e.g. ChatGPT↔Bing), AI-crawler names, llms.txt conventions, and schema/rich-result support change monthly; confirm against current vendor/official docs before asserting or fixing.
