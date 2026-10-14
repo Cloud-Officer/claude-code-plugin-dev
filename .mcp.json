@@ -23,6 +23,16 @@
         "--isolated"
       ]
     },
+    "playwright-webkit": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp",
+        "--isolated",
+        "--browser",
+        "webkit"
+      ]
+    },
     "chrome-devtools": {
       "command": "npx",
       "args": ["-y", "chrome-devtools-mcp@latest"]

@@ -25,7 +25,7 @@ Claude Code plugin for development workflow automation.
 
 `claude-code-plugin-dev` is the source repository for **`co-dev`**, a Claude Code plugin that automates day-to-day
 development workflows. It bundles 34 skills — issue tracking, PR creation, deep code review, test generation, linting,
-documentation reviews, cloud cost audits, cloud, email-marketing, Xcode and app-store operations, and reporting — alongside 13 language servers and 14 MCP servers
+documentation reviews, cloud cost audits, cloud, email-marketing, Xcode and app-store operations, and reporting — alongside 13 language servers and 15 MCP servers
 that Claude Code loads automatically once the plugin is installed.
 
 It is aimed at engineering teams that want these workflows available in every repository without wiring up each
@@ -76,13 +76,14 @@ needed if you use the skills that call them.
 |-----------------------------------------|--------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Claude Code                             | **Required** | Everything                                                                                                                                                                                                                                                                             |
 | `git` (Git for Windows on Windows)      | **Required** | Any skill that reads history, branches, or diffs. On Windows it also provides Git Bash, which Claude Code's Bash tool — and so every skill's shell commands (`curl`, `sed`, `awk`) — runs in                                                                                           |
-| `node` (`npm` / `npx`)                  | **Required** | Bundled MCP servers started with `npx` (`context7`, `chrome-devtools`, `playwright`, the database and `gcloud` MCPs) and npm-installed LSPs                                                                                                                                            |
+| `node` (`npm` / `npx`)                  | **Required** | Bundled MCP servers started with `npx` (`context7`, `chrome-devtools`, both `playwright` servers, the database and `gcloud` MCPs) and npm-installed LSPs                                                                                                                               |
 | `uv` (`uvx`)                            | **Required** | Bundled MCP servers started with `uvx` (`fetch`, `aws`, `redis`, `playstore`)                                                                                                                                                                                                          |
 | `jq`                                    | **Required** | JSON parsing in `code-review-deep`, `review-readme`, and the GitHub, Jira, and Loco skills                                                                                                                                                                                             |
 | `direnv` (plus PowerShell 7 on Windows) | **Required** | Loading each repo's credentials (`GITHUB_TOKEN`, `JIRA_*`, database and cloud variables) from its `.envrc` — see [Multi-Account Setups (direnv)](#multi-account-setups-direnv)                                                                                                         |
 | `github-mcp-server` and/or `gh`         | Optional     | GitHub skills: `create-pr`, `create-issue`, `work-issue`, `verify-resolved-issues`, `weekly-dev-report`, `code-review-deep`. The MCP is preferred and `gh` is the fallback — either one is enough. Without the MCP binary, the bundled `github` server just shows as failed to connect |
 | Google Chrome                           | Optional     | The bundled `chrome-devtools` MCP, used by `review-seo` and `review-design` for rendered-page checks                                                                                                                                                                                   |
 | Playwright Chromium                     | Optional     | The bundled `playwright` MCP, for ad-hoc browser automation — no skill requires it                                                                                                                                                                                                     |
+| Playwright WebKit                       | Optional     | The bundled `playwright-webkit` MCP, for driving Safari's engine (WebKit) — no skill requires it                                                                                                                                                                                       |
 | Service CLIs                            | Optional     | The matching skill — see the **Setup** column in the [Skills](#skills) table                                                                                                                                                                                                           |
 | Database CLIs                           | Optional     | `query-db` and `analyze-db`, for the engines you point them at                                                                                                                                                                                                                         |
 | Language servers (LSPs)                 | Optional     | Real type information for the languages you write — see [Language Servers (LSPs)](#language-servers-lsps)                                                                                                                                                                              |
@@ -124,6 +125,7 @@ Browsers:
 ```bash
 brew install --cask google-chrome # chrome-devtools MCP (review-seo, review-design)
 npx playwright install chromium # playwright MCP
+npx @playwright/mcp install-browser webkit # playwright-webkit MCP (Safari engine)
 ```
 
 Service CLIs (each maps to a skill in the [Skills](#skills) table below):
@@ -220,7 +222,7 @@ claude plugin install co-dev@cloud-officer
 * GitHub skills: [`github-mcp-server`](https://github.com/github/github-mcp-server/releases) (verified against v1.12.2)
   and/or [`gh`](https://github.com/cli/cli/blob/trunk/docs/install_linux.md).
 * Browsers: Google Chrome for the `chrome-devtools` MCP; `npx playwright install --with-deps chromium` for the
-  `playwright` MCP.
+  `playwright` MCP; `npx @playwright/mcp install-browser --with-deps webkit` for the `playwright-webkit` MCP.
 * Service CLIs: each tool ships its own Linux installer — see official docs for `aws`, `gcloud`, `heroku`, `newrelic`,
   `jira-cli`. App Store Connect is macOS-only.
 * Database CLIs: `sudo apt install -y postgresql-client default-mysql-client redis-tools sqlite3`, plus
@@ -278,6 +280,7 @@ Browsers:
 ```powershell
 winget install --id Google.Chrome -e # chrome-devtools MCP (review-seo, review-design)
 npx playwright install chromium # playwright MCP
+npx @playwright/mcp install-browser webkit # playwright-webkit MCP (Safari engine)
 ```
 
 Service CLIs (each maps to a skill in the [Skills](#skills) table below):
@@ -790,6 +793,7 @@ This plugin bundles several MCP servers. By default, Claude Code will prompt for
       "mcp__mysql__*",
       "mcp__playstore__*",
       "mcp__playwright__*",
+      "mcp__playwright-webkit__*",
       "mcp__postgres__*",
       "mcp__redis__*",
       "mcp__xcode__*"
