@@ -1,6 +1,6 @@
 ---
 name: query-db
-description: Query the database, run a query, look up data, search the database, or check data. Use when the user wants to query the database, run a SQL query, look up data, find data, search for records, check the database, or ask questions about data. Executes queries via CLI commands using natural language. Reads schema context from docs/db.md. Supports MySQL, PostgreSQL, SQLite, MongoDB, Elasticsearch, Redis, and BigQuery.
+description: Query the database, run a query, look up data, search the database, or check data. Use when the user wants to query the database, run a SQL query, look up data, find data, search for records, check the database, or ask questions about data. Executes queries via CLI commands using natural language. Reads schema context from docs/db.md, or from the file DB_DOC points at. Supports MySQL, PostgreSQL, SQLite, MongoDB, Elasticsearch, Redis, and BigQuery.
 allowed-tools: Read, Bash(printenv:*), Bash(nc:*), Bash(ssm-jump:*), Bash(lsof:*), Bash(seq:*), Bash(sleep:*), AskUserQuestion, TaskStop, Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), mcp__postgres__execute_sql, mcp__postgres__search_objects, mcp__mysql__execute_sql, mcp__mysql__search_objects, mcp__mongodb__find, mcp__mongodb__aggregate, mcp__mongodb__count, mcp__mongodb__list-databases, mcp__mongodb__list-collections, mcp__mongodb__collection-schema, mcp__redis__*, mcp__bigquery__*
 ---
 
@@ -71,6 +71,12 @@ Every variable can also be set per environment (`MYSQL_PASS_BETA`, `REDIS_URL_PR
 
 - `BQ_PROJECT` - GCP project ID
 - `BQ_DATASETS` - Comma-separated list of BigQuery datasets (e.g., `archive_2023,archive_2024,archive_2025`)
+
+### Schema document
+
+- `DB_DOC` - Optional path to the schema document, for querying from a repository that does not hold it (e.g. `~/src/api/docs/db.md`). Absolute, `~/`-prefixed, or relative to the project root. Unset or empty means `docs/db.md` in the project root. It holds no secret and may be read with `printenv DB_DOC`.
+
+Everywhere else in this file, `docs/db.md` means this resolved schema document.
 
 ## Environments and Tunnels
 
@@ -235,16 +241,19 @@ SQL
 
 ### 1. Check for database context file
 
-Check if `docs/db.md` exists in the project root.
+Resolve the schema document: run `printenv DB_DOC`. Empty output means `docs/db.md` in the project root. Otherwise use that value as the path, replacing a leading `~/` with the home directory and resolving a relative path against the project root. Never fall back to `docs/db.md` when `DB_DOC` is set.
+
+Check that the resolved file exists.
 
 **If the file does not exist:**
 
-- Tell the user: "No database context found. Run `/co-dev:analyze-db` first to generate `docs/db.md`."
+- When `DB_DOC` is set, tell the user: "`DB_DOC` points at `<resolved path>`, which does not exist. Fix `DB_DOC` or unset it to use `docs/db.md`."
+- Otherwise tell the user: "No database context found. Run `/co-dev:analyze-db` first to generate `docs/db.md`, or set `DB_DOC` to the path of an existing one."
 - Stop here.
 
 **If the file exists:**
 
-- Read it and continue to step 2.
+- Read it and continue to step 2. When `DB_DOC` is set, tell the user which file was loaded, e.g. `Using schema from ~/src/api/docs/db.md (DB_DOC)`.
 
 ### 2. Load database context
 
