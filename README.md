@@ -773,6 +773,10 @@ export REDIS_URL="$REDIS_URL_PROD"
 The database MCP servers connect once, at startup, to the plain variables, so when `DB_ENVS` is set both skills query
 PostgreSQL, MySQL, MongoDB and Redis through their CLIs, which can target any environment mid-session.
 
+On Windows, set the same variables as Windows user environment variables instead of an `.envrc`. Both skills then run
+their commands in PowerShell 7 and open tunnels through the `ssm-jump.cmd` wrapper that the
+[ci-tools Windows installer](https://github.com/Cloud-Officer/ci-tools#windows-installation) puts on the user `PATH`.
+
 #### Sharing one schema document across repositories
 
 `query-db` reads `docs/db.md` from the current repository. To query from another repository, point `DB_DOC` at the
