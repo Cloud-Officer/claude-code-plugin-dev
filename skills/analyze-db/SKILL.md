@@ -1,6 +1,6 @@
 ---
 name: analyze-db
-description: Analyze, document, map, or scan the database schema. Use when the user wants to analyze the database, document the database, generate schema docs, map the database, create DB documentation, or inspect the database structure. Generates a docs/db.md file with complete database schema documentation. Auto-detects language/framework. Supports MySQL, PostgreSQL, SQLite, MongoDB, Elasticsearch, Redis, and BigQuery.
+description: Analyze, document, map, or scan the database schema. Use when the user wants to analyze the database, document the database, generate schema docs, map the database, create DB documentation, or inspect the database structure. Generates a docs/db.md file (or the file DB_DOC points at) with complete database schema documentation. Auto-detects language/framework. Supports MySQL, PostgreSQL, SQLite, MongoDB, Elasticsearch, Redis, and BigQuery.
 allowed-tools: Bash(printenv:*), Bash(nc:*), Bash(ssm-jump:*), Bash(lsof:*), Bash(seq:*), Bash(sleep:*), AskUserQuestion, TaskStop, Bash(php:*), Bash(python:*), Bash(ruby:*), Bash(npm:*), Bash(npx:*), Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Glob, Grep, mcp__postgres__execute_sql, mcp__postgres__search_objects, mcp__mysql__execute_sql, mcp__mysql__search_objects, mcp__mongodb__find, mcp__mongodb__aggregate, mcp__mongodb__count, mcp__mongodb__list-databases, mcp__mongodb__list-collections, mcp__mongodb__collection-schema, mcp__redis__scan_keys, mcp__redis__scan_all_keys, mcp__redis__type, mcp__redis__get, mcp__redis__hgetall, mcp__redis__lrange, mcp__redis__zrange, mcp__redis__smembers, mcp__redis__llen, mcp__redis__json_get, mcp__redis__dbsize, mcp__redis__info, mcp__bigquery__query, mcp__bigquery__list_tables, mcp__bigquery__get_table_schema
 ---
 
@@ -39,6 +39,12 @@ PostgreSQL and MySQL are both served by DBHub, which exposes exactly two tools p
 | Elasticsearch | `ES_URL`, `ES_API_KEY` (optional) |
 | Redis | `REDIS_URL` (or `CACHE_DSN`) |
 | BigQuery | `BQ_PROJECT`, `BQ_DATASETS` (comma-separated list, e.g. `archive_2023,archive_2024,archive_2025`) |
+
+## Schema Document Location
+
+`DB_DOC` optionally points at the schema document `query-db` reads, so one file can serve several repositories (e.g. `~/src/api/docs/db.md`). Resolve it once, before Step 0: run `printenv DB_DOC`; empty output means `docs/db.md` in the project root. Otherwise use that value, replacing a leading `~/` with the home directory and resolving a relative path against the project root. Everywhere else in this file, `docs/db.md` means this resolved path.
+
+When the resolved path lies outside the current repository, the code scanned in Steps 1-4 may not be the code behind that document. Before Step 5 writes anything, ask with `AskUserQuestion` whether to write to that path, to `docs/db.md` in this repository instead, or to stop. Never write outside the repository without that confirmation.
 
 ## Environments and Tunnels
 
@@ -190,9 +196,7 @@ Look for:
 
 ### Step 5 — Generate initial `docs/db.md` draft
 
-```bash
-mkdir -p docs
-```
+Create the document's parent directory: `mkdir -p docs` for the default path, otherwise `mkdir -p "<resolved parent directory>"` written literally.
 
 Write the initial draft using the per-DB template (see "Document Templates" below).
 
