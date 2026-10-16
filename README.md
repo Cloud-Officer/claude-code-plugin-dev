@@ -743,6 +743,10 @@ environment's tunnel themselves, without asking, when its port is closed, check 
 * Give every environment its own local port so all tunnels can be up at once. Convention: prod keeps the service's
   port, rc adds 10000, beta adds 20000 (MySQL 4306 / 14306 / 24306).
 * `CACHE_DSN` / `CACHE_DSN_<ENV>` are accepted for Redis when `REDIS_URL` is unset.
+* Amazon DocumentDB is configured as MongoDB (`MONGODB_URI_<ENV>`, `MONGODB_TUNNEL_<ENV>`). Through a tunnel its URI needs
+  `directConnection=true`, `tlsAllowInvalidHostnames=true`, `authSource=admin` (when the URI names a database),
+  `retryWrites=false` and `tls=true&tlsCAFile=<path>/global-bundle.pem`; the tunnel script warns when the first two are
+  missing.
 
 ```bash
 export DB_ENVS="beta prod"

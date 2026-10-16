@@ -161,6 +161,16 @@ if ($Engine -eq 'mysql' -or $Engine -eq 'pg') {
   Fail "$tunnelVar forwards to local port $port but $($names[0]) (or its fallback) does not use that port"
 }
 
+function Write-MongoWarnings {
+  if ($Engine -ne 'mongodb') { return }
+  if ($value -match '[?&]replicaSet=' -and $value -notmatch '[?&]directConnection=true') {
+    Write-Output "WARN: $($names[0]) sets replicaSet without directConnection=true; through a tunnel the driver follows the replica set to unreachable hosts"
+  }
+  if ($value -match '[?&](tls|ssl)=true' -and $value -notmatch '[?&](tlsAllowInvalidHostnames|tlsInsecure)=true') {
+    Write-Output "WARN: $($names[0]) uses TLS without tlsAllowInvalidHostnames=true; the server certificate will not match 127.0.0.1"
+  }
+}
+
 $startedByUs = ''
 if (Test-Path $stateFile) {
   $old = Read-State $stateFile
@@ -170,6 +180,7 @@ if (Test-Path $stateFile) {
 if (Test-Port $port) {
   if (-not $startedByUs) { $startedByUs = ' (not started by this skill; it will be left open)' }
   Write-Output "OPEN: $EnvName $Engine tunnel already up on 127.0.0.1:$port$startedByUs"
+  Write-MongoWarnings
   exit 0
 }
 
@@ -192,6 +203,7 @@ $waited = 0
 while ($waited -lt $WaitSeconds) {
   if (Test-Port $port) {
     Write-Output "${verb}: $EnvName $Engine tunnel on 127.0.0.1:$port (pid $($process.Id), log $logFile)"
+    Write-MongoWarnings
     exit 0
   }
   if ($process.HasExited) { break }

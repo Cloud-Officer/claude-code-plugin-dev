@@ -202,8 +202,16 @@ if [ -e "$state_file" ]; then
   kill -0 "$old_pid" 2>/dev/null && started_by_us=" (started earlier by this skill, pid $old_pid)"
 fi
 
+warn_mongo_options() {
+  [ "$engine" = mongodb ] || return 0
+  [[ $value =~ [?\&]replicaSet= && ! $value =~ [?\&]directConnection=true ]] && echo "WARN: ${names[0]} sets replicaSet without directConnection=true; through a tunnel the driver follows the replica set to unreachable hosts"
+  [[ $value =~ [?\&](tls|ssl)=true && ! $value =~ [?\&](tlsAllowInvalidHostnames|tlsInsecure)=true ]] && echo "WARN: ${names[0]} uses TLS without tlsAllowInvalidHostnames=true; the server certificate will not match 127.0.0.1"
+  return 0
+}
+
 if port_open "$port"; then
   echo "OPEN: $env_name $engine tunnel already up on 127.0.0.1:$port${started_by_us:- (not started by this skill; it will be left open)}"
+  warn_mongo_options
   exit 0
 fi
 
@@ -227,6 +235,7 @@ waited=0
 while [ "$waited" -lt "$WAIT_SECONDS" ]; do
   if port_open "$port"; then
     echo "$verb: $env_name $engine tunnel on 127.0.0.1:$port (pid $pid, log $log_file)"
+    warn_mongo_options
     exit 0
   fi
   kill -0 "$pid" 2>/dev/null || break

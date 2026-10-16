@@ -54,7 +54,7 @@ This skill assumes database connection environment variables are already set:
 
 ### MongoDB
 
-- `MONGODB_URI` - Full connection URI (e.g., `mongodb://localhost:27017/dbname`)
+- `MONGODB_URI` - Full connection URI (e.g., `mongodb://localhost:27017/dbname`). Amazon DocumentDB is queried as MongoDB; reached through a tunnel, its URI needs `directConnection=true` (otherwise the driver follows `replicaSet` to the cluster's private hostnames and times out), `tlsAllowInvalidHostnames=true` (its certificate does not name `127.0.0.1`), `authSource=admin` when the URI names a database, `retryWrites=false`, and `tls=true&tlsCAFile=<path to global-bundle.pem>`. When a connection fails with `Hostname/IP does not match certificate's altnames`, `Server selection timed out` or `Authentication failed`, name the missing option and the variable it belongs in, and ask the user to add it; never print the URI
 
 ### Elasticsearch
 
@@ -121,6 +121,7 @@ SQL
 | `NONE: …` | No tunnel variable for this engine and environment: go straight to the connectivity test |
 | `OPEN: …` | A tunnel is already up (an earlier one or the user's): use it |
 | `OPENED: …` / `REOPENED: …` | The script started it: tell the user in one line, e.g. `Opened rc MySQL tunnel on 127.0.0.1:16033` |
+| `WARN: …` (after the outcome line, MongoDB only) | The URI lacks an option a tunnel needs (`directConnection=true`, `tlsAllowInvalidHostnames=true`). Tell the user which option to add to which variable, then still run the connectivity test |
 | `ERROR: …` (exit 1) | Report the message and the output lines under it, then stop. With `HINT: SSO_EXPIRED profile=<p>`, run `aws sso login --profile <p>` yourself (a foreground command, `timeout` 300000: it opens the browser for the user to approve), tell the user to approve it in the browser, then rerun `ensure` once. With `HINT: INSTANCE_PROMPT`, tell the user to add `-a <instance>` to the tunnel variable |
 
 **5. Keep it up.** SSM sessions close on their own after about 20 idle minutes (the Session Manager idle timeout default) or when AWS drops them, so a tunnel that worked earlier may be gone. Before every query, not only the first, run the same `ensure` command again. It returns `OPEN` immediately when the tunnel is still up and reopens it when it dropped; on `REOPENED`, tell the user, e.g. `Reopened rc MySQL tunnel (it had timed out)`. If a command fails with a connection error (connection refused, `Lost connection to MySQL server`, `server closed the connection unexpectedly`, `ECONNRESET`, a MongoDB server-selection timeout), run `ensure` and retry that same command once; a second failure falls under the failure policy. Never retry a write automatically, since it may already have been applied: report the error and ask the user.
@@ -204,14 +205,14 @@ SQL
 ### MongoDB
 
 ```bash
-mongosh "$MONGODB_URI" --file - <<'JS'
+mongosh "$MONGODB_URI" --quiet <<'JS'
 JS_CODE
 JS
 ```
 
 **Useful flags:**
 
-- `--file -` - Execute JavaScript from stdin via a quoted heredoc (universal quoting rule)
+- `<<'JS' … JS` - Pipe the script on stdin via a quoted heredoc (universal quoting rule). Never `--file -`: `mongosh` has no stdin form of `--file` and fails with `ENOENT … open '…/-'`. Piped input is run line by line like the shell, so each result is preceded by a prompt such as `rs0 [direct: primary] app>`; ignore the prompts when reading the output
 - `--quiet` - Suppress connection messages
 - `--json` - Output in JSON format
 
@@ -334,7 +335,7 @@ When `DB_ENVS` is set, skip this step for PostgreSQL, MySQL, MongoDB and Redis a
 | --- | --- | --- |
 | PostgreSQL | `mcp__postgres__execute_sql` | `psql -f -` (stdin heredoc) |
 | MySQL | `mcp__mysql__execute_sql` | `mysql -h ...` (stdin heredoc) |
-| MongoDB | `mcp__mongodb__find`, `mcp__mongodb__aggregate` | `mongosh --file -` (stdin heredoc) |
+| MongoDB | `mcp__mongodb__find`, `mcp__mongodb__aggregate` | `mongosh --quiet` (stdin heredoc) |
 | Redis | `mcp__redis__get`, `mcp__redis__hgetall`, `mcp__redis__lrange`, `mcp__redis__zrange`, `mcp__redis__json_get`, etc. | `redis-cli -u ... COMMAND` |
 | BigQuery | `mcp__bigquery__query` | `bq query --use_legacy_sql=false --project_id="$BQ_PROJECT" <<'SQL'` (stdin heredoc) |
 
@@ -419,7 +420,7 @@ SQL
 #### For MongoDB
 
 ```bash
-mongosh "$MONGODB_URI" --file - <<'JS'
+mongosh "$MONGODB_URI" --quiet <<'JS'
 db.orders.aggregate([
   { $match: { createdAt: { $gte: new Date(Date.now() - 30*24*60*60*1000) } } },
   { $group: {
@@ -540,7 +541,7 @@ Run the appropriate CLI command with the generated query.
 - **MySQL**: Pass the query on stdin via a quoted heredoc (see Step 6), `-N` to skip column headers, `-B` for batch mode (tab-separated)
 - **PostgreSQL**: Use `-f -` with a quoted heredoc (see Step 6), `-t` for tuples only (no headers), `-A` for unaligned output
 - **SQLite**: Pass the query on stdin via a quoted heredoc (see Step 6), `-header` for column headers, `-csv` or `-json` for output format
-- **MongoDB**: Use `--file -` with a quoted heredoc (see Step 6), `--quiet` to suppress connection messages
+- **MongoDB**: Pipe the script on stdin with a quoted heredoc and `--quiet` (see Step 6); never `--file -`
 - **Elasticsearch**: Use `curl` with `-s` (silent) and `-d @-` reading the body from a quoted heredoc; pipe to `jq` for formatting
 - **Redis**: Commands go to `redis-cli` on stdin via a quoted heredoc, one per line
 
@@ -624,7 +625,7 @@ When the user wants chart data, structure the output as:
 - Remember `_id` is ObjectId by default
 - Dates are ISODate objects
 - For references, may need `$lookup` for joins
-- No `$` escaping needed — the JS arrives via a quoted heredoc (`--file -`), never a double-quoted shell string
+- No `$` escaping needed — the JS arrives on stdin via a quoted heredoc, never a double-quoted shell string
 
 ### Elasticsearch
 

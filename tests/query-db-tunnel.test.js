@@ -82,6 +82,24 @@ describe('db-tunnel.sh', () => {
     })
   }
 
+  it('warns after the outcome when a tunneled MongoDB URI lacks directConnection or tlsAllowInvalidHostnames', () => {
+    const env = {
+      MONGODB_URI_RC: `mongodb://u:s3cret@127.0.0.1:${PORT}/app?tls=true&replicaSet=rs0&retryWrites=false`,
+      MONGODB_TUNNEL_RC: `ssm-jump --profile acme -a api-rc --forward docdb.example.com:27017:${PORT}`
+    }
+    const result = run(['ensure', 'mongodb', 'rc'], env)
+    assert.equal(result.status, 0, result.stdout)
+    const lines = result.stdout.trim().split('\n')
+    assert.match(lines[0], /^OPENED: rc mongodb tunnel/)
+    assert.match(lines[1], /^WARN: MONGODB_URI_RC sets replicaSet without directConnection=true/)
+    assert.match(lines[2], /^WARN: MONGODB_URI_RC uses TLS without tlsAllowInvalidHostnames=true/)
+    assert.doesNotMatch(result.stdout, /s3cret/)
+
+    const fixed = run(['ensure', 'mongodb', 'rc'], { ...env, MONGODB_URI_RC: env.MONGODB_URI_RC + '&directConnection=true&tlsAllowInvalidHostnames=true' })
+    assert.equal(fixed.stdout.trim().split('\n').length, 1)
+    run(['close', 'mongodb', 'rc'])
+  })
+
   it('fails fast with an SSO hint when ssm-jump exits', () => {
     const result = run(['ensure', 'mysql', 'rc'], { FAKE_SSO_EXPIRED: '1' })
     assert.equal(result.status, 1)

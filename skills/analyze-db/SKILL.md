@@ -40,6 +40,8 @@ PostgreSQL and MySQL are both served by DBHub, which exposes exactly two tools p
 | Redis | `REDIS_URL` (or `CACHE_DSN`) |
 | BigQuery | `BQ_PROJECT`, `BQ_DATASETS` (comma-separated list, e.g. `archive_2023,archive_2024,archive_2025`) |
 
+Amazon DocumentDB is analysed as MongoDB. Reached through a tunnel, its `MONGODB_URI` needs `directConnection=true`, `tlsAllowInvalidHostnames=true`, `authSource=admin` when the URI names a database, `retryWrites=false`, and `tls=true&tlsCAFile=<path to global-bundle.pem>`. When a connection fails with `Hostname/IP does not match certificate's altnames`, `Server selection timed out` or `Authentication failed`, name the missing option and the variable it belongs in, and ask the user to add it; never print the URI.
+
 ## Schema Document Location
 
 `DB_DOC` optionally points at the schema document `query-db` reads, so one file can serve several repositories (e.g. `~/src/api/docs/db.md`). Resolve it once, before Step 0: run `printenv DB_DOC`; empty output means `docs/db.md` in the project root. Otherwise use that value, replacing a leading `~/` with the home directory and resolving a relative path against the project root. Everywhere else in this file, `docs/db.md` means this resolved path.
@@ -89,6 +91,7 @@ SQL
 | `NONE: …` | No tunnel variable for this engine and environment: go straight to the connectivity test |
 | `OPEN: …` | A tunnel is already up (an earlier one or the user's): use it |
 | `OPENED: …` / `REOPENED: …` | The script started it: tell the user in one line, e.g. `Opened beta MySQL tunnel on 127.0.0.1:24306` |
+| `WARN: …` (after the outcome line, MongoDB only) | The URI lacks an option a tunnel needs (`directConnection=true`, `tlsAllowInvalidHostnames=true`). Tell the user which option to add to which variable, then still run the connectivity test |
 | `ERROR: …` (exit 1) | Report the message and the output lines under it, then stop. With `HINT: SSO_EXPIRED profile=<p>`, run `aws sso login --profile <p>` yourself (a foreground command, `timeout` 300000: it opens the browser for the user to approve), tell the user to approve it in the browser, then rerun `ensure` once. With `HINT: INSTANCE_PROMPT`, tell the user to add `-a <instance>` to the tunnel variable |
 
 **5. Keep it up.** SSM sessions close on their own after about 20 idle minutes (the Session Manager idle timeout default) or when AWS drops them, so a tunnel that worked earlier may be gone. Before each step that queries the database (Steps 6, 7 and 8), run the same `ensure` command again. It returns `OPEN` immediately when the tunnel is still up and reopens it when it dropped; on `REOPENED`, tell the user, e.g. `Reopened beta MySQL tunnel (it had timed out)`. If a command fails with a connection error (connection refused, `Lost connection to MySQL server`, `server closed the connection unexpectedly`, `ECONNRESET`, a MongoDB server-selection timeout), run `ensure` and retry that same command once; a second failure falls under the failure policy.
@@ -120,7 +123,7 @@ A single-quoted here-string expands nothing, exactly like a quoted heredoc. Its 
 | MySQL | `MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" <<'SQL'` (query on stdin) | `SELECT table_name, table_rows FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY table_rows DESC;` (estimates, instant) |
 | PostgreSQL | `psql -f - <<'SQL'` (query on stdin) | `SELECT schemaname, relname, n_live_tup FROM pg_stat_user_tables ORDER BY n_live_tup DESC;` |
 | SQLite | `sqlite3 "$SQLITE_DB" <<'SQL'` (query on stdin) | `SELECT name FROM sqlite_master WHERE type='table';` |
-| MongoDB | `mongosh "$MONGODB_URI" --file - <<'JS'` (script on stdin) | `db.getCollectionNames().forEach(c => print(c + ': ' + db[c].estimatedDocumentCount()))` |
+| MongoDB | `mongosh "$MONGODB_URI" --quiet <<'JS'` (script piped on stdin; never `--file -`, which `mongosh` reads as a file named `-`) | `db.getCollectionNames().forEach(c => print(c + ': ' + db[c].estimatedDocumentCount()))` |
 | Elasticsearch | `curl -s "$ES_URL/<endpoint>"` (add `-H "Authorization: ApiKey $ES_API_KEY"` if set) | `curl -s "$ES_URL/_cat/indices?v&h=index,docs.count,store.size"` |
 | Redis | `redis-cli -u "$REDIS_URL" <<'CMD'` (one command per line on stdin) | `DBSIZE`, `SCAN 0 MATCH "<pattern>" COUNT 100` (both on stdin) |
 | BigQuery | `bq query --use_legacy_sql=false --format=prettyjson --project_id="$BQ_PROJECT" <<'SQL'` (query on stdin) | inside Step 7's `for ds` loop: `bq ls --project_id="$BQ_PROJECT" "$ds"`; `bq show --schema --format=prettyjson --project_id="$BQ_PROJECT" "$ds.<table>"` |
