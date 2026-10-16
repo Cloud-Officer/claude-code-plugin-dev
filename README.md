@@ -728,7 +728,7 @@ launcher script) handles the rest.
 When a repo's databases exist once per environment, declare them all in the same `.envrc` instead of commenting lines
 in and out. `query-db` and `analyze-db` pick the environment you name in the request (`how many orders yesterday on
 beta?`), fall back to `DB_ENV`, then to the only entry of `DB_ENVS`, and otherwise ask. They open the
-environment's tunnel themselves when its port is closed, check it again before every query (SSM sessions time out after about 20 idle minutes) and reopen it if it dropped, and close it when you are done.
+environment's tunnel themselves, without asking, when its port is closed, check it again before every query (SSM sessions time out after about 20 idle minutes) and reopen it if it dropped, and close it when you are done. All of that goes through the bundled `skills/query-db/scripts/db-tunnel.sh` (`db-tunnel.ps1` on Windows), so a `Bash(nc *)` deny rule in your settings does not get in the way.
 
 * `DB_ENVS` lists the environments (`beta rc prod`); `DB_ENV` optionally sets the default.
 * `<VAR>_<ENV>` overrides any connection variable for one environment (`MYSQL_PORT_BETA`, `MYSQL_PASS_PROD`,
