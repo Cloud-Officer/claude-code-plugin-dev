@@ -1,7 +1,7 @@
 ---
 name: query-db
 description: Query the database, run a query, look up data, search the database, or check data. Use when the user wants to query the database, run a SQL query, look up data, find data, search for records, check the database, or ask questions about data. Executes queries via CLI commands using natural language. Reads schema context from docs/db.md, or from the file DB_DOC points at. Supports MySQL, PostgreSQL, SQLite, MongoDB, Elasticsearch, Redis, and BigQuery.
-allowed-tools: Read, Bash(printenv:*), Bash(nc:*), Bash(ssm-jump:*), Bash(lsof:*), Bash(seq:*), Bash(sleep:*), PowerShell(ssm-jump *), PowerShell(Get-ChildItem Env:*), PowerShell(Get-NetTCPConnection *), PowerShell(mysql *), PowerShell(psql *), PowerShell(sqlite3 *), PowerShell(mongosh *), PowerShell(redis-cli *), PowerShell(bq *), PowerShell(curl.exe *), AskUserQuestion, TaskStop, Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), mcp__postgres__execute_sql, mcp__postgres__search_objects, mcp__mysql__execute_sql, mcp__mysql__search_objects, mcp__mongodb__find, mcp__mongodb__aggregate, mcp__mongodb__count, mcp__mongodb__list-databases, mcp__mongodb__list-collections, mcp__mongodb__collection-schema, mcp__redis__*, mcp__bigquery__*
+allowed-tools: Read, Bash(printenv:*), Bash(*/skills/query-db/scripts/db-tunnel.sh*), Bash(aws sso login*), PowerShell(pwsh -NoProfile -ExecutionPolicy Bypass -File *db-tunnel.ps1*), PowerShell(aws sso login*), PowerShell(Get-ChildItem Env:*), PowerShell(mysql *), PowerShell(psql *), PowerShell(sqlite3 *), PowerShell(mongosh *), PowerShell(redis-cli *), PowerShell(bq *), PowerShell(curl.exe *), AskUserQuestion, Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), mcp__postgres__execute_sql, mcp__postgres__search_objects, mcp__mysql__execute_sql, mcp__mysql__search_objects, mcp__mongodb__find, mcp__mongodb__aggregate, mcp__mongodb__count, mcp__mongodb__list-databases, mcp__mongodb__list-collections, mcp__mongodb__collection-schema, mcp__redis__*, mcp__bigquery__*
 ---
 
 ## Purpose
@@ -54,7 +54,7 @@ This skill assumes database connection environment variables are already set:
 
 ### MongoDB
 
-- `MONGODB_URI` - Full connection URI (e.g., `mongodb://localhost:27017/dbname`)
+- `MONGODB_URI` - Full connection URI (e.g., `mongodb://localhost:27017/dbname`). Amazon DocumentDB is queried as MongoDB; reached through a tunnel, its URI needs `directConnection=true` (otherwise the driver follows `replicaSet` to the cluster's private hostnames and times out), `tlsAllowInvalidHostnames=true` (its certificate does not name `127.0.0.1`), `authSource=admin` when the URI names a database, `retryWrites=false`, and `tls=true&tlsCAFile=<path to global-bundle.pem>`. When a connection fails with `Hostname/IP does not match certificate's altnames`, `Server selection timed out` or `Authentication failed`, name the missing option and the variable it belongs in, and ask the user to add it; never print the URI
 
 ### Elasticsearch
 
@@ -108,21 +108,29 @@ SQL
 
 **3. CLI only for PostgreSQL, MySQL, MongoDB and Redis.** Their MCP servers connected once, at Claude Code startup, to whatever the plain variables pointed at, so they cannot reach a chosen environment. When `DB_ENVS` is set, run every query for these engines through the CLI form and never call their `mcp__*` tools.
 
-**4. Bring the tunnel up when needed** — before the connectivity test, per engine:
+**4. Bring the tunnel up — yourself, without asking.** Opening, checking and reopening tunnels is this skill's job. Never ask the user whether to open one, never tell them to open it in another terminal, and never probe the port by hand (`nc`, `lsof`, `/dev/tcp`; `nc` is commonly denied in user settings). One bundled script does all of it. Before the connectivity test, run it per engine as its own Bash command, never chained with `cd`, `;`, `&&` or a pipe:
 
-1. `printenv <ENGINE>_TUNNEL_<ENV>` (e.g. `MYSQL_TUNNEL_BETA`; `MYSQL_TUNNEL_BETA_WRITE` for a confirmed write, falling back to the read tunnel when unset). Empty means this skill manages no tunnel for it — go straight to the connectivity test.
-2. The value must match `^ssm-jump( +[A-Za-z0-9._:@/=-]+)+$` and carry `--forward <host>:<remote_port>:<local_port>`; anything else is reported and never run. `<local_port>` must be the port the connection uses — the resolved `MYSQL_PORT`/`PGPORT`, or the port in the URL, checked without printing it (`printenv MONGODB_URI_BETA | grep -cE ':48017([/?]|$)'` returns `1`). A mismatch is reported and stops the step.
-3. `nc -z -w 2 127.0.0.1 <local_port>` — open means a tunnel is already up (the user's or an earlier one): use it, start nothing.
-4. Otherwise run the tunnel command, written out literally, as a background Bash command (`run_in_background: true`) and note its task id. Wait for the port: `for i in $(seq 1 30); do nc -z -w 1 127.0.0.1 <local_port> && echo open && break; sleep 1; done`. Still closed after 30 s → read the task's output and report it (expired SSO session: ask the user to run `aws sso login --profile <profile>`; an instance-selection prompt: the command needs `-a`), then stop.
-5. Tell the user which tunnel was opened, e.g. `Opened beta MySQL tunnel on 127.0.0.1:24306`.
+```bash
+"${CLAUDE_PLUGIN_ROOT}/skills/query-db/scripts/db-tunnel.sh" ensure <engine> <env>
+```
 
-**5. Keep it up.** SSM sessions close on their own after about 20 idle minutes (the Session Manager idle timeout default) or when AWS drops them, so a tunnel that worked earlier may be gone. Before every query — not only the first —, run `nc -z -w 2 127.0.0.1 <local_port>` again. If it is closed and the `<ENGINE>_TUNNEL_<ENV>` variable exists, stop the old background task if it is still listed, rerun item 4's sub-steps 4–5 to reopen it, and tell the user, e.g. `Reopened beta MySQL tunnel (it had timed out)`. If a command fails with a connection error (connection refused, `Lost connection to MySQL server`, `server closed the connection unexpectedly`, `ECONNRESET`, a MongoDB server-selection timeout), check the port, reopen the tunnel if it is closed, and retry that same command once; a second failure falls under the failure policy. Never retry a write automatically — it may already have been applied: report the error and ask the user.
+`<engine>` is `mysql`, `pg`, `mongodb`, `redis` or `es`; `<env>` is the environment from item 1. Add `write` as a fourth argument only for a write the user confirmed (it uses `<ENGINE>_TUNNEL_<ENV>_WRITE`, falling back to the read tunnel). The script reads `<ENGINE>_TUNNEL_<ENV>`, refuses anything that is not a plain `ssm-jump <args>` command with `--forward <host>:<remote_port>:<local_port>`, checks that `<local_port>` is the port the connection variables use (without printing them), reuses a port that is already open, otherwise starts `ssm-jump` detached and waits up to 45 s for the port. Its first output line is the outcome:
 
-**6. Close what you opened.** Tunnels this skill started stay up for follow-up queries in the conversation; list them in the final answer. When the user is done or asks to close them, stop each background task, then if `nc -z -w 1 127.0.0.1 <local_port>` still succeeds run `lsof -ti tcp:<local_port> -sTCP:LISTEN | xargs kill`. Never close a tunnel that was already open before this skill ran.
+| Output | Meaning and what to do |
+| --- | --- |
+| `NONE: …` | No tunnel variable for this engine and environment: go straight to the connectivity test |
+| `OPEN: …` | A tunnel is already up (an earlier one or the user's): use it |
+| `OPENED: …` / `REOPENED: …` | The script started it: tell the user in one line, e.g. `Opened rc MySQL tunnel on 127.0.0.1:16033` |
+| `WARN: …` (after the outcome line, MongoDB only) | The URI lacks an option a tunnel needs (`directConnection=true`, `tlsAllowInvalidHostnames=true`). Tell the user which option to add to which variable, then still run the connectivity test |
+| `ERROR: …` (exit 1) | Report the message and the output lines under it, then stop. With `HINT: SSO_EXPIRED profile=<p>`, run `aws sso login --profile <p>` yourself (a foreground command, `timeout` 300000: it opens the browser for the user to approve), tell the user to approve it in the browser, then rerun `ensure` once. With `HINT: INSTANCE_PROMPT`, tell the user to add `-a <instance>` to the tunnel variable |
+
+**5. Keep it up.** SSM sessions close on their own after about 20 idle minutes (the Session Manager idle timeout default) or when AWS drops them, so a tunnel that worked earlier may be gone. Before every query, not only the first, run the same `ensure` command again. It returns `OPEN` immediately when the tunnel is still up and reopens it when it dropped; on `REOPENED`, tell the user, e.g. `Reopened rc MySQL tunnel (it had timed out)`. If a command fails with a connection error (connection refused, `Lost connection to MySQL server`, `server closed the connection unexpectedly`, `ECONNRESET`, a MongoDB server-selection timeout), run `ensure` and retry that same command once; a second failure falls under the failure policy. Never retry a write automatically, since it may already have been applied: report the error and ask the user.
+
+**6. Close what you opened.** Tunnels this skill started stay up for follow-up queries in the conversation; list them in the final answer. When the user is done or asks to close them, run `"${CLAUDE_PLUGIN_ROOT}/skills/query-db/scripts/db-tunnel.sh" close-all` (or `close <engine> <env>` for one). It closes only tunnels the script started and never one that was already open before.
 
 ## Running on Windows (PowerShell)
 
-Claude Code on Windows runs commands in PowerShell when its PowerShell tool is enabled, and Git Bash, when present, has neither `nc` nor `lsof`. So whenever a command from this file runs on Windows, run it in the PowerShell tool with these equivalents. They need PowerShell 7 (`pwsh`): Windows PowerShell 5.1 has no `??`, so on 5.1 tell the user to install PowerShell 7 and stop. Every rule around a command — validation, never printing a secret, the universal quoting rule — is unchanged:
+Claude Code on Windows runs commands in PowerShell when its PowerShell tool is enabled, so whenever a command from this file runs on Windows, run it in the PowerShell tool with these equivalents. They need PowerShell 7 (`pwsh`): Windows PowerShell 5.1 has no `??`, so on 5.1 tell the user to install PowerShell 7 and stop. Every rule around a command — validation, never printing a secret, the universal quoting rule — is unchanged:
 
 | Bash form in this file | PowerShell form |
 | --- | --- |
@@ -133,11 +141,8 @@ Claude Code on Windows runs commands in PowerShell when its PowerShell tool is e
 | `NAME="value" command …` | `$env:NAME = <value>; try { command … } finally { Remove-Item Env:NAME }` |
 | `command <<'SQL'` … `SQL` | `@'` … `'@ \| command`, a single-quoted here-string, never a double-quoted `@"` … `"@` one |
 | `curl …` | `curl.exe …` |
-| `nc -z -w 2 127.0.0.1 <local_port>` | `try { [Net.Sockets.TcpClient]::new().ConnectAsync('127.0.0.1', <local_port>).Wait(2000) } catch { $false }`, where `True` means open |
-| `for i in $(seq 1 30); do nc … && echo open && break; sleep 1; done` | `foreach ($i in 1..30) { if (<the check above>) { 'open'; break }; Start-Sleep 1 }` |
-| `lsof -ti tcp:<local_port> -sTCP:LISTEN \| xargs kill` | `Get-NetTCPConnection -LocalPort <local_port> -State Listen -ErrorAction SilentlyContinue \| ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }` |
 
-A single-quoted here-string expands nothing, exactly like a quoted heredoc. Its closing `'@` must start a line, so a query line that itself starts with `'@` is reported and never run. The tunnel command of [Environments and Tunnels](#environments-and-tunnels) item 4 still runs written out literally, as a background PowerShell command: there `ssm-jump` is the `ssm-jump.cmd` wrapper that the [ci-tools Windows installer](https://github.com/Cloud-Officer/ci-tools#windows-installation) puts in `%USERPROFILE%\bin`, which runs the bash script through Git Bash. If PowerShell reports that `ssm-jump` is not recognized, tell the user to run that installer or add `%USERPROFILE%\bin` to their user `PATH`, then stop. Stopping the background task can leave the wrapper's `bash`, `aws` and `session-manager-plugin` processes running, so on Windows always finish item 6 of [Environments and Tunnels](#environments-and-tunnels) with the port check and the `Get-NetTCPConnection` form.
+A single-quoted here-string expands nothing, exactly like a quoted heredoc. Its closing `'@` must start a line, so a query line that itself starts with `'@` is reported and never run. Tunnels use the PowerShell twin of the script in [Environments and Tunnels](#environments-and-tunnels), run as its own PowerShell command with the same arguments and the same output lines: `pwsh -NoProfile -ExecutionPolicy Bypass -File "${CLAUDE_PLUGIN_ROOT}/skills/query-db/scripts/db-tunnel.ps1" ensure <engine> <env>` (and `close-all` / `close <engine> <env>` to close). It starts `ssm-jump` through the `ssm-jump.cmd` wrapper that the [ci-tools Windows installer](https://github.com/Cloud-Officer/ci-tools#windows-installation) puts in `%USERPROFILE%\bin`, which runs the bash script through Git Bash, and on close stops the wrapper's whole process tree and whatever still listens on the port. When it reports that `ssm-jump` is not recognized, tell the user to run that installer or add `%USERPROFILE%\bin` to their user `PATH`, then stop.
 
 ## CLI Command Reference
 
@@ -200,14 +205,14 @@ SQL
 ### MongoDB
 
 ```bash
-mongosh "$MONGODB_URI" --file - <<'JS'
+mongosh "$MONGODB_URI" --quiet <<'JS'
 JS_CODE
 JS
 ```
 
 **Useful flags:**
 
-- `--file -` - Execute JavaScript from stdin via a quoted heredoc (universal quoting rule)
+- `<<'JS' … JS` - Pipe the script on stdin via a quoted heredoc (universal quoting rule). Never `--file -`: `mongosh` has no stdin form of `--file` and fails with `ENOENT … open '…/-'`. Piped input is run line by line like the shell, so each result is preceded by a prompt such as `rs0 [direct: primary] app>`; ignore the prompts when reading the output
 - `--quiet` - Suppress connection messages
 - `--json` - Output in JSON format
 
@@ -330,7 +335,7 @@ When `DB_ENVS` is set, skip this step for PostgreSQL, MySQL, MongoDB and Redis a
 | --- | --- | --- |
 | PostgreSQL | `mcp__postgres__execute_sql` | `psql -f -` (stdin heredoc) |
 | MySQL | `mcp__mysql__execute_sql` | `mysql -h ...` (stdin heredoc) |
-| MongoDB | `mcp__mongodb__find`, `mcp__mongodb__aggregate` | `mongosh --file -` (stdin heredoc) |
+| MongoDB | `mcp__mongodb__find`, `mcp__mongodb__aggregate` | `mongosh --quiet` (stdin heredoc) |
 | Redis | `mcp__redis__get`, `mcp__redis__hgetall`, `mcp__redis__lrange`, `mcp__redis__zrange`, `mcp__redis__json_get`, etc. | `redis-cli -u ... COMMAND` |
 | BigQuery | `mcp__bigquery__query` | `bq query --use_legacy_sql=false --project_id="$BQ_PROJECT" <<'SQL'` (stdin heredoc) |
 
@@ -415,7 +420,7 @@ SQL
 #### For MongoDB
 
 ```bash
-mongosh "$MONGODB_URI" --file - <<'JS'
+mongosh "$MONGODB_URI" --quiet <<'JS'
 db.orders.aggregate([
   { $match: { createdAt: { $gte: new Date(Date.now() - 30*24*60*60*1000) } } },
   { $group: {
@@ -536,7 +541,7 @@ Run the appropriate CLI command with the generated query.
 - **MySQL**: Pass the query on stdin via a quoted heredoc (see Step 6), `-N` to skip column headers, `-B` for batch mode (tab-separated)
 - **PostgreSQL**: Use `-f -` with a quoted heredoc (see Step 6), `-t` for tuples only (no headers), `-A` for unaligned output
 - **SQLite**: Pass the query on stdin via a quoted heredoc (see Step 6), `-header` for column headers, `-csv` or `-json` for output format
-- **MongoDB**: Use `--file -` with a quoted heredoc (see Step 6), `--quiet` to suppress connection messages
+- **MongoDB**: Pipe the script on stdin with a quoted heredoc and `--quiet` (see Step 6); never `--file -`
 - **Elasticsearch**: Use `curl` with `-s` (silent) and `-d @-` reading the body from a quoted heredoc; pipe to `jq` for formatting
 - **Redis**: Commands go to `redis-cli` on stdin via a quoted heredoc, one per line
 
@@ -620,7 +625,7 @@ When the user wants chart data, structure the output as:
 - Remember `_id` is ObjectId by default
 - Dates are ISODate objects
 - For references, may need `$lookup` for joins
-- No `$` escaping needed — the JS arrives via a quoted heredoc (`--file -`), never a double-quoted shell string
+- No `$` escaping needed — the JS arrives on stdin via a quoted heredoc, never a double-quoted shell string
 
 ### Elasticsearch
 

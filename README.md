@@ -728,7 +728,7 @@ launcher script) handles the rest.
 When a repo's databases exist once per environment, declare them all in the same `.envrc` instead of commenting lines
 in and out. `query-db` and `analyze-db` pick the environment you name in the request (`how many orders yesterday on
 beta?`), fall back to `DB_ENV`, then to the only entry of `DB_ENVS`, and otherwise ask. They open the
-environment's tunnel themselves when its port is closed, check it again before every query (SSM sessions time out after about 20 idle minutes) and reopen it if it dropped, and close it when you are done.
+environment's tunnel themselves, without asking, when its port is closed, check it again before every query (SSM sessions time out after about 20 idle minutes) and reopen it if it dropped, and close it when you are done. All of that goes through the bundled `skills/query-db/scripts/db-tunnel.sh` (`db-tunnel.ps1` on Windows), so a `Bash(nc *)` deny rule in your settings does not get in the way.
 
 * `DB_ENVS` lists the environments (`beta rc prod`); `DB_ENV` optionally sets the default.
 * `<VAR>_<ENV>` overrides any connection variable for one environment (`MYSQL_PORT_BETA`, `MYSQL_PASS_PROD`,
@@ -743,6 +743,10 @@ environment's tunnel themselves when its port is closed, check it again before e
 * Give every environment its own local port so all tunnels can be up at once. Convention: prod keeps the service's
   port, rc adds 10000, beta adds 20000 (MySQL 4306 / 14306 / 24306).
 * `CACHE_DSN` / `CACHE_DSN_<ENV>` are accepted for Redis when `REDIS_URL` is unset.
+* Amazon DocumentDB is configured as MongoDB (`MONGODB_URI_<ENV>`, `MONGODB_TUNNEL_<ENV>`). Through a tunnel its URI needs
+  `directConnection=true`, `tlsAllowInvalidHostnames=true`, `authSource=admin` (when the URI names a database),
+  `retryWrites=false` and `tls=true&tlsCAFile=<path>/global-bundle.pem`; the tunnel script warns when the first two are
+  missing.
 
 ```bash
 export DB_ENVS="beta prod"
