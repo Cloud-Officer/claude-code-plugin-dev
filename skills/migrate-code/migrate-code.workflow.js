@@ -77,7 +77,7 @@ const FOUNDATION_SCHEMA = {
           source_file: { type: 'string' },
           target_file: { type: 'string' },          // where the port should be written
           depends_on: { type: 'array', items: { type: 'string' } },
-          est_complexity: { type: 'string' },        // XS|S|M|L|XL
+          est_complexity: { type: 'string', enum: ['XS', 'S', 'M', 'L', 'XL'] },
         },
         required: ['source_file', 'target_file'],
       },
@@ -91,7 +91,7 @@ const FOUNDATION_SCHEMA = {
           area: { type: 'string' },                  // e.g. "stdlib: no direct equivalent for X"
           detail: { type: 'string' },
           suggested_handling: { type: 'string' },
-          risk: { type: 'string' },                  // high|medium|low
+          risk: { type: 'string', enum: ['high', 'medium', 'low'] },
         },
         required: ['area', 'detail'],
       },
@@ -116,7 +116,7 @@ const STRESS_SCHEMA = {
           pattern: { type: 'string' },
           why_systemic: { type: 'string' },
           proposed_rule: { type: 'string' },         // the amendment to make to the rulebook
-          severity: { type: 'string' },              // high|medium|low
+          severity: { type: 'string', enum: ['high', 'medium', 'low'] },
         },
         required: ['pattern', 'proposed_rule'],
       },
@@ -134,9 +134,9 @@ const TRANSLATE_SCHEMA = {
   properties: {
     source_file: { type: 'string' },
     target_file: { type: 'string' },
-    status: { type: 'string' },                      // ported | skipped-exists | blocked
+    status: { type: 'string', enum: ['ported', 'skipped-exists', 'blocked'] },
     todo_count: { type: 'integer' },                 // uncertain spots flagged with TODO(migrate)
-    review_verdict: { type: 'string' },              // pass | changes-applied | needs-human
+    review_verdict: { type: 'string', enum: ['pass', 'changes-applied', 'needs-human'] },
     rule_gaps: {                                     // recurring patterns the rulebook should absorb
       type: 'array',
       items: {
@@ -220,7 +220,7 @@ const VERIFY_SCHEMA = {
   additionalProperties: true,
   properties: {
     file: { type: 'string' },
-    verdict: { type: 'string' },                     // faithful | mismatch | uncertain
+    verdict: { type: 'string', enum: ['faithful', 'mismatch', 'uncertain'] },
     mismatches: {
       type: 'array',
       items: {
@@ -229,7 +229,7 @@ const VERIFY_SCHEMA = {
         properties: {
           behavior: { type: 'string' },              // the original behavior
           divergence: { type: 'string' },            // how the port differs
-          severity: { type: 'string' },              // high|medium|low
+          severity: { type: 'string', enum: ['high', 'medium', 'low'] },
           evidence: { type: 'string' },              // quoted source vs quoted port
         },
         required: ['behavior', 'divergence'],
