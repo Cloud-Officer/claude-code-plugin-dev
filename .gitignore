@@ -1,4 +1,4 @@
-# Edit at https://www.toptal.com/developers/gitignore?templates=eclipse,emacs,jetbrains,linux,macos,netbeans,node,nova,sublimetext,vim,visualstudiocode,webstorm,windows
+# Edit at https://www.toptal.com/developers/gitignore?templates=eclipse,emacs,jetbrains,linux,macos,netbeans,node,nova,powershell,sublimetext,vim,visualstudiocode,webstorm,windows
 
 ### Eclipse ###
 .metadata
@@ -426,6 +426,13 @@ dist
 ### nova ###
 .nova/*
 
+### PowerShell ###
+# Exclude packaged modules
+*.zip
+
+# Exclude .NET assemblies from source
+*.dll
+
 ### SublimeText ###
 # Cache files for Sublime Text
 *.tmlanguage.cache
@@ -598,7 +605,7 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
-# End of https://www.toptal.com/developers/gitignore/api/eclipse,emacs,jetbrains,linux,macos,netbeans,node,nova,sublimetext,vim,visualstudiocode,webstorm,windows
+# End of https://www.toptal.com/developers/gitignore/api/eclipse,emacs,jetbrains,linux,macos,netbeans,node,nova,powershell,sublimetext,vim,visualstudiocode,webstorm,windows
 
 # BEGIN Managed patterns
 
