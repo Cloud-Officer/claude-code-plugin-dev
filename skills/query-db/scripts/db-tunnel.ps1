@@ -40,30 +40,57 @@ function Test-Port([int]$Port) {
   try { return $client.ConnectAsync('127.0.0.1', $Port).Wait(1000) } catch { return $false } finally { $client.Dispose() }
 }
 
-function Stop-Tree([int]$ProcessId) {
-  Get-CimInstance Win32_Process -Filter "ParentProcessId=$ProcessId" -ErrorAction SilentlyContinue | ForEach-Object { Stop-Tree $_.ProcessId }
-  Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+function Get-Identity([int]$ProcessId) {
+  $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+  if (-not $process) { return $null }
+  try { return "$($process.ProcessName) $($process.StartTime.ToUniversalTime().ToString('o'))" } catch { return $null }
+}
+
+function Get-Tree([int]$ProcessId) {
+  $seen = @{}
+  $queue = New-Object Collections.Queue
+  $queue.Enqueue($ProcessId)
+  while ($queue.Count -gt 0) {
+    $current = [int]$queue.Dequeue()
+    if ($current -lt 2 -or $seen.ContainsKey($current)) { continue }
+    $seen[$current] = $true
+    Get-CimInstance Win32_Process -Filter "ParentProcessId=$current" -ErrorAction SilentlyContinue | ForEach-Object { $queue.Enqueue([int]$_.ProcessId) }
+  }
+  return @($seen.Keys)
 }
 
 function Stop-Tunnel([int]$ProcessId, [int]$Port) {
-  Stop-Tree $ProcessId
+  $tree = Get-Tree $ProcessId
+  foreach ($member in $tree) { Stop-Process -Id $member -Force -ErrorAction SilentlyContinue }
   foreach ($i in 1..5) {
     if (-not (Test-Port $Port)) { return $true }
     Start-Sleep 1
   }
-  Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Tree $_.OwningProcess }
+  Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Where-Object { $tree -contains [int]$_.OwningProcess } | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
   return -not (Test-Port $Port)
 }
 
 function Read-State([string]$File) {
-  $parts = (Get-Content $File -TotalCount 1).Trim() -split ' '
-  return @{ Pid = [int]$parts[0]; Port = [int]$parts[1] }
+  $lines = @(Get-Content $File -TotalCount 2)
+  if ($lines.Count -eq 0) { return $null }
+  $parts = @("$($lines[0])".Trim() -split ' +')
+  $id = 0
+  $port = 0
+  if ($parts.Count -lt 2 -or -not [int]::TryParse($parts[0], [ref]$id) -or $id -lt 2 -or -not [int]::TryParse($parts[1], [ref]$port)) { return $null }
+  $identity = if ($lines.Count -gt 1) { "$($lines[1])" } else { '' }
+  return @{ Pid = $id; Port = $port; Identity = $identity }
+}
+
+function Test-Ours($State) {
+  return [bool]($State -and $State.Identity -and (Get-Identity $State.Pid) -eq $State.Identity)
 }
 
 function Close-State([string]$File) {
   $label = [IO.Path]::GetFileNameWithoutExtension($File)
   $state = Read-State $File
-  if (Stop-Tunnel $state.Pid $state.Port) {
+  if (-not (Test-Ours $state)) {
+    Write-Output "NOT-OURS: the recorded $label process is gone or is no longer the tunnel this skill started; dropped the record and killed nothing"
+  } elseif (Stop-Tunnel $state.Pid $state.Port) {
     Write-Output "CLOSED: $label tunnel on 127.0.0.1:$($state.Port)"
   } else {
     Write-Output "WARNING: $label tunnel on 127.0.0.1:$($state.Port) is still listening after kill"
@@ -82,6 +109,7 @@ switch ($Action) {
   'list' {
     foreach ($file in Get-StateFiles) {
       $state = Read-State $file
+      if (-not $state) { continue }
       $status = if (Test-Port $state.Port) { 'open' } else { 'closed' }
       Write-Output "$([IO.Path]::GetFileNameWithoutExtension($file)) 127.0.0.1:$($state.Port) pid=$($state.Pid) $status"
     }
@@ -174,7 +202,7 @@ function Write-MongoWarnings {
 $startedByUs = ''
 if (Test-Path $stateFile) {
   $old = Read-State $stateFile
-  if (Get-Process -Id $old.Pid -ErrorAction SilentlyContinue) { $startedByUs = " (started earlier by this skill, pid $($old.Pid))" }
+  if (Test-Ours $old) { $startedByUs = " (started earlier by this skill, pid $($old.Pid))" }
 }
 
 if (Test-Port $port) {
@@ -188,7 +216,7 @@ $verb = 'OPENED'
 if (Test-Path $stateFile) {
   $verb = 'REOPENED'
   $old = Read-State $stateFile
-  [void](Stop-Tunnel $old.Pid $old.Port)
+  if (Test-Ours $old) { [void](Stop-Tunnel $old.Pid $old.Port) }
   Remove-Item $stateFile -Force -ErrorAction SilentlyContinue
 }
 
@@ -197,7 +225,7 @@ if (-not $command) { Fail 'ssm-jump is not recognized; run the ci-tools Windows 
 
 New-Item -ItemType Directory -Force -Path $StateDir | Out-Null
 $process = Start-Process -FilePath $command.Source -ArgumentList $tunnelArgs -WindowStyle Hidden -RedirectStandardOutput $logFile -RedirectStandardError $errFile -PassThru
-Set-Content -Path $stateFile -Value "$($process.Id) $port"
+Set-Content -Path $stateFile -Value @("$($process.Id) $port", "$(Get-Identity $process.Id)")
 
 $waited = 0
 while ($waited -lt $WaitSeconds) {
