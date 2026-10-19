@@ -558,6 +558,7 @@ const buildInstruction = xcodeBuild
     '`mcp__xcode__BuildProject`, then `mcp__xcode__GetBuildLog` with `severity: "error"` to read the errors alone.',
     'GetBuildLog returns issues already structured with `path` and `message` — cluster on those fields directly and',
     'do NOT re-parse console text. For `error_marker`, paste the failure line the build log itself reports.',
+    'Each tool may instead be named `mcp__plugin_co-dev_xcode__<name>`; call whichever form the session exposes.',
   ].join('\n')
   : 'Build command: `' + buildCmd + '` (run it from ' + repoRoot + ').'
 

@@ -76,7 +76,7 @@ function buildImplementPrompt(issue) {
     '1. Fetch the issue details:',
     isJira
       ? '   - `mcp__atlassian__getJiraIssue` (preferred) or `jira issue view ' + ref + ' --comments 16`.'
-      : '   - `mcp__github__get_issue` (preferred) or `gh issue view ' + ref + ' --comments`.',
+      : '   - `mcp__github__issue_read` (method `get`, then `get_comments`; preferred) or `gh issue view ' + ref + ' --comments`.',
     '   Read the title, description, acceptance criteria, and comments. If Figma URLs appear, pull design context',
     '   via `mcp__figma__*` when available (skip silently if not).',
     '',

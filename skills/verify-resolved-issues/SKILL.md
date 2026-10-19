@@ -1,7 +1,7 @@
 ---
 name: verify-resolved-issues
 description: Audit issues in a "resolved" / "fixed" / "done" state that have not been closed yet, verify the fix actually exists in the current codebase, then either close them with a detailed summary or kick them back to the original resolver with an explanation. Use when the user wants to verify resolved issues, audit resolved tickets, audit issues marked resolved but still open, check fixed bugs, close stale resolved issues, clean up the resolved column, sweep resolved issues, sweep done tickets that are not yet closed, verify fixes, confirm resolutions, validate that fixed issues are really fixed, or review the resolved-but-not-closed backlog. Works against GitHub Issues if enabled on the repo, otherwise against Jira. Handles Jira projects with separate "Resolved" → "Closed" workflow as well as projects that use a single terminal state.
-allowed-tools: Bash(gh:*), Bash(jira:*), Bash(git:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(printf:*), Bash(rm:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Grep, Glob, Write, Edit, Workflow, Agent, mcp__github__list_issues, mcp__github__get_issue, mcp__github__search_issues, mcp__github__add_issue_comment, mcp__github__update_issue, mcp__github__get_pull_request, mcp__github__get_pull_request_files, mcp__github__list_commits, mcp__atlassian__searchJiraIssuesUsingJql, mcp__atlassian__getJiraIssue, mcp__atlassian__addCommentToJiraIssue, mcp__atlassian__transitionJiraIssue, mcp__atlassian__getTransitionsForJiraIssue
+allowed-tools: Bash(gh:*), Bash(jira:*), Bash(git:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(printf:*), Bash(rm:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Grep, Glob, Write, Edit, Workflow, Agent, mcp__github__list_issues, mcp__plugin_co-dev_github__list_issues, mcp__github__issue_read, mcp__plugin_co-dev_github__issue_read, mcp__github__search_issues, mcp__plugin_co-dev_github__search_issues, mcp__github__add_issue_comment, mcp__plugin_co-dev_github__add_issue_comment, mcp__github__issue_write, mcp__plugin_co-dev_github__issue_write, mcp__github__pull_request_read, mcp__plugin_co-dev_github__pull_request_read, mcp__github__list_commits, mcp__plugin_co-dev_github__list_commits, mcp__atlassian__searchJiraIssuesUsingJql, mcp__atlassian__getJiraIssue, mcp__atlassian__addCommentToJiraIssue, mcp__atlassian__transitionJiraIssue, mcp__atlassian__getTransitionsForJiraIssue
 ---
 
 # Verify Resolved Issues
@@ -53,12 +53,12 @@ Prefer MCP tools when available; fall back to CLIs and `curl` when MCP returns t
 | --- | --- | --- |
 | Check issues enabled | `mcp__github__list_issues` succeeds | `gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'` |
 | List candidate issues | `mcp__github__list_issues` / `mcp__github__search_issues` | `gh issue list --state open --label "fixed,resolved" --json ...` and `gh search issues "is:open is:issue linked:pr" --json ...` |
-| Get issue detail | `mcp__github__get_issue` | `gh issue view <NUM> --json number,title,body,labels,assignees,state,createdAt,updatedAt,timelineItems` |
-| Get linked PRs | `mcp__github__get_issue` (timelineItems) | `gh issue view <NUM> --json closedByPullRequestsReferences,timelineItems` |
-| Get PR diff/files | `mcp__github__get_pull_request_files` | `gh pr view <PR> --json files,mergeCommit,mergedBy,author,state,merged,mergedAt` |
+| Get issue detail | `mcp__github__issue_read` (method `get`) | `gh issue view <NUM> --json number,title,body,labels,assignees,state,createdAt,updatedAt,timelineItems` |
+| Get linked PRs | none (`mcp__github__issue_read` returns no timeline; use the CLI) | `gh issue view <NUM> --json closedByPullRequestsReferences,timelineItems` |
+| Get PR diff/files | `mcp__github__pull_request_read` (method `get_files`) | `gh pr view <PR> --json files,mergeCommit,mergedBy,author,state,merged,mergedAt` |
 | Add comment | `mcp__github__add_issue_comment` | `gh issue comment <NUM> --body-file comment.md` |
-| Close issue | `mcp__github__update_issue` (state=closed) | `gh issue comment <NUM> --body-file comment.md` then `gh issue close <NUM> --reason completed` |
-| Reopen + reassign | `mcp__github__update_issue` (state=open, assignees) | `gh issue reopen <NUM>` then `gh issue edit <NUM> --add-assignee <user>` |
+| Close issue | `mcp__github__issue_write` (method `update`, state=closed) | `gh issue comment <NUM> --body-file comment.md` then `gh issue close <NUM> --reason completed` |
+| Reopen + reassign | `mcp__github__issue_write` (method `update`, state=open, assignees) | `gh issue reopen <NUM>` then `gh issue edit <NUM> --add-assignee <user>` |
 
 ### Jira Access
 
@@ -201,7 +201,7 @@ Post the workflow's `comment_markdown` verbatim — don't rewrite it. In `--dry-
 
 **On VERIFIED** — close the issue:
 
-- MCP preferred: `mcp__github__add_issue_comment` with `body` = `comment_markdown`, then `mcp__github__update_issue` with `state: "closed"` and `state_reason: "completed"`.
+- MCP preferred: `mcp__github__add_issue_comment` with `body` = `comment_markdown`, then `mcp__github__issue_write` with `method: "update"`, `state: "closed"` and `state_reason: "completed"`.
 - CLI fallback:
 
 ```bash
@@ -212,7 +212,7 @@ gh issue close <NUM> --reason completed
 
 **On NOT_VERIFIED** — comment, ensure the issue is open, reassign to the resolver:
 
-- MCP preferred: `mcp__github__add_issue_comment` with `body` = `comment_markdown`, then `mcp__github__update_issue` with `assignees: ["<resolver-login>"]`.
+- MCP preferred: `mcp__github__add_issue_comment` with `body` = `comment_markdown`, then `mcp__github__issue_write` with `method: "update"`, `state: "open"`, `assignees: ["<resolver-login>"]`.
 - CLI fallback:
 
 ```bash

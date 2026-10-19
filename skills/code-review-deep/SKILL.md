@@ -1,7 +1,7 @@
 ---
 name: code-review-deep
 description: "Exhaustive multi-phase code audit using parallel agents (security, dependencies, code quality, infrastructure, tests, and more). Use when the user wants a deep or thorough code review, a comprehensive audit, a security-and-quality sweep of a repo or subsystem, or a multi-agent review that goes beyond the current diff. Optionally scoped to a path or subsystem."
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(jira:*), Bash(jq:*), Bash(awk:*), Bash(cat:*), Bash(date:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(ls:*), Bash(rm:*), Bash(sed:*), Bash(shasum:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, Workflow, Agent, Skill, AskUserQuestion, WebSearch, WebFetch, mcp__github__*, mcp__context7__*, mcp__cookieyes__list_domains, mcp__cookieyes__get_embed_code
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(jira:*), Bash(jq:*), Bash(awk:*), Bash(cat:*), Bash(date:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(ls:*), Bash(rm:*), Bash(sed:*), Bash(shasum:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, Workflow, Agent, Skill, AskUserQuestion, WebSearch, WebFetch, mcp__github__*, mcp__plugin_co-dev_github__*, mcp__context7__*, mcp__plugin_co-dev_context7__*, mcp__cookieyes__list_domains, mcp__cookieyes__get_embed_code
 ---
 
 # Deep Code Review (Workflow-Orchestrated)
@@ -26,7 +26,7 @@ Run the `cd` as a **separate** call — never chain it as `cd … && gh …`. di
 
 ## MCP Tools with Fallbacks
 
-Prefer MCP tools (`mcp__github__*`, `mcp__context7__*`) when available; fall back to `gh` CLI / `WebSearch` on errors. Don't let MCP failures block the review.
+Prefer MCP tools (`mcp__github__*`, `mcp__context7__*`, or their `mcp__plugin_co-dev_<server>__*` forms) when available; fall back to `gh` CLI / `WebSearch` on errors. Don't let MCP failures block the review.
 
 | Operation | Preferred | Fallback |
 | --- | --- | --- |

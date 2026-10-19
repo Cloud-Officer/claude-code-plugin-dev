@@ -1,7 +1,7 @@
 ---
 name: create-issue
 description: Create, open, file, or report an issue, bug, or ticket in GitHub or Jira. Use when the user wants to open an issue, file a bug, report a bug, create a ticket, log an issue, or submit a bug report. Automatically detects if GitHub issues are enabled; if so creates a GitHub issue, otherwise creates a Jira issue.
-allowed-tools: Bash(gh:*), Bash(jira:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(mktemp:*), Bash(rm:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, mcp__github__create_issue, mcp__github__list_issues, mcp__github__search_issues, mcp__github__get_issue, mcp__github__add_issue_comment, mcp__atlassian__createJiraIssue, mcp__atlassian__getJiraIssueTypeMetaWithFields, mcp__atlassian__getJiraProjectIssueTypesMetadata, mcp__atlassian__getVisibleJiraProjects
+allowed-tools: Bash(gh:*), Bash(jira:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(mktemp:*), Bash(rm:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, mcp__github__issue_write, mcp__plugin_co-dev_github__issue_write, mcp__github__list_issues, mcp__plugin_co-dev_github__list_issues, mcp__github__search_issues, mcp__plugin_co-dev_github__search_issues, mcp__github__issue_read, mcp__plugin_co-dev_github__issue_read, mcp__github__add_issue_comment, mcp__plugin_co-dev_github__add_issue_comment, mcp__atlassian__createJiraIssue, mcp__atlassian__getJiraIssueTypeMetaWithFields, mcp__atlassian__getJiraProjectIssueTypesMetadata, mcp__atlassian__getVisibleJiraProjects
 ---
 
 # Create Issue
@@ -26,12 +26,12 @@ This skill uses MCP tools when available and falls back gracefully if they are u
 
 ### GitHub Access
 
-**Prefer MCP tools** (`mcp__github__*`) when available. If MCP tools are not available (tool not found errors), **fall back to the `gh` CLI**.
+**Prefer MCP tools** (`mcp__github__*`, or `mcp__plugin_co-dev_github__*` when loaded through this plugin) when available. If neither name form is available (tool not found errors), **fall back to the `gh` CLI**.
 
 | Operation | MCP Tool | CLI Fallback |
 | --- | --- | --- |
 | Check issues enabled | `mcp__github__list_issues` (if it succeeds, issues are enabled) | `gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'` |
-| Create issue | `mcp__github__create_issue` | `gh issue create --title '...' --body-file "$BODY" --label '...'` |
+| Create issue | `mcp__github__issue_write` (method `create`) | `gh issue create --title '...' --body-file "$BODY" --label '...'` |
 | Get repo owner/name | Parse from `git remote get-url origin` | `gh repo view --json owner,name` |
 
 ### Jira Access
@@ -69,7 +69,7 @@ This skill uses MCP tools when available and falls back gracefully if they are u
 
 ## GitHub Issues
 
-If GitHub issues are enabled, create a GitHub issue. **Prefer `mcp__github__create_issue`** when available, fall back to `gh issue create` CLI.
+If GitHub issues are enabled, create a GitHub issue. **Prefer `mcp__github__issue_write` (method `create`)** when available, fall back to `gh issue create` CLI.
 
 ### Step 2a: Write issue body to a temp file
 
@@ -325,7 +325,7 @@ The Severity column below is the closed set of severity values (Step 1 item 5) â
 ## Important Rules
 
 - **GitHub Issues:**
-  - Prefer `mcp__github__create_issue`; with the CLI fallback, use `gh issue create` with `--body-file`
+  - Prefer `mcp__github__issue_write` (method `create`); with the CLI fallback, use `gh issue create` with `--body-file`
   - No repo name prefix needed (issues are scoped to repo)
   - The label set is the type-derived default from Step 1 item 5 (`task`, `bug`, or `story`) plus every caller-supplied label, applied together; a label the repo rejects as undefined is dropped on retry and reported
 - **Jira Issues:**
