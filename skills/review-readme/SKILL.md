@@ -78,19 +78,21 @@ git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'
 ```
 
 ```bash
-# Check if build.yml workflow exists
-ls -la .github/workflows/build.yml 2>/dev/null || echo "No build.yml found"
+# Check if build.yml workflow exists (empty output means none)
+ls -1 .github/workflows/build.yml 2>/dev/null
 ```
 
 ```bash
-# Check for existing README (case-insensitive)
-ls -la README.md readme.md Readme.md 2>/dev/null || echo "No README found"
+# Check for existing README (case-insensitive; empty output means none)
+ls -1 README.md readme.md Readme.md 2>/dev/null
 ```
 
 ```bash
-# Check for license file
-ls -la LICENSE LICENSE.md LICENSE.txt license license.md license.txt 2>/dev/null || echo "No license file found"
+# Check for license file (empty output means none)
+ls -1 LICENSE LICENSE.md LICENSE.txt license license.md license.txt 2>/dev/null
 ```
+
+Each `ls` probe lists only the names that exist and exits non-zero when any one is missing, so decide from its output, never from its exit status: a probe with empty output is the negative result.
 
 Store these values:
 
@@ -99,9 +101,9 @@ Store these values:
 - `visibility`: "public" or "private"
 - `description`: Repository description from GitHub
 - `default_branch`: The default branch name from the `git symbolic-ref` command above (e.g. `master`, `main`)
-- `has_build_yml`: true/false
-- `has_license`: true/false
-- `readme_file`: The existing README filename or "README.md" if creating new
+- `has_build_yml`: true if the build.yml probe printed a path, false if its output was empty
+- `has_license`: true if the license probe printed any filename, false if its output was empty
+- `readme_file`: The first filename the README probe printed, or "README.md" if its output was empty
 
 ## Step 2: Detect Project Type and Stack
 
@@ -110,16 +112,13 @@ Analyze the repository to determine the project type, language, and tooling.
 ### Check for Project Files
 
 ```bash
-# List all potential project files
-ls -la package.json package-lock.json yarn.lock pnpm-lock.yaml \
-  requirements.txt setup.py pyproject.toml Pipfile poetry.lock \
-  Cargo.toml go.mod go.sum \
-  Makefile CMakeLists.txt \
-  Dockerfile docker-compose.yml docker-compose.yaml \
-  Gemfile composer.json pom.xml build.gradle build.gradle.kts \
-  *.sln *.csproj \
-  mix.exs pubspec.yaml \
-  2>/dev/null || echo "No standard project files found"
+# List all potential project files (empty output means none)
+ls -1 package.json package-lock.json yarn.lock pnpm-lock.yaml requirements.txt setup.py pyproject.toml Pipfile poetry.lock Cargo.toml go.mod go.sum Makefile CMakeLists.txt Dockerfile docker-compose.yml docker-compose.yaml Gemfile composer.json pom.xml build.gradle build.gradle.kts mix.exs pubspec.yaml 2>/dev/null
+```
+
+```bash
+# List .NET solution and project files (empty output means none)
+find . -maxdepth 1 \( -name '*.sln' -o -name '*.csproj' \)
 ```
 
 ### Project Type Detection Table
