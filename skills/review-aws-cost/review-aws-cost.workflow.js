@@ -10,7 +10,20 @@ export const meta = {
 
 // Every agent in every phase is READ-ONLY: nothing here creates, modifies, deletes or tags an AWS resource.
 
-const input = args || {}
+function readArgs(raw) {
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw)
+    } catch (e) {
+      log('args arrived as a string but is not valid JSON — ignoring it: ' + e.message)
+      return {}
+    }
+  }
+
+  return raw || {}
+}
+
+const input = readArgs(args)
 const windows = input.windows || {}
 const windowMonths = w => {
   const n = Number(w && w.months)

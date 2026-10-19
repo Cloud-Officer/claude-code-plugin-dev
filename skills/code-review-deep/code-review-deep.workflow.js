@@ -22,7 +22,20 @@ export const meta = {
 //              args: { repoContext: {...}, scope: "..." } })
 // ---------------------------------------------------------------------------
 
-const input = args || {}
+function readArgs(raw) {
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw)
+    } catch (e) {
+      log('args arrived as a string but is not valid JSON — ignoring it: ' + e.message)
+      return {}
+    }
+  }
+
+  return raw || {}
+}
+
+const input = readArgs(args)
 const repoContext = input.repoContext || {}
 // Every caller-supplied value entering the <repo_context> fence is stripped of
 // angle brackets by construction, so a value carrying '</repo_context>' cannot

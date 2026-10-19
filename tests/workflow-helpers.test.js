@@ -4,6 +4,8 @@ const path = require('node:path')
 const { describe, it } = require('node:test')
 const { ROOT, loadHelpers, workflowScript } = require('../scripts/workflow-helpers.js')
 
+const WORKFLOWS = ['code-review-deep', 'migrate-code', 'review-aws-cost', 'verify-resolved-issues', 'work-issue']
+
 describe('review-aws-cost helpers', () => {
   const { normSev, keepFinding, chunk, num, clean, joinVerdicts, confirmedFinding, collapseSharedBasis } = loadHelpers(workflowScript('review-aws-cost'), ['SEV_THRESHOLDS', 'normSev', 'keepFinding', 'chunk', 'num', 'clean', 'joinVerdicts', 'confirmedFinding', 'collapseSharedBasis'])
   const verdict = (finding_id, adjusted_monthly_saving_usd) => ({ finding_id, decision: 'CONFIRM', confidence_score: 90, adjusted_monthly_saving_usd })
@@ -162,7 +164,7 @@ describe('review-aws-cost helpers', () => {
 })
 
 describe('review-aws-cost window length', () => {
-  const PROMPT_NAMES = ['input', 'windows', 'windowMonths', 'months', 'account', 'clean', 'scope', 'awsBlock', 'A_TREND']
+  const PROMPT_NAMES = ['readArgs', 'input', 'windows', 'windowMonths', 'months', 'account', 'clean', 'scope', 'awsBlock', 'A_TREND']
   const prompts = windows => loadHelpers(workflowScript('review-aws-cost'), PROMPT_NAMES, { args: { windows } })
 
   it('tells the agents the window length passed in windows.months', () => {
@@ -184,6 +186,12 @@ describe('review-aws-cost window length', () => {
 
   it('accepts a numeric string for windows.months', () => {
     assert.equal(prompts({ months: '12' }).months, 12)
+  })
+
+  it('reads windows from args delivered as a JSON string', () => {
+    const { months } = loadHelpers(workflowScript('review-aws-cost'), PROMPT_NAMES, { args: JSON.stringify({ windows: { months: 6 } }) })
+
+    assert.equal(months, 6)
   })
 })
 
@@ -248,26 +256,7 @@ describe('code-review-deep helpers', () => {
 })
 
 describe('work-issue helpers', () => {
-  const logged = []
-  const { readArgs, branchName } = loadHelpers(workflowScript('work-issue'), ['readArgs', 'REF_PATTERN', 'TRACKER_REF', 'branchName'], { log: message => logged.push(message) })
-
-  it('readArgs accepts the object form unchanged', () => {
-    const args = { issues: [{ ref: '1', tracker: 'github' }] }
-
-    assert.equal(readArgs(args), args)
-  })
-
-  it('readArgs parses the JSON-string form', () => {
-    assert.deepEqual(readArgs('{"defaultBranch":"master"}'), { defaultBranch: 'master' })
-  })
-
-  it('readArgs falls back to an empty object', () => {
-    logged.length = 0
-    assert.deepEqual(readArgs('{not json'), {})
-    assert.equal(logged.length, 1)
-    assert.deepEqual(readArgs(null), {})
-    assert.deepEqual(readArgs(undefined), {})
-  })
+  const { branchName } = loadHelpers(workflowScript('work-issue'), ['REF_PATTERN', 'TRACKER_REF', 'branchName'])
 
   it('branchName derives the branch per tracker', () => {
     assert.equal(branchName({ ref: '123', tracker: 'github' }), 'issue-123')
@@ -313,10 +302,36 @@ describe('verify-resolved-issues helpers', () => {
   })
 })
 
+describe('readArgs', () => {
+  for (const skill of WORKFLOWS) {
+    const logged = []
+    const { readArgs } = loadHelpers(workflowScript(skill), ['readArgs'], { log: message => logged.push(message) })
+
+    it(skill + ' accepts the object form unchanged', () => {
+      const args = { issues: [{ ref: '1', tracker: 'github' }] }
+
+      assert.equal(readArgs(args), args)
+    })
+
+    it(skill + ' parses the JSON-string form', () => {
+      assert.deepEqual(readArgs('{"defaultBranch":"master"}'), { defaultBranch: 'master' })
+    })
+
+    it(skill + ' falls back to an empty object and logs a bad string', () => {
+      logged.length = 0
+      assert.deepEqual(readArgs('{not json'), {})
+      assert.equal(logged.length, 1)
+      assert.deepEqual(readArgs(null), {})
+      assert.deepEqual(readArgs(undefined), {})
+      assert.equal(logged.length, 1)
+    })
+  }
+})
+
 describe('safeAgent dispatch failure policy', () => {
   const load = (skill, agent, logs) => loadHelpers(workflowScript(skill), ['safeAgent'], { agent, log: (m) => logs.push(m) }).safeAgent
 
-  for (const skill of ['code-review-deep', 'migrate-code', 'review-aws-cost', 'verify-resolved-issues', 'work-issue']) {
+  for (const skill of WORKFLOWS) {
     it(skill + ' resolves a rejected dispatch to null and logs the label', async () => {
       const logs = []
       const safeAgent = load(skill, () => Promise.reject(new Error('dispatch exploded')), logs)

@@ -8,7 +8,20 @@ export const meta = {
 
 // Agents inherit the working directory, so their gh/git calls authenticate with that directory's .envrc token.
 
-const input = args || {}
+function readArgs(raw) {
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw)
+    } catch (e) {
+      log('args arrived as a string but is not valid JSON — ignoring it: ' + e.message)
+      return {}
+    }
+  }
+
+  return raw || {}
+}
+
+const input = readArgs(args)
 const tracker = input.tracker === 'jira' ? 'jira' : 'github'
 const scope = input.scope || (tracker === 'jira' ? 'the active sprint' : 'this repository')
 const candidates = Array.isArray(input.candidates) ? input.candidates : []
