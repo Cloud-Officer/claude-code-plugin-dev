@@ -93,13 +93,15 @@ if (plugin && marketplace) {
 
   if (!listed) fail('marketplace.json lists no plugin named ' + JSON.stringify(plugin.name))
   else {
-    for (const field of ['version', 'description']) {
-      if (listed[field] !== plugin[field]) {
-        fail('manifests disagree on ' + field + ':\n  plugin.json      ' + JSON.stringify(plugin[field]) + '\n  marketplace.json ' + JSON.stringify(listed[field]))
-      }
+    if (listed.description !== plugin.description) {
+      fail('manifests disagree on description:\n  plugin.json      ' + JSON.stringify(plugin.description) + '\n  marketplace.json ' + JSON.stringify(listed.description))
     }
+
+    if ('version' in listed) fail('marketplace.json pins plugin version ' + JSON.stringify(listed.version) + '; drop it so updates track commits')
   }
 }
+
+if (plugin && 'version' in plugin) fail('plugin.json pins version ' + JSON.stringify(plugin.version) + '; drop it so updates track commits')
 
 if (mcp && (!mcp.mcpServers || typeof mcp.mcpServers !== 'object')) fail('.mcp.json has no mcpServers object')
 
@@ -157,7 +159,7 @@ for (const error of errors) console.error('FAIL ' + error)
 
 if (errors.length) process.exit(1)
 
-console.log('ok   3 manifests parse and agree')
+console.log('ok   3 manifests parse, agree and pin no plugin version')
 console.log('ok   ' + skills.length + ' skills declare name, description and allowed-tools')
 console.log('ok   every ${CLAUDE_PLUGIN_ROOT} path resolves')
 console.log('ok   ' + (plugin.keywords || []).length + ' keywords are unique and map to live skills or documentation')

@@ -93,6 +93,9 @@ To verify the install, start Claude Code and run `/plugin` to confirm `co-dev` i
 bundled MCP servers connected — servers whose optional tool or credentials are missing show as failed and only affect
 the skills that use them.
 
+The plugin pins no version, so updates track the latest commit on `master`: run `claude plugin marketplace update cloud-officer`
+then `claude plugin update co-dev@cloud-officer`, or turn on auto-update for the marketplace under `/plugin` → **Marketplaces**.
+
 #### macOS (Homebrew)
 
 **Required.** Install [Homebrew](https://brew.sh) first if you don't have it, then:
