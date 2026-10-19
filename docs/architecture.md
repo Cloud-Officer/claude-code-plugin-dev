@@ -98,7 +98,7 @@ many agents run at once.
 | Unit | Location | Purpose | Depends on |
 | --- | --- | --- | --- |
 | Plugin manifest | `.claude-plugin/plugin.json` | Plugin identity, keyword index, and the 13 `lspServers` declarations (TypeScript, Pyright, Ruby, gopls, Bash, rust-analyzer, YAML, SourceKit, Intelephense, Kotlin, jdtls, clangd, perlnavigator) | — |
-| Marketplace manifest | `.claude-plugin/marketplace.json` | Distribution entry; `name`, `version` and `description` must match `plugin.json` | `plugin.json` |
+| Marketplace manifest | `.claude-plugin/marketplace.json` | Distribution entry; `name` and `description` must match `plugin.json`. Neither manifest sets `version`, so installs track the latest commit | `plugin.json` |
 | MCP manifest | `.mcp.json` | 15 stdio MCP servers and the environment variables their credentials come from | host `node`/`uv`, external packages |
 | Skills | `skills/<name>/SKILL.md` (34) | One self-contained procedure each: frontmatter trigger + tool grant, body procedure. Templates and rules live in the single file | the tools listed in `allowed-tools` |
 | Shared authoring standard | `skills/code-standards/SKILL.md` | The one skill other skills delegate *to* rather than being invoked directly by a user: comment discipline and the diff sweep that enforces it, for every change to source or test files. `write-tests`, `work-issue` and `migrate-code` route to it | `Read`, `Grep`, `Glob`, `Bash(git:*)`, `Bash(grep:*)` |
