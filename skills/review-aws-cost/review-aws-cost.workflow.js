@@ -60,6 +60,7 @@ function chunk(arr, n) {
 }
 
 function num(v) {
+  if (v === null || v === undefined || v === '') return null
   const n = Number(v)
   return Number.isFinite(n) ? n : null
 }
@@ -80,6 +81,23 @@ function joinVerdicts(issues, verdicts) {
     if (!ambiguous.has(v.finding_id)) byId.set(v.finding_id, v)
   }
   return { byId, ambiguous }
+}
+
+function confirmedFinding(f, v, agentKey) {
+  const adjusted = num(v.adjusted_monthly_saving_usd)
+  return {
+    ...f,
+    agent: agentKey,
+    confidence_score: v.confidence_score,
+    verified_monthly_saving_usd: adjusted !== null ? adjusted : num(f.monthly_saving_usd),
+    saving_adjusted: adjusted !== null,
+    saving_reconciles: v.saving_reconciles ?? null,
+    recomputed_value: v.recomputed_value || '',
+    double_counted_with: v.double_counted_with || [],
+    iac_note: v.iac_note || '',
+    confirmation_evidence: v.confirmation_evidence || '',
+    confidence_rationale: v.confidence_rationale || '',
+  }
 }
 
 function collapseSharedBasis(findings) {
@@ -1204,20 +1222,7 @@ for (const item of reviewed.filter(Boolean)) {
     if (v.decision !== 'CONFIRM') continue
     // The validator's recomputed figure wins over the analysis agent's claim:
     // it is the one that was reproduced against Cost Explorer.
-    const adjusted = num(v.adjusted_monthly_saving_usd)
-    confirmed.push({
-      ...f,
-      agent: agentDef.key,
-      confidence_score: v.confidence_score,
-      verified_monthly_saving_usd: adjusted !== null ? adjusted : num(f.monthly_saving_usd),
-      saving_adjusted: adjusted !== null,
-      saving_reconciles: v.saving_reconciles ?? null,
-      recomputed_value: v.recomputed_value || '',
-      double_counted_with: v.double_counted_with || [],
-      iac_note: v.iac_note || '',
-      confirmation_evidence: v.confirmation_evidence || '',
-      confidence_rationale: v.confidence_rationale || '',
-    })
+    confirmed.push(confirmedFinding(f, v, agentDef.key))
   }
 }
 

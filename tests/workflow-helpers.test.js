@@ -5,7 +5,7 @@ const { describe, it } = require('node:test')
 const { ROOT, loadHelpers, workflowScript } = require('../scripts/workflow-helpers.js')
 
 describe('review-aws-cost helpers', () => {
-  const { normSev, keepFinding, chunk, num, clean, joinVerdicts, collapseSharedBasis } = loadHelpers(workflowScript('review-aws-cost'), ['SEV_THRESHOLDS', 'normSev', 'keepFinding', 'chunk', 'num', 'clean', 'joinVerdicts', 'collapseSharedBasis'])
+  const { normSev, keepFinding, chunk, num, clean, joinVerdicts, confirmedFinding, collapseSharedBasis } = loadHelpers(workflowScript('review-aws-cost'), ['SEV_THRESHOLDS', 'normSev', 'keepFinding', 'chunk', 'num', 'clean', 'joinVerdicts', 'confirmedFinding', 'collapseSharedBasis'])
   const verdict = (finding_id, adjusted_monthly_saving_usd) => ({ finding_id, decision: 'CONFIRM', confidence_score: 90, adjusted_monthly_saving_usd })
 
   it('normSev maps any spelling onto the five buckets', () => {
@@ -50,6 +50,32 @@ describe('review-aws-cost helpers', () => {
     assert.equal(num('not a number'), null)
     assert.equal(num(undefined), null)
     assert.equal(num(Infinity), null)
+  })
+
+  it('num treats null and empty string as missing, not zero', () => {
+    assert.equal(num(null), null)
+    assert.equal(num(''), null)
+    assert.equal(num(0), 0)
+    assert.equal(num('0'), 0)
+  })
+
+  it('confirmedFinding keeps the analyst saving when the validator adjusted nothing', () => {
+    for (const adjusted of [null, undefined, '']) {
+      const out = confirmedFinding({ id: 'CMP-001', monthly_saving_usd: 420 }, { ...verdict('CMP-001', adjusted), confidence_score: 75 }, 'compute')
+
+      assert.equal(out.verified_monthly_saving_usd, 420, String(adjusted))
+      assert.equal(out.saving_adjusted, false, String(adjusted))
+      assert.equal(out.agent, 'compute')
+    }
+  })
+
+  it('confirmedFinding takes the validator figure when it adjusted the saving', () => {
+    for (const adjusted of [0, 150]) {
+      const out = confirmedFinding({ id: 'CMP-001', monthly_saving_usd: 420 }, verdict('CMP-001', adjusted), 'compute')
+
+      assert.equal(out.verified_monthly_saving_usd, adjusted)
+      assert.equal(out.saving_adjusted, true)
+    }
   })
 
   it('clean strips the angle brackets that would close a fence', () => {
