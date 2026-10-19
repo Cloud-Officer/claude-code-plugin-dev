@@ -515,25 +515,29 @@ async function runFixLoop(opts) {
 
   if (!opts.cmd) {
     log(opts.idleLog)
-    return { state, dropped, ruleGaps }
+    return { state, dropped, ruleGaps, rounds_exhausted: false }
   }
 
+  const runOnce = (label) => safeAgent(opts.runnerPrompt, { label: opts.runnerLabel + label, phase: opts.phaseName, schema: opts.runnerSchema, effort: 'low' })
   let round = 0
+  let fixedLast = false
   while (round < opts.maxRounds) {
     round += 1
-    state = await safeAgent(opts.runnerPrompt, { label: opts.runnerLabel + round, phase: opts.phaseName, schema: opts.runnerSchema, effort: 'low' })
+    fixedLast = false
+    state = await runOnce(round)
 
     if (!state) { state = opts.silentState; break }
     if (opts.isDone(state)) { log(opts.doneLog(round)); break }
 
     const all = opts.itemsOf(state) || []
+    if (!all.length) { log(opts.phaseName + ' round ' + round + ': the runner reported a failure but listed no ' + opts.itemNoun + ' — stopping for human intervention.'); break }
+
     const items = all.slice(0, maxFixesPerRound)
     log(opts.phaseName + ' round ' + round + ': ' + items.length + ' ' + opts.itemNoun + ' — dispatching fixers.')
     if (all.length > items.length) {
       dropped += all.length - items.length
       log('Capped at ' + maxFixesPerRound + ' of ' + all.length + ' ' + opts.itemNoun + ' this round; ' + (all.length - items.length) + ' deferred to the next round.')
     }
-    if (!items.length) break
 
     const fixes = (await parallel(items.map(item => () => safeAgent(
       opts.fixerPrompt(item),
@@ -542,9 +546,18 @@ async function runFixLoop(opts) {
 
     ruleGaps.push(...fixes.filter(x => x.rule_gap).map(x => x.rule_gap))
     if (!fixes.some(x => x.fixed)) { log(opts.noProgressLog); break }
+    fixedLast = true
   }
 
-  return { state, dropped, ruleGaps }
+  if (fixedLast) {
+    state = (await runOnce('final')) || opts.silentState
+    if (opts.isDone(state)) log(opts.doneLog(round))
+  }
+
+  const roundsExhausted = fixedLast && !opts.isDone(state)
+  if (roundsExhausted) log(opts.phaseName + ' stopped after ' + round + ' round(s) without a clean result.')
+
+  return { state, dropped, ruleGaps, rounds_exhausted: roundsExhausted }
 }
 
 phase('Compile')
@@ -741,8 +754,8 @@ return {
     source_file: p.source_file, target_file: p.target_file, status: p.status,
     review_verdict: p.review_verdict, todo_count: p.todo_count || 0, block_reason: p.block_reason,
   })),
-  build: { ran: build.ran, clean: build.clean, marker: build.error_marker, summary: build.summary },
-  test: { ran: test.ran, green: test.green, marker: test.pass_marker, summary: test.summary },
+  build: { ran: build.ran, clean: build.clean, marker: build.error_marker, summary: build.summary, rounds_exhausted: compileLoop.rounds_exhausted },
+  test: { ran: test.ran, green: test.green, marker: test.pass_marker, summary: test.summary, rounds_exhausted: testLoop.rounds_exhausted },
   verify: verifyResults,
   rule_gaps: ruleGaps,
 }
