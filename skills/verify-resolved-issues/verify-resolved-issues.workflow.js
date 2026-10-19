@@ -183,19 +183,30 @@ const RESULT_SCHEMA = {
   type: 'object',
   additionalProperties: true,
   properties: {
-    id: { type: ['string', 'integer'] },
-    title: { type: 'string' },
     outcome: { type: 'string', enum: ['VERIFIED', 'NOT_VERIFIED', 'SKIP_NEEDS_MANUAL', 'SKIP_INSUFFICIENT'] },
     one_line: { type: 'string' },               // short report line (gap for NOT_VERIFIED, reason for SKIP)
     comment_markdown: { type: 'string' },        // fully-filled comment, '' for SKIP_*
     comment_language: { type: 'string' },        // detected language of the comment
     planned_action: { type: 'string', enum: ['close', 'reopen+reassign', 'none'] },
-    resolver: { type: 'string', description: 'Tracker account identifier exactly as the tracker returned it — GitHub login, or Jira accountId; never a display name. Empty string when the tracker supplied neither.' },
     files_reviewed: { type: 'array', items: { type: 'string' } },
     tests_run: { type: 'string' },               // command + pasted pass/fail marker, or 'none'
     evidence: { type: 'string' },                // file:line quotes backing the verdict
   },
-  required: ['id', 'outcome', 'one_line', 'comment_markdown', 'planned_action'],
+  required: ['outcome', 'one_line', 'comment_markdown', 'planned_action'],
+}
+
+// Caller-validated identity fields always win — an agent return never overwrites them.
+function mergeResult(c, r, tracker) {
+  if (r.id != null && String(r.id) !== String(c.id)) log('WARNING: agent returned id ' + JSON.stringify(String(r.id)) + ' for issue ' + JSON.stringify(String(c.id)) + ' — ignored')
+  const callerResolver = c.resolver && (tracker === 'jira' ? c.resolver.accountId : c.resolver.login)
+  return {
+    ...r,
+    id: c.id,
+    title: c.title,
+    url: c.url,
+    resolver: callerResolver || r.resolver || '',
+    mergedPRs: c.mergedPRs || [],
+  }
 }
 
 // A rejected dispatch resolves to null (logged) so the per-site falsy guards cover thrown failures too.
@@ -221,18 +232,7 @@ const results = await pipeline(
     phase: 'Verify',
     schema: RESULT_SCHEMA,
     agentType: 'general-purpose',
-  }).then(r => {
-    // Echo back identity fields the skill needs to act, even if the agent omitted them.
-    if (!r) return null
-    return {
-      ...r,
-      id: r.id ?? c.id,
-      title: r.title || c.title,
-      url: c.url,
-      resolver: r.resolver || (c.resolver && (c.resolver.login || c.resolver.accountId)) || '',
-      mergedPRs: c.mergedPRs || [],
-    }
-  })
+  }).then(r => r && mergeResult(c, r, tracker))
 )
 
 const clean = results.filter(Boolean)
