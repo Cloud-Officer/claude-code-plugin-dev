@@ -32,7 +32,7 @@ const scope = input.scope || 'the whole repository'
 const outDir = input.outDir || 'docs/migration'
 const rulebookPath = input.rulebookPath || (outDir + '/rulebook.md')
 const buildCmd = input.buildCmd || ''
-const xcodeBuild = input.xcodeBuild === true // Xcode target: build through the xcode MCP instead of a shell command
+const xcodeBuild = input.xcodeBuild === true
 const testCmd = input.testCmd || ''
 const repoRoot = input.repoRoot || '.'
 const maxCompileRounds = Number.isFinite(input.maxCompileRounds) ? input.maxCompileRounds : 4
@@ -40,13 +40,6 @@ const maxTestRounds = Number.isFinite(input.maxTestRounds) ? input.maxTestRounds
 const maxVerifyFiles = Number.isFinite(input.maxVerifyFiles) ? input.maxVerifyFiles : 24
 const maxFixesPerRound = Number.isFinite(input.maxFixesPerRound) ? input.maxFixesPerRound : 12
 
-// No `model` is pinned anywhere: every agent inherits the session default deliberately.
-
-// ===========================================================================
-// SHARED CONTEXT — every agent prompt is grounded in the same migration facts.
-// ===========================================================================
-// Fence untrusted text (repo/agent-derived values) so it reaches prompts as
-// delimited DATA; strips the delimiter so the value cannot break out of it.
 function fence(id, value) {
   return '<untrusted id="' + id + '">'
     + String(value == null ? '' : value).replace(/<\/?untrusted[^>]*>/gi, '')
@@ -73,9 +66,6 @@ const CONTEXT = [
   'fixed once, for every file. This is "fix the loop, not the code".',
 ].join('\n')
 
-// ===========================================================================
-// SCHEMAS
-// ===========================================================================
 const FOUNDATION_SCHEMA = {
   type: 'object',
   additionalProperties: true,
@@ -253,12 +243,8 @@ const VERIFY_SCHEMA = {
   required: ['file', 'verdict'],
 }
 
-// A rejected dispatch resolves to null (logged) so the per-site falsy guards cover thrown failures too.
 const safeAgent = (p, o) => agent(p, o).catch(e => { log('WARNING: agent ' + o.label + ' failed: ' + e); return null })
 
-// ===========================================================================
-// PLAN MODE — Foundation + StressTest. Front-loaded, human-reviewed afterward.
-// ===========================================================================
 if (mode === 'plan') {
   phase('Foundation')
   log('Building rulebook, dependency map, and gap inventory for ' + source + ' → ' + target + ' (' + scope + ').')
@@ -362,20 +348,12 @@ if (mode === 'plan') {
   }
 }
 
-// ===========================================================================
-// MIGRATE MODE — Translate → Compile → Test → Verify.
-// ===========================================================================
 const rawFiles = Array.isArray(input.files) ? input.files : []
 if (!rawFiles.length) {
   log('No files passed to migrate — nothing to do. Run plan mode first to produce the dependency-ordered file list.')
   return { mode, ok: false, reason: 'no-files' }
 }
 
-// Every agent-returned path — dependency_order entries, sample_files, build
-// error_groups[].files, test failures[].file — passes through here before any
-// use: normalize each one and reject
-// any that escapes the repo root or carries a newline (dependency_order fails
-// closed to 'blocked'; fixer file lists drop the path and say so in the prompt).
 function safeRepoPath(p) {
   const s = String(p == null ? '' : p)
   if (!s || /[\r\n]/.test(s) || s.startsWith('/') || /^[A-Za-z]:/.test(s)) return null
@@ -435,17 +413,11 @@ for (const f of rawFiles) {
 }
 if (pathBlocked.length) log('Blocked ' + pathBlocked.length + ' file(s) whose paths failed validation — not translated.')
 
-// ---- Phase: TRANSLATE -----------------------------------------------------
-// One agent per file. Resumable BY DESIGN: each agent first checks whether its
-// target file already exists and is complete, and returns 'skipped-exists' if
-// so. The port is immediately reviewed by a SECOND, independent agent in the same
-// pipeline item, so a file is never "done" until it has been reviewed once.
 phase('Translate')
 log('Translating ' + files.length + ' file(s), dependency-ordered, one agent to port + an independent agent to review.')
 
 const translated = await pipeline(
   files,
-  // Stage 1 — port one file.
   (f) => safeAgent([
     'You are porting ONE file from ' + fence('source', source) + ' to ' + fence('target', target) + ', following the rulebook exactly.',
     CONTEXT,
@@ -477,7 +449,6 @@ const translated = await pipeline(
     effort: 'medium',
   }).then(r => r ? { ...r, _file: f } : { source_file: f.source_file, target_file: f.target_file, status: 'blocked', block_reason: 'port agent returned nothing', _file: f }),
 
-  // Stage 2 — independent review of the port. Skips cleanly for skipped-exists.
   (port, f) => {
     if (!port || port.status === 'skipped-exists') return port
     if (port.status === 'blocked') return port
@@ -503,11 +474,8 @@ const translated = await pipeline(
       source_file: f.source_file,
       target_file: f.target_file,
       status: port.status,
-      // The reviewer's own counts never erase the porter's: `todo_count` is the risk
-      // signal Verify ranks on, and both agents may report rule gaps.
       todo_count: Math.max(port.todo_count || 0, rev.todo_count || 0),
       rule_gaps: [...(port.rule_gaps || []), ...(rev.rule_gaps || [])],
-      // A file is never "done" until reviewed once — a silent reviewer must not pass it as reviewed.
     } : { ...port, review_verdict: 'needs-human', notes: 'reviewer returned nothing — port is unreviewed' })
   },
 )
@@ -520,7 +488,6 @@ const totalTodos = ported.reduce((n, p) => n + (p.todo_count || 0), 0)
 const translateRuleGaps = ported.flatMap(p => p.rule_gaps || [])
 log('Translated ' + portedOk.length + '/' + files.length + '  ·  ' + blocked.length + ' blocked  ·  ' + needsHuman.length + ' need human  ·  ' + totalTodos + ' TODO(migrate) markers.')
 
-// ---- Phase: COMPILE / TEST ------------------------------------------------
 async function runFixLoop(opts) {
   const ruleGaps = []
   let dropped = 0
@@ -575,7 +542,6 @@ async function runFixLoop(opts) {
 
 phase('Compile')
 
-// With xcodeBuild the loop runs on the MCP tools, so it must not be treated as idle for an empty buildCmd.
 const buildInstruction = xcodeBuild
   ? [
     'Build through the Xcode MCP, NOT a shell command. The project is at ' + repoRoot + '.',
@@ -588,6 +554,7 @@ const buildInstruction = xcodeBuild
   : 'Build command: `' + buildCmd + '` (run it from ' + repoRoot + ').'
 
 const compileLoop = await runFixLoop({
+  // A non-empty sentinel so the loop does not idle when the build runs on the Xcode MCP.
   cmd: buildCmd || (xcodeBuild ? 'xcode-mcp' : ''),
   phaseName: 'Compile',
   maxRounds: maxCompileRounds,
@@ -650,13 +617,8 @@ const test = testLoop.state
 const droppedTestFailures = testLoop.dropped
 const fixRuleGaps = [...compileLoop.ruleGaps, ...testLoop.ruleGaps]
 
-// ---- Phase: VERIFY --------------------------------------------------------
-// Adversarial behavioral check on the highest-risk ported files. Two reviewers
-// per file; if they disagree on the verdict, a third breaks the tie (2-of-3).
 phase('Verify')
-// 'skipped-exists' files count as candidates: they are ported code that this run
-// never behaviorally checked, and on a RESUMED run they are every file — excluding
-// them would verify nothing while still reporting zero mismatches.
+// skipped-exists files are ported code this run never checked; on a resumed run they are every file.
 const verifyCandidates = ported
   .filter(p => p.status === 'ported' || p.status === 'skipped-exists')
   .sort((a, b) => (b.todo_count || 0) - (a.todo_count || 0))
@@ -700,12 +662,10 @@ function verifyPrompt(p, lens) {
 
 const verified = await pipeline(
   verifyTargets,
-  // Two independent adversarial passes with different lenses.
   (p) => parallel([
     () => safeAgent(verifyPrompt(p, 'error-handling & edge cases'), { label: 'verify-a:' + p.target_file, phase: 'Verify', schema: VERIFY_SCHEMA, effort: 'high' }),
     () => safeAgent(verifyPrompt(p, 'data model, numerics & concurrency'), { label: 'verify-b:' + p.target_file, phase: 'Verify', schema: VERIFY_SCHEMA, effort: 'high' }),
   ]).then(votes => ({ p, votes: votes.filter(Boolean) })),
-  // Tie-break: if the two disagree on whether there IS a mismatch, a third decides.
   ({ p, votes }) => {
     const flags = votes.map(v => v.verdict === 'mismatch')
     const disagree = flags.length === 2 && flags[0] !== flags[1]
@@ -717,9 +677,6 @@ const verified = await pipeline(
 )
 
 const verifyResults = verified.filter(Boolean).map(({ p, votes }) => {
-  // Fewer than 2 returned votes = failed verification: drop the file (null) so it
-  // lands in capped.unverified_files — never scored on 0–1 opinions, and never
-  // 'faithful' or 'mismatch' by default.
   const verdict = tallyVerdict(votes)
   if (!verdict) return null
   const mismatches = votes.flatMap(v => v.mismatches || [])
@@ -729,7 +686,6 @@ const behavioralMismatches = verifyResults.filter(r => r.verdict === 'mismatch')
 const behavioralUncertain = verifyResults.filter(r => r.verdict === 'uncertain')
 log('Verify: ' + behavioralMismatches.length + '/' + verifyResults.length + ' file(s) flagged with behavioral mismatches; ' + behavioralUncertain.length + ' inconclusive (uncertain).')
 
-// De-duplicate proposed rule gaps by pattern so the human sees each once.
 const allRuleGaps = [...translateRuleGaps, ...fixRuleGaps]
 const seenGap = new Set()
 const ruleGaps = allRuleGaps.filter(g => {
@@ -750,14 +706,11 @@ return {
     needs_human: needsHuman.length,
     todos: totalTodos,
     verified: verifyResults.length,
-    // null — NEVER 0 — when nothing was verified: a zero here reads as "verified
-    // clean" when no file was ever checked.
+    // null, never 0, when nothing was verified: zero would read as "verified clean".
     behavioral_mismatches: verifyResults.length ? behavioralMismatches.length : null,
     behavioral_uncertain: verifyResults.length ? behavioralUncertain.length : null,
   },
-  // What the per-phase caps dropped, so the report can say so instead of implying
-  // full coverage. error_groups/test_failures sum per-round deferral EVENTS: the
-  // build re-clusters every round, so one persistent group deferred twice counts twice.
+  // error_groups and test_failures count per-round deferrals: a group deferred twice counts twice.
   capped: {
     error_groups: droppedErrorGroups,
     test_failures: droppedTestFailures,

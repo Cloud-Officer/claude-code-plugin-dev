@@ -37,9 +37,9 @@ For those five the boundary is deliberate and sharp:
 - **`SKILL.md` owns the edges.** Preflight (is there already a report? what is the repo's team profile? which issues are
   candidates?), the interactive questions, and the final rendering of whatever the script returns.
 - **`<skill>.workflow.js` owns the middle.** Every prompt sent to every dispatched agent, the phase order, the fan-out
-  width, the filtering, the failure policy and the returned payload shape. `code-review-deep.workflow.js` states this
-  outright near the top: it is "the canonical source of truth for the code-review-deep analysis behaviour", and SKILL.md
-  "only handles preflight ... and the final report rendering".
+  width, the filtering, the failure policy and the returned payload shape. To tune what `code-review-deep` looks for —
+  its scout and analysis prompts, validation checklist, governance rules, exclusions and confidence thresholds — edit
+  `code-review-deep.workflow.js`; its SKILL.md only handles preflight and the final report rendering.
 - **The dispatched agents own the reading.** They are fresh Claude sessions with their own context, given one prompt and
   a JSON schema, returning structured data.
 
@@ -83,8 +83,8 @@ Workflow({
 })
 ```
 
-`args` arrives as a harness global, not a function parameter. Every script opens with `const input = args || {}` (or, in
-`work-issue.workflow.js`, a `readArgs` that also parses `args` when a harness delivers it as a JSON string). Results
+`args` arrives as a harness global, not a function parameter. Every script opens with `const input = readArgs(args)`,
+which also parses `args` when a harness delivers it as a JSON string and logs when that string is not valid JSON. Results
 flow back the other way as the script's top-level `return` value, which the skill body then renders.
 
 The harness supplies six globals the scripts rely on and this repository does not implement: `args`, `log()`, `phase()`,
@@ -102,12 +102,12 @@ many agents run at once.
 | MCP manifest | `.mcp.json` | 15 stdio MCP servers and the environment variables their credentials come from | host `node`/`uv`, external packages |
 | Skills | `skills/<name>/SKILL.md` (34) | One self-contained procedure each: frontmatter trigger + tool grant, body procedure. Templates and rules live in the single file | the tools listed in `allowed-tools` |
 | Shared authoring standard | `skills/code-standards/SKILL.md` | The one skill other skills delegate *to* rather than being invoked directly by a user: comment discipline and the diff sweep that enforces it, for every change to source or test files. `write-tests`, `work-issue` and `migrate-code` route to it | `Read`, `Grep`, `Glob`, `Bash(git:*)`, `Bash(grep:*)` |
-| Workflow scripts | `skills/<name>/<name>.workflow.js` (5) | Multi-phase agent orchestration for the five heavy skills. 3,496 lines total; `review-aws-cost` (1,258) and `code-review-deep` (1,013) are the largest | harness globals only |
+| Workflow scripts | `skills/<name>/<name>.workflow.js` (5) | Multi-phase agent orchestration for the five heavy skills. 3,339 lines total; `review-aws-cost` (1,201) and `code-review-deep` (952) are the largest | harness globals only |
 | Tunnel script | `skills/query-db/scripts/db-tunnel.sh`, `db-tunnel.ps1` | The one executable a skill ships. `query-db` and `analyze-db` call it to validate, open, reuse, reopen and close the `ssm-jump` tunnel declared by `<ENGINE>_TUNNEL_<ENV>`, so neither skill probes ports by hand (users commonly deny `nc`). The `.ps1` twin runs on Windows | host `bash` or PowerShell, `ssm-jump` |
 | Harness/slicing library | `scripts/workflow-helpers.js` | The one `require()`-able shared module. Discovers workflow scripts, emulates the harness wrapper (`harnessSource`), and slices named declarations out of workflow source (`declarationSource`, `loadHelpers`) | `node:fs`, `node:path` |
 | Syntax gate | `scripts/check-workflow-syntax.js` | Wraps each workflow script in the harness shape and runs `node --check` on it; fails if zero scripts are found | `workflow-helpers.js` |
 | Consistency gate | `scripts/check-repo-consistency.js` | Cross-checks the three manifests, every skill's frontmatter, every `${CLAUDE_PLUGIN_ROOT}` path in docs and skills, and every `plugin.json` keyword (unique, and present in the repo's own text) | `workflow-helpers.js` (`ROOT`), `node:fs`, `node:path` |
-| Tests | `tests/*.test.js` (10 files, 13 suites, 161 tests) | Pure-function tests over sliced workflow declarations, the `safeAgent` failure policy for all five scripts, and contract tests that read `SKILL.md` text — guardrail cross-references, heredoc fencing, interpolation-boundary patterns — two of which extract a skill's `bash` block and execute it, and one that drives `db-tunnel.sh` against a fake `ssm-jump` | `node:test`, `node:assert`, `workflow-helpers.js`, host `bash` |
+| Tests | `tests/*.test.js` (13 files, 18 suites, 199 tests) | Pure-function tests over sliced workflow declarations, the `safeAgent` and `readArgs` behaviour of all five scripts, a parity check on helpers copied between scripts, a one-line comment cap on every script, and contract tests that read `SKILL.md` text — guardrail cross-references, heredoc fencing, interpolation-boundary patterns — two of which extract a skill's `bash` block and execute it, and one that drives `db-tunnel.sh` against a fake `ssm-jump` | `node:test`, `node:assert`, `workflow-helpers.js`, host `bash` |
 | CI | `.github/workflows/build.yml` | The `js_unit_tests` job runs `npm ci`, the two gates and `node --test 'tests/*.test.js'`; separate jobs run actionlint, ESLint, markdownlint, Semgrep and yamllint | GitHub Actions |
 
 ### Why workflow scripts are not modules
@@ -130,6 +130,11 @@ the file, extracts just the named top-level declarations, joins them with a synt
 that through `new Function` with stubs (`log`, and whatever the caller injects — `agent` for the `safeAgent` tests)
 bound as parameters. The unit under test is therefore the *real bytes* from the workflow script, with the harness
 globals replaced by test doubles. No test copy of the logic exists to drift.
+
+Because a script cannot import, helpers two scripts need are copied inline: `readArgs` and `safeAgent` live in all five,
+and `normSev`, `keepFinding`, `chunk` and `joinVerdicts` in both audit scripts. `tests/workflow-helper-parity.test.js`
+slices every copy with `declarationSource()` and fails if any copy differs from the others, then runs the behaviour
+tests over each copy. A fix to one copy therefore has to be made to all of them.
 
 ## Software of Unknown Provenance
 
@@ -249,7 +254,8 @@ differ in what reaches a validator, and a maintainer should not assume one scrip
    file's findings across batches and re-read it in each.
 
 `review-aws-cost` has none of those three. Every finding is validated, whatever its severity, in batches of four in
-emission order — smaller than five because each cost verdict re-runs a Cost Explorer or CloudWatch query. Its
+emission order — smaller than five because each cost verdict re-runs a Cost Explorer or CloudWatch query, and a larger
+batch starves the per-finding recompute budget that is the point of the phase. Its
 deduplication happens *after* the threshold instead: `collapseSharedBasis(findings)` groups kept findings by
 `cost_basis_ref`, keeps the one with the largest `verified_monthly_saving_usd`, records the others' ids in the winner's
 `double_counted_with`, and returns the losers as `collapsed`, so the same dollars are never summed twice into `totals`.
@@ -265,7 +271,9 @@ The shared steps:
   against `SEV_THRESHOLDS`, which differ per script: `code-review-deep` uses `{critical: 25, high: 50, medium: 50,
   low: 50, info: 75}` (a critical finding is cheap to keep and expensive to miss), `review-aws-cost` uses
   `{critical: 50, high: 50, medium: 50, low: 75, info: 75}` (a confidently wrong dollar figure is worse than a missed
-  saving).
+  saving: it can send someone deleting a load-bearing resource or put a fictional number in front of finance, while a
+  missed saving costs money slowly and the audit is cheap to re-run next month). Every threshold must sit on one of the
+  anchors; an off-anchor value would silently change which scores clear it.
 
 Everything that was confirmed but fell below the threshold, or was never verified, is returned in `filtered` alongside
 `kept`, so the appendix accounts for it. Findings a validator rejected are dropped, and `code-review-deep`'s
@@ -345,8 +353,8 @@ constrains the *skill's* session — not the tools available to an agent the wor
 
 Eleven skills declare a read-only posture — `analyze-db`, `crashlytics`, `doc-tracker-coverage`, `monday`,
 `monday-weekly-report`, `newrelic`, `query-db`, `review-aws-cost`, `sprint-summary`, `verify-resolved-issues` and
-`weekly-dev-report`. `review-aws-cost.workflow.js` states it as an invariant in the source: "*Every agent in every phase
-is READ-ONLY: nothing here creates, modifies, deletes or tags an AWS resource*", and it further forbids recommending
+`weekly-dev-report`. `review-aws-cost.workflow.js` puts it in every agent prompt through its `READ_ONLY` block — read
+APIs only; never create, modify, delete, tag, start, stop or resize anything — and it further forbids recommending
 Reserved Instances or Savings Plans, with the verifier instructed to reject any finding that proposes a commitment.
 
 `query-db` is the most developed instance. Its **Write Operation Blocking** rule requires a keyword scan before any
