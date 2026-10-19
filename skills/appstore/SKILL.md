@@ -1,7 +1,7 @@
 ---
 name: appstore
 description: Manage App Store Connect apps, builds, distribution, or Xcode Cloud. Use when the user wants to check builds, manage TestFlight beta groups and testers, read or respond to App Store reviews, manage in-app purchases and their price schedules, list app versions, check app status, list Xcode Cloud workflows or build runs, start an Xcode Cloud build, or investigate Xcode Cloud build failures, logs, and test results.
-allowed-tools: Bash(jq:*), Bash(curl:*), Bash(mktemp:*), Bash(unzip:*), Bash(find:*), Bash(xcrun:*), Bash(command -v asc:*), Bash(env ASC_TELEMETRY_DISABLED=1 asc:*), mcp__appstore__*
+allowed-tools: Bash(jq:*), Bash(curl:*), Bash(mktemp:*), Bash(unzip:*), Bash(find:*), Bash(xcrun:*), Bash(command -v asc:*), Bash(env ASC_TELEMETRY_DISABLED=1 asc:*), mcp__appstore__*, mcp__plugin_co-dev_appstore__*
 ---
 
 # App Store Connect
@@ -10,8 +10,8 @@ Manage iOS/macOS apps and their Xcode Cloud CI on App Store Connect.
 
 ## Access paths
 
-1. **MCP (primary)**: the `mcp__appstore__*` tools, served by `asc-mcp` (v4.1.6 or later).
-2. **`asc` CLI (fallback)**: use it only when the `mcp__appstore__*` tools are not available in this session. Check with `command -v asc`. If neither is available, tell the user to install one (see the plugin README) and stop.
+1. **MCP (primary)**: the `mcp__appstore__*` tools (`mcp__plugin_co-dev_appstore__*` when loaded through this plugin), served by `asc-mcp` (v4.1.6 or later).
+2. **`asc` CLI (fallback)**: use it only when neither `mcp__appstore__*` nor `mcp__plugin_co-dev_appstore__*` tools are available in this session. Check with `command -v asc`. If neither is available, tell the user to install one (see the plugin README) and stop.
 
 Credentials are the same for both: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY_PATH` (path to the `.p8`).
 

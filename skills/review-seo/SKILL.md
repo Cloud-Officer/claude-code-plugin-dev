@@ -1,7 +1,7 @@
 ---
 name: review-seo
 description: Review, audit, or check SEO, GEO (AI answer-engine / generative-engine optimization), and front-end web quality (performance, Core Web Vitals, accessibility). Use when the user wants an SEO audit, technical SEO check, GEO/AEO audit, AI-search optimization, llms.txt review, structured-data/schema check, meta-tag/Open-Graph audit, sitemap or robots.txt review, crawlability analysis, a Lighthouse or web-quality audit, a performance or Core Web Vitals (LCP/INP/CLS) review, or an accessibility (WCAG) audit. Audits a codebase and/or a live site URL (usually production) and writes docs/seo-audit.md.
-allowed-tools: Bash(curl:*), Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, WebSearch, WebFetch, AskUserQuestion, Skill, mcp__fetch__fetch, mcp__github__get_file_contents, mcp__chrome-devtools__*, mcp__cookieyes__list_domains, mcp__cookieyes__get_website_details, mcp__cookieyes__get_embed_code, mcp__cookieyes__list_banners, mcp__cookieyes__get_banner_status, mcp__cookieyes__get_scan_results, mcp__cookieyes__get_compliance_status
+allowed-tools: Bash(curl:*), Bash(gh:*), Bash(git:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, WebSearch, WebFetch, AskUserQuestion, Skill, mcp__fetch__fetch, mcp__plugin_co-dev_fetch__fetch, mcp__github__get_file_contents, mcp__plugin_co-dev_github__get_file_contents, mcp__chrome-devtools__*, mcp__plugin_co-dev_chrome-devtools__*, mcp__cookieyes__list_domains, mcp__cookieyes__get_website_details, mcp__cookieyes__get_embed_code, mcp__cookieyes__list_banners, mcp__cookieyes__get_banner_status, mcp__cookieyes__get_scan_results, mcp__cookieyes__get_compliance_status
 ---
 
 # Review SEO & GEO
@@ -206,7 +206,7 @@ Audit steps:
 
 ## Phase 7: Performance, Core Web Vitals, Accessibility & Best Practices
 
-Beyond SEO, audit the remaining **Lighthouse web-quality pillars** using the **bundled `chrome-devtools` MCP** (`co-dev` ships it — no separate install; the tools are `mcp__chrome-devtools__*`). Run against the live URL; in **codebase-only** mode do the static checks below and mark the live-metric parts **N/A**.
+Beyond SEO, audit the remaining **Lighthouse web-quality pillars** using the **bundled `chrome-devtools` MCP** (`co-dev` ships it — no separate install; the tools are `mcp__chrome-devtools__*`, or `mcp__plugin_co-dev_chrome-devtools__*` when loaded through this plugin). Run against the live URL; in **codebase-only** mode do the static checks below and mark the live-metric parts **N/A**.
 
 Engine: `mcp__chrome-devtools__lighthouse_audit` for the category scores (Performance, Accessibility, Best Practices, SEO), plus `performance_start_trace` / `performance_analyze_insight` for CWV detail and `take_snapshot` for the accessibility tree. Prefer **field data** (CrUX / Search Console real-user data) over lab data for ranking-relevant CWV. Record the four Lighthouse category scores (0–100) and back each issue with evidence.
 

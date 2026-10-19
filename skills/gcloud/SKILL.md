@@ -1,7 +1,7 @@
 ---
 name: gcloud
 description: Manage Google Cloud infrastructure, services, or resources. Use when the user wants to manage any GCP service including Compute Engine, Cloud Run, Cloud SQL, GKE, Cloud Storage, IAM, Pub/Sub, Cloud Logging, Cloud Monitoring, Firebase, Artifact Registry, Secret Manager, Cloud Functions, App Engine, Dataflow, BigTable, Spanner, Cloud CDN, Cloud DNS, VPC, Load Balancing, or any other Google Cloud service. Also use for running any gcloud, gsutil, or kubectl command.
-allowed-tools: Bash(gcloud:*), Bash(gsutil:*), Bash(kubectl:*), Bash(curl:*), Bash(jq:*), Bash(echo:*), mcp__gcloud__*
+allowed-tools: Bash(gcloud:*), Bash(gsutil:*), Bash(kubectl:*), Bash(curl:*), Bash(jq:*), Bash(echo:*), mcp__gcloud__*, mcp__plugin_co-dev_gcloud__*
 ---
 
 # Google Cloud
@@ -10,7 +10,7 @@ Manage Google Cloud Platform infrastructure and services.
 
 ## MCP Tools with Fallbacks
 
-**Prefer MCP tools.** MCP is available exactly when the session's tool list contains a tool named `mcp__gcloud__run_gcloud_command`. If that name is absent from the tool list, or a call to it is rejected by the tool harness before any gcloud output is produced, **fall back to the `gcloud` CLI**.
+**Prefer MCP tools.** MCP is available exactly when the session's tool list contains a tool named `mcp__gcloud__run_gcloud_command` or `mcp__plugin_co-dev_gcloud__run_gcloud_command`. If both names are absent from the tool list, or a call to it is rejected by the tool harness before any gcloud output is produced, **fall back to the `gcloud` CLI**.
 
 The `gcloud` MCP server wraps the `gcloud` CLI and provides access to all GCP services through a single entry point.
 

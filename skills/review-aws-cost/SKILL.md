@@ -1,7 +1,7 @@
 ---
 name: review-aws-cost
 description: "Audit AWS spend for cost optimization over the last 3 complete months, compared against the same 3 months of the previous year, using parallel agents per cost domain. Use when the user wants an AWS cost review, cloud cost optimization, a spend audit, to find AWS waste or savings, to know why the AWS bill went up, a year-over-year cost comparison, or a FinOps review. Never recommends Reserved Instances or Savings Plans. Prints the report to the terminal and waits — writes no file unless asked."
-allowed-tools: Bash(aws:*), Bash(git:*), Bash(gh:*), Bash(jira:*), Bash(awk:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(printf:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, Workflow, Agent, Skill, AskUserQuestion, WebSearch, WebFetch, mcp__aws__*
+allowed-tools: Bash(aws:*), Bash(git:*), Bash(gh:*), Bash(jira:*), Bash(awk:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(printf:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, Workflow, Agent, Skill, AskUserQuestion, WebSearch, WebFetch, mcp__aws__*, mcp__plugin_co-dev_aws__*
 ---
 
 # AWS Cost Review
@@ -100,7 +100,7 @@ Run the `cd` as a **separate** call — never chain it as `cd … && gh …`. di
 
 ## MCP Tools with Fallbacks
 
-Prefer MCP tools (`mcp__aws__*`) when available; fall back to the `aws` CLI on errors. Do not let an MCP failure block the audit.
+Prefer MCP tools (`mcp__aws__*`, or `mcp__plugin_co-dev_aws__*` when loaded through this plugin) when available; fall back to the `aws` CLI on errors. Do not let an MCP failure block the audit.
 
 | Operation | Preferred | Fallback |
 | --- | --- | --- |

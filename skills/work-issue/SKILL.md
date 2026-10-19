@@ -1,7 +1,7 @@
 ---
 name: work-issue
 description: "Implement one or more GitHub issues or Jira tickets end-to-end — explore, design, implement, and open a PR. Multiple issues run in parallel. Use when the user wants to work on an issue, implement a ticket, fix a bug from a tracker, or take a GitHub issue or Jira key from description to pull request."
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(jira:*), Bash(awk:*), Bash(cat:*), Bash(echo:*), Bash(grep:*), Bash(jq:*), Bash(sed:*), Bash(tr:*), Read, Edit, Write, Glob, Grep, TodoWrite, Agent, Workflow, Skill, AskUserQuestion, mcp__github__*, mcp__atlassian__*, mcp__figma__*
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(jira:*), Bash(awk:*), Bash(cat:*), Bash(echo:*), Bash(grep:*), Bash(jq:*), Bash(sed:*), Bash(tr:*), Read, Edit, Write, Glob, Grep, TodoWrite, Agent, Workflow, Skill, AskUserQuestion, mcp__github__*, mcp__plugin_co-dev_github__*, mcp__atlassian__*, mcp__figma__*
 ---
 
 ## Arguments
@@ -32,14 +32,14 @@ This command uses MCP tools when available and falls back gracefully if they are
 
 ### GitHub Access
 
-**Prefer MCP tools** (`mcp__github__*`) when available. If MCP tools are not available (tool not found errors), **fall back to the `gh` CLI**.
+**Prefer MCP tools** (`mcp__github__*`, or `mcp__plugin_co-dev_github__*` when loaded through this plugin) when available. If neither name form is available (tool not found errors), **fall back to the `gh` CLI**.
 
 | Operation | MCP Tool | CLI Fallback |
 | --- | --- | --- |
 | Check issues enabled | `mcp__github__list_issues` (if it succeeds, issues are enabled) | `gh repo view --json hasIssuesEnabled --jq '.hasIssuesEnabled'` |
-| Get issue details | `mcp__github__get_issue` | `gh issue view <issue> --comments` |
+| Get issue details | `mcp__github__issue_read` (method `get`, then `get_comments`) | `gh issue view <issue> --comments` |
 | Create PR | `mcp__github__create_pull_request` | `gh pr create --base ... --head ... --title "..." --body "..."` |
-| Update issue | `mcp__github__update_issue` | `gh issue edit <issue> --title "..." --body "..."` |
+| Update issue | `mcp__github__issue_write` (method `update`) | `gh issue edit <issue> --title "..." --body "..."` |
 | Add comment | `mcp__github__add_issue_comment` | `gh issue comment <issue> --body "..."` |
 | Get repo owner/name | Parse from `git remote get-url origin` | `gh repo view --json owner,name` |
 
@@ -203,7 +203,7 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
    Use `TodoWrite` to create a todo list of the workflow steps for this issue. Mark each item completed as you finish it. This survives context compaction and gives the user a stable progress view across long sessions.
 
 1. **Get issue details** (all types) — Present to user before proceeding
-   - GitHub: `mcp__github__get_issue` (preferred) or `gh issue view <issue> --comments`
+   - GitHub: `mcp__github__issue_read` (method `get`, then `get_comments`; preferred) or `gh issue view <issue> --comments`
    - Jira: `mcp__atlassian__getJiraIssue` (preferred) or `jira issue view <issue> --comments 16`
 
 2. **Extract Figma design context** (all types — only if Figma links are present)
@@ -399,7 +399,7 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
     Write in a prospective tone (as if before implementation, not after):
     The updated description arrives on stdin through a quoted heredoc (`<<'EOF'` suppresses all expansion, so it needs no escaping), never as a double-quoted argument. The title travels the same channel — captured into a shell variable through a quoted heredoc and passed as `"$TITLE"` (a variable's value is not re-scanned for expansion inside double quotes, so it needs no escaping either):
 
-    - GitHub: `mcp__github__update_issue` (preferred), or:
+    - GitHub: `mcp__github__issue_write` (method `update`; preferred), or:
 
       ```bash
       TITLE=$(cat <<'TITLE_EOF'

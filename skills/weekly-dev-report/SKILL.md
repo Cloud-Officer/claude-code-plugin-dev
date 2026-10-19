@@ -1,7 +1,7 @@
 ---
 name: weekly-dev-report
 description: Generate a weekly team activity report from the active Jira sprint and linked GitHub repos, with per-member achievability ratings, stuck-ticket flags, stalled-member flags, and worklog audit. The roster mixes engineers, QA, content, and consultants; titles and language stay generic so non-engineering members aren't mislabelled. Flags sprint-goal delivery risk with a concrete, prioritized catch-up plan, and confirms each member's role (developer full-time / consultant part-time / manager-cto-ciso / tester / other) once interactively then caches it so later runs reuse it. Use when the user wants a weekly activity report, per-member Jira sprint progress audit, Jira sprint delivery-risk assessment, contributor status report, time-logged audit, or team check-in. Pulls roster from the active sprint, auto-discovers repos from Jira ticket dev-info, emails the report on --send, otherwise writes WEEKLY_REPORT.md and prints to stdout.
-allowed-tools: Bash(jira:*), Bash(gh:*), Bash(git:*), Bash(curl:*), Bash(gmail:*), Bash(gcloud:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(echo:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(printenv:*), Bash(printf:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, AskUserQuestion, mcp__atlassian__searchJiraIssuesUsingJql, mcp__atlassian__getJiraIssue, mcp__github__list_pull_requests, mcp__github__get_pull_request_reviews, mcp__github__search_issues, mcp__github__get_pull_request
+allowed-tools: Bash(jira:*), Bash(gh:*), Bash(git:*), Bash(curl:*), Bash(gmail:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(echo:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(printenv:*), Bash(printf:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, AskUserQuestion, mcp__atlassian__searchJiraIssuesUsingJql, mcp__atlassian__getJiraIssue, mcp__github__list_pull_requests, mcp__plugin_co-dev_github__list_pull_requests, mcp__github__pull_request_read, mcp__plugin_co-dev_github__pull_request_read, mcp__github__search_issues, mcp__plugin_co-dev_github__search_issues
 ---
 
 # Weekly Activity Report
@@ -788,10 +788,9 @@ If run with `--send`:
 4. Try delivery in this order:
    - A Google Workspace MCP tool discovered in the session's tool list at runtime (do not hardcode): eligible names match `mcp__*gmail*send*` or `mcp__google*workspace*gmail*` AND contain `send` (so a search or draft tool never qualifies). Use this path only when exactly one tool is eligible; zero or several eligible tools skip this path entirely and fall through to the `gmail` CLI, so which mail lands never depends on discovery order
    - `gmail send` CLI if installed (`which gmail`)
-   - `gcloud` SMTP relay if configured
 5. On success, print `Sent to: <list>`. On failure, leave `WEEKLY_REPORT.md` in place, print the error, and instruct the user to send manually.
 
-The Gmail MCP tools (path 1) are **discovered at runtime** and so cannot be pre-listed in `allowed-tools` — expect a one-time permission prompt the first time one is called. The `gmail` and `gcloud` CLI fallbacks are pre-granted.
+The Gmail MCP tools (path 1) are **discovered at runtime** and so cannot be pre-listed in `allowed-tools` — expect a one-time permission prompt the first time one is called. The `gmail` CLI fallback is pre-granted.
 
 ## Important rules
 
