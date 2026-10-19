@@ -1,10 +1,8 @@
 const assert = require('node:assert/strict')
-const path = require('node:path')
 const { test } = require('node:test')
-const { extractWorkflowFunctions } = require('../scripts/extract-workflow-functions.js')
+const { loadHelpers, workflowScript } = require('../scripts/workflow-helpers.js')
 
-const workflowPath = path.join(__dirname, '..', 'skills', 'migrate-code', 'migrate-code.workflow.js')
-const { buildFixerPrompt, testFixerPrompt } = extractWorkflowFunctions(workflowPath, ['fence', 'safeRepoPath', 'buildFixerPrompt', 'testFixerPrompt'])
+const { buildFixerPrompt, testFixerPrompt } = loadHelpers(workflowScript('migrate-code'), ['fence', 'safeRepoPath', 'buildFixerPrompt', 'testFixerPrompt'])
 
 const SCOPE_RULE = 'edit only files inside the repo root; if the cause lies in a file outside it, touch nothing there and return fixed=false with the path in notes'
 

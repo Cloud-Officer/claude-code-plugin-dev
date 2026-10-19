@@ -2,10 +2,10 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 const { test } = require('node:test')
-const { extractWorkflowFunctions } = require('../scripts/extract-workflow-functions.js')
+const { ROOT, loadHelpers, workflowScript } = require('../scripts/workflow-helpers.js')
 
-const workflowPath = path.join(__dirname, '..', 'skills', 'migrate-code', 'migrate-code.workflow.js')
-const { tallyVerdict, verifyCoverage } = extractWorkflowFunctions(workflowPath, ['tallyVerdict', 'verifyCoverage'])
+const workflowPath = workflowScript('migrate-code')
+const { tallyVerdict, verifyCoverage } = loadHelpers(workflowPath, ['tallyVerdict', 'verifyCoverage'])
 
 const votes = (...verdicts) => verdicts.map(verdict => ({ verdict }))
 
@@ -57,7 +57,7 @@ test('verifyCoverage does not count cap-dropped files as unverified', () => {
   assert.deepEqual(verifyCoverage(100, 40, 40), { verify_files: 60, unverified_files: 0 })
 })
 
-const skillPath = path.join(__dirname, '..', 'skills', 'migrate-code', 'SKILL.md')
+const skillPath = path.join(ROOT, 'skills', 'migrate-code', 'SKILL.md')
 
 const returnedCountKeys = () => {
   const source = fs.readFileSync(workflowPath, 'utf8')
@@ -82,4 +82,17 @@ test('rulebook prompt hands TODO(migrate) markers to a human, not to the read-on
   const source = fs.readFileSync(workflowPath, 'utf8')
   assert.doesNotMatch(source, /verify phase removes/)
   assert.match(source, /resolved by a human before the migration is called complete \(Step 5\)/)
+})
+
+test('schemas pin every control-flow string to its closed set', () => {
+  const { FOUNDATION_SCHEMA, STRESS_SCHEMA, TRANSLATE_SCHEMA, VERIFY_SCHEMA } = loadHelpers(workflowScript('migrate-code'), ['FOUNDATION_SCHEMA', 'STRESS_SCHEMA', 'TRANSLATE_SCHEMA', 'VERIFY_SCHEMA'])
+  const levels = ['high', 'medium', 'low']
+
+  assert.deepEqual(FOUNDATION_SCHEMA.properties.dependency_order.items.properties.est_complexity.enum, ['XS', 'S', 'M', 'L', 'XL'])
+  assert.deepEqual(FOUNDATION_SCHEMA.properties.gap_inventory.items.properties.risk.enum, levels)
+  assert.deepEqual(STRESS_SCHEMA.properties.systemic_issues.items.properties.severity.enum, levels)
+  assert.deepEqual(TRANSLATE_SCHEMA.properties.status.enum, ['ported', 'skipped-exists', 'blocked'])
+  assert.deepEqual(TRANSLATE_SCHEMA.properties.review_verdict.enum, ['pass', 'changes-applied', 'needs-human'])
+  assert.deepEqual(VERIFY_SCHEMA.properties.verdict.enum, ['faithful', 'mismatch', 'uncertain'])
+  assert.deepEqual(VERIFY_SCHEMA.properties.mismatches.items.properties.severity.enum, levels)
 })

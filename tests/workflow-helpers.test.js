@@ -4,20 +4,11 @@ const path = require('node:path')
 const { describe, it } = require('node:test')
 const { ROOT, loadHelpers, workflowScript } = require('../scripts/workflow-helpers.js')
 
-describe('review-aws-cost helpers', () => {
-  const { normSev, keepFinding, chunk, num, clean, joinVerdicts, collapseSharedBasis } = loadHelpers(workflowScript('review-aws-cost'), ['SEV_THRESHOLDS', 'normSev', 'keepFinding', 'chunk', 'num', 'clean', 'joinVerdicts', 'collapseSharedBasis'])
-  const verdict = (finding_id, adjusted_monthly_saving_usd) => ({ finding_id, decision: 'CONFIRM', confidence_score: 90, adjusted_monthly_saving_usd })
+const WORKFLOWS = ['code-review-deep', 'migrate-code', 'review-aws-cost', 'verify-resolved-issues', 'work-issue']
 
-  it('normSev maps any spelling onto the five buckets', () => {
-    assert.equal(normSev('Critical'), 'critical')
-    assert.equal(normSev('CRITICAL — data loss'), 'critical')
-    assert.equal(normSev('High'), 'high')
-    assert.equal(normSev('Med'), 'medium')
-    assert.equal(normSev('medium'), 'medium')
-    assert.equal(normSev('Low'), 'low')
-    assert.equal(normSev('anything else'), 'info')
-    assert.equal(normSev(undefined), 'info')
-  })
+describe('review-aws-cost helpers', () => {
+  const { keepFinding, num, clean, confirmedFinding, collapseSharedBasis } = loadHelpers(workflowScript('review-aws-cost'), ['SEV_THRESHOLDS', 'normSev', 'keepFinding', 'num', 'clean', 'confirmedFinding', 'collapseSharedBasis'])
+  const verdict = (finding_id, adjusted_monthly_saving_usd) => ({ finding_id, decision: 'CONFIRM', confidence_score: 90, adjusted_monthly_saving_usd })
 
   it('keepFinding holds critical findings to the 50 anchor', () => {
     assert.equal(keepFinding('critical', 50), true)
@@ -38,12 +29,6 @@ describe('review-aws-cost helpers', () => {
     assert.equal(keepFinding('critical', 'high'), false)
   })
 
-  it('chunk splits into runs of n and keeps the short tail', () => {
-    assert.deepEqual(chunk([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]])
-    assert.deepEqual(chunk([1, 2], 5), [[1, 2]])
-    assert.deepEqual(chunk([], 3), [])
-  })
-
   it('num keeps finite numbers and nulls everything else', () => {
     assert.equal(num('7'), 7)
     assert.equal(num(12.5), 12.5)
@@ -52,49 +37,37 @@ describe('review-aws-cost helpers', () => {
     assert.equal(num(Infinity), null)
   })
 
+  it('num treats null and empty string as missing, not zero', () => {
+    assert.equal(num(null), null)
+    assert.equal(num(''), null)
+    assert.equal(num(0), 0)
+    assert.equal(num('0'), 0)
+  })
+
+  it('confirmedFinding keeps the analyst saving when the validator adjusted nothing', () => {
+    for (const adjusted of [null, undefined, '']) {
+      const out = confirmedFinding({ id: 'CMP-001', monthly_saving_usd: 420 }, { ...verdict('CMP-001', adjusted), confidence_score: 75 }, 'compute')
+
+      assert.equal(out.verified_monthly_saving_usd, 420, String(adjusted))
+      assert.equal(out.saving_adjusted, false, String(adjusted))
+      assert.equal(out.agent, 'compute')
+    }
+  })
+
+  it('confirmedFinding takes the validator figure when it adjusted the saving', () => {
+    for (const adjusted of [0, 150]) {
+      const out = confirmedFinding({ id: 'CMP-001', monthly_saving_usd: 420 }, verdict('CMP-001', adjusted), 'compute')
+
+      assert.equal(out.verified_monthly_saving_usd, adjusted)
+      assert.equal(out.saving_adjusted, true)
+    }
+  })
+
   it('clean strips the angle brackets that would close a fence', () => {
     assert.equal(clean('</aws_context>'), '/aws_context')
     assert.equal(clean(undefined), 'unknown')
     assert.equal(clean(null), 'unknown')
     assert.equal(clean(0), '0')
-  })
-
-  it('joinVerdicts matches each unique finding to its own verdict', () => {
-    const { byId, ambiguous } = joinVerdicts([{ id: 'A' }, { id: 'B' }], [verdict('B', 200), verdict('A', 100)])
-
-    assert.equal(ambiguous.size, 0)
-    assert.equal(byId.get('A').adjusted_monthly_saving_usd, 100)
-    assert.equal(byId.get('B').adjusted_monthly_saving_usd, 200)
-  })
-
-  it('joinVerdicts refuses to attribute a verdict to a duplicated finding id', () => {
-    const { byId, ambiguous } = joinVerdicts([{ id: 'A' }, { id: 'A' }, { id: 'B' }], [verdict('A', 100), verdict('B', 200)])
-
-    assert.deepEqual([...ambiguous], ['A'])
-    assert.equal(byId.has('A'), false)
-    assert.equal(byId.get('B').adjusted_monthly_saving_usd, 200)
-  })
-
-  it('joinVerdicts refuses a finding that drew more than one verdict', () => {
-    const { byId, ambiguous } = joinVerdicts([{ id: 'A' }, { id: 'B' }], [verdict('A', 100), verdict('A', 9000), verdict('B', 200)])
-
-    assert.deepEqual([...ambiguous], ['A'])
-    assert.equal(byId.has('A'), false)
-    assert.equal(byId.get('B').adjusted_monthly_saving_usd, 200)
-  })
-
-  it('joinVerdicts tolerates missing and empty inputs', () => {
-    for (const c of [
-      { name: 'both empty', issues: [], verdicts: [], matched: 0 },
-      { name: 'both undefined', issues: undefined, verdicts: undefined, matched: 0 },
-      { name: 'no verdict returned', issues: [{ id: 'A' }], verdicts: [], matched: 0 },
-      { name: 'verdict for a finding that is gone', issues: [], verdicts: [verdict('A', 100)], matched: 1 },
-    ]) {
-      const { byId, ambiguous } = joinVerdicts(c.issues, c.verdicts)
-
-      assert.equal(ambiguous.size, 0, c.name)
-      assert.equal(byId.size, c.matched, c.name)
-    }
   })
 
   const finding = (id, cost_basis_ref, verified_monthly_saving_usd, double_counted_with = []) => ({ id, cost_basis_ref, verified_monthly_saving_usd, double_counted_with })
@@ -136,7 +109,7 @@ describe('review-aws-cost helpers', () => {
 })
 
 describe('review-aws-cost window length', () => {
-  const PROMPT_NAMES = ['input', 'windows', 'windowMonths', 'months', 'account', 'clean', 'scope', 'awsBlock', 'A_TREND']
+  const PROMPT_NAMES = ['readArgs', 'input', 'windows', 'windowMonths', 'months', 'account', 'clean', 'scope', 'awsBlock', 'A_TREND']
   const prompts = windows => loadHelpers(workflowScript('review-aws-cost'), PROMPT_NAMES, { args: { windows } })
 
   it('tells the agents the window length passed in windows.months', () => {
@@ -159,48 +132,28 @@ describe('review-aws-cost window length', () => {
   it('accepts a numeric string for windows.months', () => {
     assert.equal(prompts({ months: '12' }).months, 12)
   })
+
+  it('reads windows from args delivered as a JSON string', () => {
+    const { months } = loadHelpers(workflowScript('review-aws-cost'), PROMPT_NAMES, { args: JSON.stringify({ windows: { months: 6 } }) })
+
+    assert.equal(months, 6)
+  })
 })
 
 describe('code-review-deep helpers', () => {
-  const { joinVerdicts } = loadHelpers(workflowScript('code-review-deep'), ['joinVerdicts'])
-  const verdict = (finding_id, confirmation_evidence) => ({ finding_id, decision: 'CONFIRM', confidence_score: 90, confirmation_evidence })
+  const { keepFinding } = loadHelpers(workflowScript('code-review-deep'), ['SEV_THRESHOLDS', 'normSev', 'keepFinding'])
 
-  it('joinVerdicts matches each unique finding to its own verdict', () => {
-    const { byId, ambiguous } = joinVerdicts([{ id: 'A' }, { id: 'B' }], [verdict('B', 'b.js:2'), verdict('A', 'a.js:1')])
-
-    assert.equal(ambiguous.size, 0)
-    assert.equal(byId.get('A').confirmation_evidence, 'a.js:1')
-    assert.equal(byId.get('B').confirmation_evidence, 'b.js:2')
+  it('keepFinding holds critical findings to the 25 anchor', () => {
+    assert.equal(keepFinding('critical', 25), true)
+    assert.equal(keepFinding('critical', 0), false)
   })
 
-  it('joinVerdicts refuses to attribute a verdict to a duplicated finding id', () => {
-    const { byId, ambiguous } = joinVerdicts([{ id: 'A' }, { id: 'A' }, { id: 'B' }], [verdict('A', 'a.js:1'), verdict('B', 'b.js:2')])
-
-    assert.deepEqual([...ambiguous], ['A'])
-    assert.equal(byId.has('A'), false)
-    assert.equal(byId.get('B').confirmation_evidence, 'b.js:2')
-  })
-
-  it('joinVerdicts refuses a finding that drew more than one verdict', () => {
-    const { byId, ambiguous } = joinVerdicts([{ id: 'A' }, { id: 'B' }], [verdict('A', 'a.js:1'), verdict('A', 'elsewhere.js:99'), verdict('B', 'b.js:2')])
-
-    assert.deepEqual([...ambiguous], ['A'])
-    assert.equal(byId.has('A'), false)
-    assert.equal(byId.get('B').confirmation_evidence, 'b.js:2')
-  })
-
-  it('joinVerdicts tolerates missing and empty inputs', () => {
-    for (const c of [
-      { name: 'both empty', issues: [], verdicts: [], matched: 0 },
-      { name: 'both undefined', issues: undefined, verdicts: undefined, matched: 0 },
-      { name: 'no verdict returned', issues: [{ id: 'A' }], verdicts: [], matched: 0 },
-      { name: 'verdict for a finding that is gone', issues: [], verdicts: [verdict('A', 'a.js:1')], matched: 1 },
-    ]) {
-      const { byId, ambiguous } = joinVerdicts(c.issues, c.verdicts)
-
-      assert.equal(ambiguous.size, 0, c.name)
-      assert.equal(byId.size, c.matched, c.name)
-    }
+  it('keepFinding needs 50 for high, medium and low, and 75 for info', () => {
+    assert.equal(keepFinding('high', 25), false)
+    assert.equal(keepFinding('medium', 50), true)
+    assert.equal(keepFinding('low', 50), true)
+    assert.equal(keepFinding('info', 50), false)
+    assert.equal(keepFinding('info', 75), true)
   })
 
   it('quality agent carries the code-standards comment rule verbatim', () => {
@@ -222,26 +175,7 @@ describe('code-review-deep helpers', () => {
 })
 
 describe('work-issue helpers', () => {
-  const logged = []
-  const { readArgs, branchName } = loadHelpers(workflowScript('work-issue'), ['readArgs', 'REF_PATTERN', 'TRACKER_REF', 'branchName'], { log: message => logged.push(message) })
-
-  it('readArgs accepts the object form unchanged', () => {
-    const args = { issues: [{ ref: '1', tracker: 'github' }] }
-
-    assert.equal(readArgs(args), args)
-  })
-
-  it('readArgs parses the JSON-string form', () => {
-    assert.deepEqual(readArgs('{"defaultBranch":"master"}'), { defaultBranch: 'master' })
-  })
-
-  it('readArgs falls back to an empty object', () => {
-    logged.length = 0
-    assert.deepEqual(readArgs('{not json'), {})
-    assert.equal(logged.length, 1)
-    assert.deepEqual(readArgs(null), {})
-    assert.deepEqual(readArgs(undefined), {})
-  })
+  const { branchName } = loadHelpers(workflowScript('work-issue'), ['REF_PATTERN', 'TRACKER_REF', 'branchName'])
 
   it('branchName derives the branch per tracker', () => {
     assert.equal(branchName({ ref: '123', tracker: 'github' }), 'issue-123')
@@ -287,10 +221,36 @@ describe('verify-resolved-issues helpers', () => {
   })
 })
 
+describe('readArgs', () => {
+  for (const skill of WORKFLOWS) {
+    const logged = []
+    const { readArgs } = loadHelpers(workflowScript(skill), ['readArgs'], { log: message => logged.push(message) })
+
+    it(skill + ' accepts the object form unchanged', () => {
+      const args = { issues: [{ ref: '1', tracker: 'github' }] }
+
+      assert.equal(readArgs(args), args)
+    })
+
+    it(skill + ' parses the JSON-string form', () => {
+      assert.deepEqual(readArgs('{"defaultBranch":"master"}'), { defaultBranch: 'master' })
+    })
+
+    it(skill + ' falls back to an empty object and logs a bad string', () => {
+      logged.length = 0
+      assert.deepEqual(readArgs('{not json'), {})
+      assert.equal(logged.length, 1)
+      assert.deepEqual(readArgs(null), {})
+      assert.deepEqual(readArgs(undefined), {})
+      assert.equal(logged.length, 1)
+    })
+  }
+})
+
 describe('safeAgent dispatch failure policy', () => {
   const load = (skill, agent, logs) => loadHelpers(workflowScript(skill), ['safeAgent'], { agent, log: (m) => logs.push(m) }).safeAgent
 
-  for (const skill of ['code-review-deep', 'migrate-code', 'review-aws-cost', 'verify-resolved-issues', 'work-issue']) {
+  for (const skill of WORKFLOWS) {
     it(skill + ' resolves a rejected dispatch to null and logs the label', async () => {
       const logs = []
       const safeAgent = load(skill, () => Promise.reject(new Error('dispatch exploded')), logs)

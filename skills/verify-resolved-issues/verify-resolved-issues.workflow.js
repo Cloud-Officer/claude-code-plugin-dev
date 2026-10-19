@@ -6,14 +6,24 @@ export const meta = {
   ],
 }
 
-// Agents inherit the working directory, so their gh/git calls authenticate with that directory's .envrc token.
+function readArgs(raw) {
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw)
+    } catch (e) {
+      log('args arrived as a string but is not valid JSON — ignoring it: ' + e.message)
+      return {}
+    }
+  }
 
-const input = args || {}
+  return raw || {}
+}
+
+const input = readArgs(args)
 const tracker = input.tracker === 'jira' ? 'jira' : 'github'
 const scope = input.scope || (tracker === 'jira' ? 'the active sprint' : 'this repository')
 const candidates = Array.isArray(input.candidates) ? input.candidates : []
 
-// --- Shared verification rules injected into every agent prompt ------------
 const VERIFY_RULES = [
   '## How to verify (do every step — a skipped step means you cannot CONFIRM)',
   '1. Read the issue body and acceptance criteria. Extract concrete, checkable claims:',
@@ -58,7 +68,6 @@ const VERIFY_RULES = [
   'verbatim. A French comment on an English issue (or vice-versa) is a defect.',
 ].join('\n')
 
-// --- Comment templates (the load-bearing artifact) -------------------------
 const TEMPLATE_VERIFIED = [
   '## Template — VERIFIED (closing comment). Fill every {{placeholder}}; never leave one in the output.',
   '',
@@ -107,9 +116,6 @@ const TEMPLATE_NOT_VERIFIED = [
   '@{{resolver}} — reassigning to you. Could you either (a) point to the change that addresses this and re-resolve, or (b) re-open the work? If the issue was descoped or is no longer valid, please leave a comment and close as Won\'t Do.',
 ].join('\n')
 
-// Tracker-supplied strings that get interpolated into a heading or a bullet:
-// collapse newlines so they cannot forge a new section, drop leading '#' so
-// they cannot forge a heading, and cap the length.
 function oneLine(s, max = 300) {
   return String(s ?? '').replace(/\s+/g, ' ').replace(/^[#\s]+/, '').trim().slice(0, max)
 }
@@ -178,7 +184,6 @@ function buildVerifyPrompt(c) {
   ].join('\n')
 }
 
-// --- Schema ----------------------------------------------------------------
 const RESULT_SCHEMA = {
   type: 'object',
   additionalProperties: true,
@@ -209,13 +214,8 @@ function mergeResult(c, r, tracker) {
   }
 }
 
-// A rejected dispatch resolves to null (logged) so the per-site falsy guards cover thrown failures too.
 const safeAgent = (p, o) => agent(p, o).catch(e => { log('WARNING: agent ' + o.label + ' failed: ' + e); return null })
 
-// ===========================================================================
-// PHASE: VERIFY — one agent per candidate, all in parallel (pipeline of a
-// single stage so each result streams back as soon as that issue is judged).
-// ===========================================================================
 phase('Verify')
 
 if (!candidates.length) {

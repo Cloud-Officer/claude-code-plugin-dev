@@ -6,10 +6,6 @@ export const meta = {
   ],
 }
 
-// Worktrees share the repo's object store, so each agent's branch outlives the worktree it was committed in.
-
-// Some harnesses deliver `args` as a JSON-encoded string rather than an object.
-// Parse that case rather than silently running zero agents.
 function readArgs(raw) {
   if (typeof raw === 'string') {
     try {
@@ -28,22 +24,13 @@ const issues = Array.isArray(input.issues) ? input.issues : []
 const defaultBranch = String(input.defaultBranch ?? '')
 const repoRoot = input.repoRoot || '.'
 
-// defaultBranch is spliced into shell commands the implementing agents run —
-// like refs below, a bad value is rejected at this boundary, never sanitised.
 if (!/^[A-Za-z0-9][A-Za-z0-9._\/-]*$/.test(defaultBranch)) {
   log('rejected defaultBranch: ' + JSON.stringify(defaultBranch))
   return { defaultBranch, repoRoot, results: [] }
 }
 
-// An issue ref is only ever a GitHub issue number (`123`) or a Jira key
-// (`PROJ-456`). Refs are spliced into shell commands the implementing agent is
-// told to run, so anything else — spaces, `;`, `|`, backticks — is rejected at
-// this boundary rather than sanitised.
 const REF_PATTERN = /^(?:\d+|[A-Za-z][A-Za-z0-9]*-\d+)$/
 
-// tracker is closed to exactly 'github' or 'jira' (lowercase), and the ref must
-// carry that tracker's shape — a Jira key in a github batch would otherwise
-// produce a branch name P3's validation regex rejects, after the work is done.
 const TRACKER_REF = { github: /^\d+$/, jira: /^[A-Za-z][A-Za-z0-9]*-\d+$/ }
 
 function branchName(issue) {
@@ -178,12 +165,8 @@ const RESULT_SCHEMA = {
   required: ['ref', 'branch', 'success', 'summary'],
 }
 
-// A rejected dispatch resolves to null (logged) so the per-site falsy guards cover thrown failures too.
 const safeAgent = (p, o) => agent(p, o).catch(e => { log('WARNING: agent ' + o.label + ' failed: ' + e); return null })
 
-// ===========================================================================
-// PHASE: IMPLEMENT — one worktree-isolated agent per issue, in parallel.
-// ===========================================================================
 phase('Implement')
 
 if (!issues.length) {
@@ -191,13 +174,12 @@ if (!issues.length) {
   return { defaultBranch, repoRoot, results: [] }
 }
 
-// Refs are unvalidated here (REF_PATTERN runs later, in buildImplementPrompt) — fence them like the sibling log calls.
+// Refs are not validated until buildImplementPrompt, so quote them.
 log('Implementing ' + issues.length + ' issues in parallel, each in its own git worktree: ' + issues.map(i => JSON.stringify(String(i.ref))).join(', '))
 
 const results = await pipeline(
   issues,
   (issue) => {
-    // A malformed ref fails only ITS issue — the rest of the batch still runs.
     let prompt
     try {
       prompt = buildImplementPrompt(issue)

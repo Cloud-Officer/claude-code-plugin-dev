@@ -145,8 +145,8 @@ The workflow runs in the background and notifies you on completion. It **returns
   counts:     { files, ported, blocked, needs_human, todos, verified, behavioral_mismatches, behavioral_uncertain },
   capped:     { error_groups, test_failures, verify_files, unverified_files },
   translated: [ { source_file, target_file, status, review_verdict, todo_count, block_reason } ],
-  build:      { ran, clean, marker, summary },
-  test:       { ran, green, marker, summary },
+  build:      { ran, clean, marker, summary, rounds_exhausted },
+  test:       { ran, green, marker, summary, rounds_exhausted },
   verify:     [ { source_file, target_file, verdict, votes, mismatches } ],
   rule_gaps:  [ { pattern, proposed_rule } ]
 }
@@ -185,7 +185,7 @@ The engine treats the existing portable suite as the referee, but that suite may
 Operate on the workflow's return value — the failed-call Guardrail applies here as everywhere: no return, `ok: false`, or missing `counts` means stop and say so rather than inventing results. Write `docs/migration/report.md`:
 
 - **Progress** — the `counts` (files ported / blocked / needing human, TODO markers, files verified, behavioral mismatches, inconclusive verifications). `behavioral_mismatches` and `behavioral_uncertain` are `null` when nothing was verified — report that as "not verified", never as zero.
-- **Build & Test** — `ran`/`clean`/`green` plus the pasted `marker`. Never claim green without the runner's own marker.
+- **Build & Test** — `ran`/`clean`/`green` plus the pasted `marker`. Never claim green without the runner's own marker. When `rounds_exhausted` is `true`, say the loop stopped because its round budget ran out, not because the build or suite came back clean.
 - **Lint & coverage backfill (Step 4.5)** — the `run-linters` outcome (clean / fixed / remaining), whether the suite was re-run after autofixes, and, if `write-tests` ran, the coverage numbers and its pass marker.
 - **Blocked & needs-human files** — list them with reasons; these need the user's attention.
 - **Behavioral mismatches** — every `verify` item whose `verdict` is not `faithful` (`mismatch` or `uncertain`), in two groups. `mismatch` first, quoting the source-vs-port evidence, sorted by `mismatches[].severity` — the workflow's closed set `high`, `medium`, `low`, in that order — then by `target_file` bytewise ascending; these are the highest-priority follow-ups. Then `uncertain` (a 2-of-3 split or votes that could not prove equivalence), sorted by `target_file` bytewise ascending and flagged as **not verified** — each needs a human review before it can count as faithful.
