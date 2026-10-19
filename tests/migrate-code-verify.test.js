@@ -2,11 +2,10 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 const { test } = require('node:test')
-const { extractWorkflowFunctions } = require('../scripts/extract-workflow-functions.js')
-const { loadHelpers, workflowScript } = require('../scripts/workflow-helpers.js')
+const { ROOT, loadHelpers, workflowScript } = require('../scripts/workflow-helpers.js')
 
-const workflowPath = path.join(__dirname, '..', 'skills', 'migrate-code', 'migrate-code.workflow.js')
-const { tallyVerdict, verifyCoverage } = extractWorkflowFunctions(workflowPath, ['tallyVerdict', 'verifyCoverage'])
+const workflowPath = workflowScript('migrate-code')
+const { tallyVerdict, verifyCoverage } = loadHelpers(workflowPath, ['tallyVerdict', 'verifyCoverage'])
 
 const votes = (...verdicts) => verdicts.map(verdict => ({ verdict }))
 
@@ -58,7 +57,7 @@ test('verifyCoverage does not count cap-dropped files as unverified', () => {
   assert.deepEqual(verifyCoverage(100, 40, 40), { verify_files: 60, unverified_files: 0 })
 })
 
-const skillPath = path.join(__dirname, '..', 'skills', 'migrate-code', 'SKILL.md')
+const skillPath = path.join(ROOT, 'skills', 'migrate-code', 'SKILL.md')
 
 const returnedCountKeys = () => {
   const source = fs.readFileSync(workflowPath, 'utf8')

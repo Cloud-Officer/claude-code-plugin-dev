@@ -105,10 +105,9 @@ many agents run at once.
 | Workflow scripts | `skills/<name>/<name>.workflow.js` (5) | Multi-phase agent orchestration for the five heavy skills. 3,496 lines total; `review-aws-cost` (1,258) and `code-review-deep` (1,013) are the largest | harness globals only |
 | Tunnel script | `skills/query-db/scripts/db-tunnel.sh`, `db-tunnel.ps1` | The one executable a skill ships. `query-db` and `analyze-db` call it to validate, open, reuse, reopen and close the `ssm-jump` tunnel declared by `<ENGINE>_TUNNEL_<ENV>`, so neither skill probes ports by hand (users commonly deny `nc`). The `.ps1` twin runs on Windows | host `bash` or PowerShell, `ssm-jump` |
 | Harness/slicing library | `scripts/workflow-helpers.js` | The one `require()`-able shared module. Discovers workflow scripts, emulates the harness wrapper (`harnessSource`), and slices named declarations out of workflow source (`declarationSource`, `loadHelpers`) | `node:fs`, `node:path` |
-| Secondary slicer | `scripts/extract-workflow-functions.js` | Brace-counting slicer used only by the two `migrate-code` tests (`tests/migrate-code-verify.test.js`, `tests/migrate-code-fixer-scope.test.js`) | `node:fs` |
 | Syntax gate | `scripts/check-workflow-syntax.js` | Wraps each workflow script in the harness shape and runs `node --check` on it; fails if zero scripts are found | `workflow-helpers.js` |
 | Consistency gate | `scripts/check-repo-consistency.js` | Cross-checks the three manifests, every skill's frontmatter, every `${CLAUDE_PLUGIN_ROOT}` path in docs and skills, and every `plugin.json` keyword (unique, and present in the repo's own text) | `workflow-helpers.js` (`ROOT`), `node:fs`, `node:path` |
-| Tests | `tests/*.test.js` (10 files, 13 suites, 161 tests) | Pure-function tests over sliced workflow declarations, the `safeAgent` failure policy for all five scripts, and contract tests that read `SKILL.md` text — guardrail cross-references, heredoc fencing, interpolation-boundary patterns — two of which extract a skill's `bash` block and execute it, and one that drives `db-tunnel.sh` against a fake `ssm-jump` | `node:test`, `node:assert`, both slicers, host `bash` |
+| Tests | `tests/*.test.js` (10 files, 13 suites, 161 tests) | Pure-function tests over sliced workflow declarations, the `safeAgent` failure policy for all five scripts, and contract tests that read `SKILL.md` text — guardrail cross-references, heredoc fencing, interpolation-boundary patterns — two of which extract a skill's `bash` block and execute it, and one that drives `db-tunnel.sh` against a fake `ssm-jump` | `node:test`, `node:assert`, `workflow-helpers.js`, host `bash` |
 | CI | `.github/workflows/build.yml` | The `js_unit_tests` job runs `npm ci`, the two gates and `node --test 'tests/*.test.js'`; separate jobs run actionlint, ESLint, markdownlint, Semgrep and yamllint | GitHub Actions |
 
 ### Why workflow scripts are not modules
@@ -302,13 +301,6 @@ inside one of them for structure. The awkward case it handles is telling `/` as 
 (`)` or `]`) or is a word character that is not one of a fixed `REGEX_KEYWORDS` set (`return`, `typeof`, `case`, …).
 Declarations are sliced in two modes — `block` (balance braces, used for `function name(...)`) and `statement` (balance
 brackets, stop at a newline at depth zero, used for `const name = ...`).
-
-`scripts/extract-workflow-functions.js` does the same job far more simply, counting braces with no awareness of strings
-or comments at all. It works today because the six functions it slices from `migrate-code.workflow.js` (`fence`,
-`safeRepoPath`, `buildFixerPrompt`, `testFixerPrompt`, `tallyVerdict`, `verifyCoverage`) contain no braces inside
-string literals. **This is a latent duplication:** a maintainer adding a `{` inside a string in a function that
-file slices will get an "unbalanced braces" error or a truncated slice, with no hint that the better scanner exists a
-file away.
 
 ## Risk controls
 
