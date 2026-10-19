@@ -96,7 +96,7 @@ SQL
 
 **5. Keep it up.** SSM sessions close on their own after about 20 idle minutes (the Session Manager idle timeout default) or when AWS drops them, so a tunnel that worked earlier may be gone. Before each step that queries the database (Steps 6, 7 and 8), run the same `ensure` command again. It returns `OPEN` immediately when the tunnel is still up and reopens it when it dropped; on `REOPENED`, tell the user, e.g. `Reopened beta MySQL tunnel (it had timed out)`. If a command fails with a connection error (connection refused, `Lost connection to MySQL server`, `server closed the connection unexpectedly`, `ECONNRESET`, a MongoDB server-selection timeout), run `ensure` and retry that same command once; a second failure falls under the failure policy.
 
-**6. Close what you opened.** Tunnels this skill started stay up until Step 9 finishes; then run `"${CLAUDE_PLUGIN_ROOT}/skills/query-db/scripts/db-tunnel.sh" close <engine> <env>` for each tunnel this run reported as `OPENED` or `REOPENED`. It closes only tunnels the script started and never one that was already open before.
+**6. Close what you opened.** Tunnels this skill started stay up until Step 9 finishes; then run `"${CLAUDE_PLUGIN_ROOT}/skills/query-db/scripts/db-tunnel.sh" close <engine> <env>` for each tunnel this run reported as `OPENED` or `REOPENED`. It closes only tunnels the script started and never one that was already open before; a `NOT-OURS: …` line means the recorded process was no longer that tunnel (stale after a reboot or crash), so nothing was killed and the record was removed.
 
 ## Running on Windows (PowerShell)
 
