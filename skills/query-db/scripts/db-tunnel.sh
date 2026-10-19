@@ -12,6 +12,7 @@ STATE_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/co-dev/db-tunnels"
 WAIT_SECONDS="${DB_TUNNEL_WAIT:-45}"
 TUNNEL_RE='^ssm-jump( +[A-Za-z0-9._:@/=-]+)+$'
 FORWARD_RE='^[A-Za-z0-9._-]+:[0-9]+:[0-9]+$'
+SIGNATURE_RE='ssm-jump|ssm start-session'
 
 fail() {
   echo "ERROR: $*"
@@ -43,20 +44,40 @@ first_set() {
   return 1
 }
 
-kill_tree() {
+proc_identity() {
+  LC_ALL=C ps -o lstart=,command= -p "${1}" 2>/dev/null
+}
+
+read_state() {
+  st_pid="" st_port="" st_identity=""
+  {
+    read -r st_pid st_port
+    IFS= read -r st_identity
+  } <"${1}"
+  [[ ${st_pid} =~ ^[0-9]+$ ]] && [ "${st_pid}" -ge 2 ] && [[ ${st_port} =~ ^[0-9]+$ ]]
+}
+
+state_is_ours() {
+  read_state "${1}" || return 1
+  [ -n "${st_identity}" ] && [[ ${st_identity} =~ ${SIGNATURE_RE} ]] && [[ "$(proc_identity "${st_pid}")" == "${st_identity}" ]]
+}
+
+tree_pids() {
   local child
 
-  for child in $(pgrep -P "$1" 2>/dev/null); do
-    kill_tree "${child}"
+  echo "${1}"
+  for child in $(pgrep -P "${1}" 2>/dev/null); do
+    tree_pids "${child}"
   done
-
-  kill "$1" 2>/dev/null
 }
 
 stop_tunnel() {
-  local pid=$1 port=$2 i
+  local pid=$1 port=$2 tree member listener i
 
-  kill_tree "${pid}"
+  tree=" $(tree_pids "${pid}" | tr '\n' ' ') "
+  for member in ${tree}; do
+    kill "${member}" 2>/dev/null
+  done
 
   for i in 1 2 3 4 5; do
     port_open "${port}" || return 0
@@ -64,22 +85,25 @@ stop_tunnel() {
   done
 
   if command -v lsof >/dev/null 2>&1; then
-    lsof -ti "tcp:${port}" -sTCP:LISTEN 2>/dev/null | xargs kill 2>/dev/null
+    for listener in $(lsof -ti "tcp:${port}" -sTCP:LISTEN 2>/dev/null); do
+      [[ ${tree} == *" ${listener} "* ]] && kill "${listener}" 2>/dev/null
+    done
   fi
 
   ! port_open "${port}"
 }
 
 close_state() {
-  local file=$1 label pid port
+  local file=$1 label
 
   label=$(basename "${file}" .pid)
-  read -r pid port <"${file}"
 
-  if stop_tunnel "${pid}" "${port}"; then
-    echo "CLOSED: ${label} tunnel on 127.0.0.1:${port}"
+  if ! state_is_ours "${file}"; then
+    echo "NOT-OURS: the recorded ${label} process is gone or is no longer the tunnel this skill started; dropped the record and killed nothing"
+  elif stop_tunnel "${st_pid}" "${st_port}"; then
+    echo "CLOSED: ${label} tunnel on 127.0.0.1:${st_port}"
   else
-    echo "WARNING: ${label} tunnel on 127.0.0.1:${port} is still listening after kill"
+    echo "WARNING: ${label} tunnel on 127.0.0.1:${st_port} is still listening after kill"
   fi
 
   rm -f "${file}"
@@ -91,9 +115,9 @@ case "${action}" in
   list)
     for file in "${STATE_DIR}"/*.pid; do
       [ -e "${file}" ] || continue
-      read -r pid port <"${file}"
-      if port_open "${port}"; then state=open; else state=closed; fi
-      echo "$(basename "${file}" .pid) 127.0.0.1:${port} pid=${pid} ${state}"
+      read_state "${file}" || continue
+      if port_open "${st_port}"; then state=open; else state=closed; fi
+      echo "$(basename "${file}" .pid) 127.0.0.1:${st_port} pid=${st_pid} ${state}"
     done
     exit 0
     ;;
@@ -197,9 +221,8 @@ case "${engine}" in
 esac
 
 started_by_us=""
-if [ -e "${state_file}" ]; then
-  read -r old_pid _ <"${state_file}"
-  kill -0 "${old_pid}" 2>/dev/null && started_by_us=" (started earlier by this skill, pid ${old_pid})"
+if [ -e "${state_file}" ] && state_is_ours "${state_file}"; then
+  started_by_us=" (started earlier by this skill, pid ${st_pid})"
 fi
 
 warn_mongo_options() {
@@ -218,8 +241,7 @@ fi
 verb=OPENED
 if [ -e "${state_file}" ]; then
   verb=REOPENED
-  read -r old_pid old_port <"${state_file}"
-  stop_tunnel "${old_pid}" "${old_port}" >/dev/null
+  state_is_ours "${state_file}" && stop_tunnel "${st_pid}" "${st_port}" >/dev/null
   rm -f "${state_file}"
 fi
 
@@ -234,6 +256,10 @@ echo "${pid} ${port}" >"${state_file}"
 waited=0
 while [ "${waited}" -lt "${WAIT_SECONDS}" ]; do
   if port_open "${port}"; then
+    {
+      echo "${pid} ${port}"
+      proc_identity "${pid}"
+    } >"${state_file}"
     echo "${verb}: ${env_name} ${engine} tunnel on 127.0.0.1:${port} (pid ${pid}, log ${log_file})"
     warn_mongo_options
     exit 0
