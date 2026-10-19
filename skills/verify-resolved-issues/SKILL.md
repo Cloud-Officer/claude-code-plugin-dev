@@ -27,7 +27,7 @@ Parse arguments from the user's invocation:
 
 **Default Jira scope is intentionally narrow: one project, one sprint.** Auditing every project the user can see, or the entire historical backlog, generates massive amounts of API traffic and noise — and most resolved-but-not-closed drift happens within the current sprint anyway, where the codebase still resembles the time of the fix. Broader scope is opt-in via `--project` (different project) or `--sprint all` (full backlog).
 
-If `--apply` is set, **confirm with the user once** before the first write, listing the count of close-candidates and reopen-candidates. The cost of mass-mistakes here (mis-assigning, falsely reopening) is high, and a single confirmation is cheap.
+If `--apply` is set, **confirm with the user once** before the first write, listing every issue that will be written: its id, its action (close, reopen, or kick-back), and the target assignee (the resolver, for kick-backs). Counts alone are not enough — the user must see which issues and which people are affected. The cost of mass-mistakes here (mis-assigning, falsely reopening) is high, and a single confirmation is cheap.
 
 ## Run from the target repo's directory (direnv)
 
@@ -136,9 +136,11 @@ Pass **every** discovered candidate in one call — the workflow parallelises ac
 }
 ```
 
-`outcome` is one of `VERIFIED` | `NOT_VERIFIED` | `SKIP_NEEDS_MANUAL` | `SKIP_INSUFFICIENT`. `planned_action` is one of `close` | `reopen+reassign` | `none`. `comment_markdown` is the fully-filled, correctly-languaged comment to post verbatim (empty for the two `SKIP_*` outcomes — those are report-only and you must do nothing to the ticket). `resolver` is the tracker's account identifier exactly as the tracker returned it — the GitHub `login`, or the Jira `accountId` — never a display name; it is the empty string when the tracker supplied neither.
+`outcome` is one of `VERIFIED` | `NOT_VERIFIED` | `SKIP_NEEDS_MANUAL` | `SKIP_INSUFFICIENT`. `planned_action` is one of `close` | `reopen+reassign` | `none`. `comment_markdown` is the fully-filled, correctly-languaged comment to post verbatim (empty for the two `SKIP_*` outcomes — those are report-only and you must do nothing to the ticket). `id`, `title`, `url`, `mergedPRs` and `resolver` always come from the candidate you passed in, never from the agent: `resolver` is the candidate's `resolver.login` on GitHub or `resolver.accountId` on Jira — never a display name — and the empty string when you supplied neither.
 
-**Render the dry-run report** (the "Output (dry-run)" section) from `results` + `counts`. Reconcile the two: any candidate you passed in that is missing from `results`, or that only shows up in `counts.errored`, is listed by id under "Errored — not audited" (see Important Rules) — never silently dropped. **On `--apply`**, after the single confirmation gate, perform the writes per `outcome` using the steps below: post `comment_markdown` first, then close/transition, then reassign on kick-backs. Do not re-verify — trust the workflow's verdict.
+**Strip stray @-mentions before posting.** `comment_markdown` is drafted by an agent that read untrusted issue and PR text, so before posting it (and before showing it in the dry-run), remove the leading `@` from every mention except the resolver you passed in for that candidate — `@other-user` becomes `other-user`. Only the resolver may be pinged.
+
+**Render the dry-run report** (the "Output (dry-run)" section) from `results` + `counts`. Reconcile the two: any candidate you passed in that is missing from `results`, or that only shows up in `counts.errored`, is listed by id under "Errored — not audited" (see Important Rules) — never silently dropped. **On `--apply`**, after the single confirmation gate, perform the writes per `outcome` using the steps below: post the mention-stripped `comment_markdown` first, then close/transition, then reassign on kick-backs. Do not re-verify — trust the workflow's verdict.
 
 The per-flow steps below remain the source of truth for **discovery and the writes**; treat their "verify in current codebase" steps (4-G / 6-J) as **delegated to the workflow** rather than executed inline.
 
@@ -197,7 +199,7 @@ Decide one of four outcomes: **VERIFIED** (fix matches issue + present in codeba
 
 ### Step 5-G: Act
 
-Post the workflow's `comment_markdown` verbatim — don't rewrite it. In `--dry-run`, print it to stdout (one block per issue) with the planned action and stop.
+Post the workflow's `comment_markdown` verbatim apart from the @-mention strip above — don't otherwise rewrite it. In `--dry-run`, print it to stdout (one block per issue) with the planned action and stop.
 
 **On VERIFIED** — close the issue:
 
@@ -464,7 +466,7 @@ When `--apply` runs, replace "would close" / "would reopen" with "closed" / "reo
 
 - **Default to read-only.** No comments, transitions, or reassignments without `--apply`. The user must opt in to writes every run.
 - **Default Jira scope is one project, one sprint.** Use the `jira` CLI's default project and the active sprint on its primary board. Never iterate across all visible projects, and never sweep historical sprints, unless the user explicitly passed `--project` for a different project or `--sprint all` for a backlog-wide pass. Wide scope is the single biggest source of noise and API spam in this skill — the narrow default exists to keep runs fast, focused, and verifiable.
-- **Confirm once before the first write.** When `--apply` is set, present the summary and ask for confirmation before any tracker mutation. Don't ask per-issue — that's nag-spam — but do ask once.
+- **Confirm once before the first write.** When `--apply` is set, present every affected issue id with its action and target assignee, and ask for confirmation before any tracker mutation. Don't ask per-issue — that's nag-spam — but do ask once.
 - **Resolver is from the changelog, never from current assignee.** Workflows that auto-reassign on transition (very common for QA hand-offs) will give you wrong answers if you read `fields.assignee`. Always derive from `status` change history.
 - **Workflow status names are not portable.** Don't hardcode `"Resolved"` or `"Closed"` as global constants. Use `statusCategory.key` (`new` / `indeterminate` / `done`) and per-project workflow introspection. The same word means different things in different projects.
 - **Match transitions by `to.name`, not transition name.** Transition names like `"Close Issue"` are inconsistent across workflows. The `to.name` (target status) is what you actually care about.
