@@ -227,7 +227,7 @@ Pre-report verification: every applicable phase task is marked complete; cross-r
 
 ## Phase 6: Write or Update the Guide
 
-After the report is approved, write `docs/user-guide.md` using the structure below. **Do not paste templates verbatim — fill them with content discovered in Phase 3.**
+After the report is approved (or without approval when the invoker's arguments say to apply fixes non-interactively; see Important Rules), write `docs/user-guide.md` using the structure below. **Do not paste templates verbatim — fill them with content discovered in Phase 3.**
 
 ### Required structure (all product types)
 
@@ -343,7 +343,7 @@ Before completing, confirm:
 3. **Cross-reference always.** Every documented feature must have a code-evidence pair.
 4. **Examples must work** with actual code — test them.
 5. **Document the happy path first**, then edge cases.
-6. **Ask before modifying.** Show proposed changes and get approval.
+6. **Ask before modifying, unless the invoker's arguments say to apply fixes non-interactively.** Show proposed changes and get approval. When another skill or script invokes this one with an apply-fixes-non-interactively instruction (e.g. a scripted multi-repo update run), apply every required fix directly without asking.
 7. **Preserve existing valid content** — only update or add, don't strip.
 8. **Walkthrough style, not field tables** — for web app forms (this rule is non-negotiable).
 9. **Reuse UI help text verbatim** — extract from `help_text:`, `helperText`, `placeholder:`, `list_items:` in the actual code.
