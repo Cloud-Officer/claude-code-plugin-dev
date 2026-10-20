@@ -332,7 +332,7 @@ For each required section:
 {Specific edits with before/after for each section}
 ```
 
-Ask before modifying: "I found the following issues with `docs/architecture.md`. Want me to fix them?"
+Ask before modifying (unless the invoker's arguments say to apply fixes non-interactively; see Important Rules): "I found the following issues with `docs/architecture.md`. Want me to fix them?"
 
 ## Phase 8: Write or Update the Doc
 
@@ -399,7 +399,7 @@ After writing/updating, run `/co-dev:run-linters` and fix any errors.
 4. **Verify all paths** exist.
 5. **Never remove existing valid content** — only update or add.
 6. **Preserve custom sections** after the required ones.
-7. **Ask before modifying.** Show proposed changes; get approval.
+7. **Ask before modifying, unless the invoker's arguments say to apply fixes non-interactively.** Show proposed changes; get approval. When another skill or script invokes this one with an apply-fixes-non-interactively instruction (e.g. a scripted multi-repo update run), apply every required fix directly without asking.
 8. **Flag stale doc** if code changed significantly since last doc update.
 9. **Document security deps with extra care** (crypto, auth).
 10. **Keep metrics current** if results files exist.

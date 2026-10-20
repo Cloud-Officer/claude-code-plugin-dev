@@ -10,10 +10,11 @@ Generate the PR content, open the pull request, then leave the repo on its defau
 
 ## Arguments
 
-Two optional caller-supplied values, for skills (such as `work-issue`) that invoke this one:
+Three optional caller-supplied values, for skills (such as `work-issue`) and scripts that invoke this one:
 
 - **title** — used verbatim as both the commit message and the PR title in Step 2, in place of the generated ones (still subject to the 80-character limit; a longer value is truncated at 80 and the truncation noted in the printed block).
 - **body addendum** — one or more lines (for example a `Fixes #123` closing keyword) appended to the end of the generated PR body, before the Step 2 block is printed.
+- **caller watches CI** — the invoker states `caller watches CI`; Step 6 is skipped (no CI watch, poll or triage, no background task) and the run goes straight from Step 5 to Step 7, because the caller monitors CI itself once this skill returns.
 
 When no arguments are passed, Step 2 generates everything from the diff and the template as described below.
 
@@ -33,7 +34,7 @@ Run the `cd` as a **separate** call — never chain it as `cd … && gh …`. di
 
 ## Step 1: Gather Information
 
-**YOU MUST EXECUTE THESE COMMANDS IN ORDER. DO NOT SKIP ANY STEP.**
+**YOU MUST EXECUTE THESE COMMANDS IN ORDER. DO NOT SKIP ANY STEP** (the only exception is Step 6, skipped when the caller passed the caller-watches-CI argument).
 
 **Step 1.1:** Capture branch info (used in later steps):
 
@@ -137,9 +138,11 @@ open "$PR_URL" 2>/dev/null || true   # macOS only — a no-op elsewhere, never f
 
 The body arrives on stdin through `--body-file -` and a quoted heredoc, never as a double-quoted `--body` argument: Step 2 authorises the body to be any valid markdown, backticks and quotes included, and inside a double-quoted argument a backtick executes and a `"` truncates. The quoted delimiter suppresses all expansion, so the body needs no escaping — this is the same answer `create-issue` uses for the identical sink, without its temp file. If the body or title itself contains a line reading exactly its heredoc delimiter, pick a different delimiter for that run. The title travels the same channel: it is captured into `PR_TITLE` through a quoted heredoc and passed as `"$PR_TITLE"` — a variable's value is not re-scanned for expansion inside double quotes, so the title needs no escaping either.
 
-If a PR already exists for `$CURRENT_BRANCH` (e.g., the caller already opened it), `gh pr create` will fail — treat that as success and continue to Step 6.
+If a PR already exists for `$CURRENT_BRANCH` (e.g., the caller already opened it), `gh pr create` will fail — treat that as success and continue to Step 6 (or Step 7 when the caller passed the caller-watches-CI argument).
 
-## Step 6: Monitor CI in the Background
+## Step 6: Monitor CI in the Background (unless the caller passed the caller-watches-CI argument)
+
+When the caller passed the caller-watches-CI argument (see `## Arguments`), skip this step entirely and go to Step 7: do not watch, poll or triage CI, and start no background task.
 
 A pushed PR is not done until its checks are green — but CI can take several minutes, so **watch it without blocking the session**. Launch the watch as a background task, then continue straight to Step 7. The background watch re-invokes you when CI settles, so a failure is still caught and triaged in this session — just not by sitting idle.
 
@@ -245,5 +248,5 @@ If the section is required, write a paragraph explaining the breaking changes, c
 - NEVER add "Generated with Claude Code" or similar signatures to commit messages or PR body
 - NO emojis unless explicitly requested
 - Before generating PR content, ensure the `run-linters` skill has been executed to verify code quality
-- After pushing, watch CI **in the background** (Step 6) — read status with the Actions runs REST API (`actions/runs?head_sha=…` → `/jobs`), not `gh pr checks` (the fine-grained PAT can't read check runs). Run the poll with `run_in_background: true` so the session is not blocked, and bound it so it also exits when no run exists for the SHA; then triage when it reports — the PR is not done while a required check is red. Xcode Cloud results don't appear in `actions/runs` — use the `appstore` skill for those.
+- After pushing, watch CI **in the background** (Step 6), unless the caller passed the caller-watches-CI argument — read status with the Actions runs REST API (`actions/runs?head_sha=…` → `/jobs`), not `gh pr checks` (the fine-grained PAT can't read check runs). Run the poll with `run_in_background: true` so the session is not blocked, and bound it so it also exits when no run exists for the SHA; then triage when it reports — the PR is not done while a required check is red. Xcode Cloud results don't appear in `actions/runs` — use the `appstore` skill for those.
 - The skill is not done until Step 7 has run (or has been deliberately skipped because of a worktree). Do not stop after printing the Step 2 block.

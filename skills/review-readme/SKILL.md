@@ -678,7 +678,7 @@ After analysis, provide a comprehensive report:
 {Show exact changes needed with before/after}
 ```
 
-**Ask the user before making changes:**
+**Ask the user before making changes (unless the invoker's arguments say to apply fixes non-interactively; see Important Rules):**
 
 > "I found the following issues with README.md. Would you like me to fix them?"
 
@@ -711,7 +711,7 @@ Fix any linting errors before considering the task complete.
 2. **Verify before documenting** - Check that commands/APIs exist before adding them
 3. **Never remove existing content** - Only add missing sections or fix inaccuracies
 4. **Demote extra H2 sections** - Any H2 section not in the 5 required sections (Table of Contents, Introduction, Installation, Usage, Contributing) must be converted to an H3 subsection under the appropriate parent H2 (typically Usage). Preserve the content but fix the heading level
-5. **Ask before modifying** - Always show proposed changes and get user approval
+5. **Ask before modifying, unless the invoker's arguments say to apply fixes non-interactively** - Always show proposed changes and get user approval. When another skill or script invokes this one with an apply-fixes-non-interactively instruction (e.g. a scripted multi-repo update run), apply every required fix directly without asking
 6. **Use exact formatting** - The build badge URL format must match exactly for CI validation
 7. **Keep examples simple** - Show the most common use cases, not every option
 8. **Run linters after changes** - Always run `/co-dev:run-linters` after modifying README.md
