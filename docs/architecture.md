@@ -349,6 +349,33 @@ page, and it is entirely prompt-level. Nothing in this repository can enforce it
 `allowed-tools` grant in a skill's frontmatter is the only control here that is a configuration guarantee, and it
 constrains the *skill's* session — not the tools available to an agent the workflow dispatches.
 
+### Database read/write authorization (AWS account permissions, outside the plugin)
+
+Who may write to a database is decided by AWS account permissions, not by this plugin. Developers fall into two groups:
+the read-only group's AWS policy can only reach the cluster's **reader** endpoint, and the read-write group can reach
+both the reader and the **writer**. A developer without write access therefore cannot write, whatever a skill, a model
+mistake or an injected instruction attempts.
+
+The plugin's read-only defaults sit on top of that boundary as intent and convenience, not as authorization: `query-db`
+reads through the reader variables and asks before any write (see below), uses the `_WRITE` variables only for a write
+the user confirmed, and `analyze-db` never writes. Accordingly, and by design:
+
+- The bundled database MCP servers (`postgres`, `mysql`, `mongodb`, `redis`) are **not** started in a read-only mode.
+- The README's recommended allowlist pre-approves those servers' tool namespaces, so the read-write group is not
+  prompted on every call.
+- The database CLIs are not forced into read-only sessions.
+
+Review findings that ask for server-level or plugin-level read-only enforcement of databases are out of scope; close
+them as won't-fix with a pointer to this section. The plugin still owns the risks AWS permissions cannot see, because
+they happen on the developer's machine rather than in the database:
+
+- **Exfiltration:** `query-db` does not pre-approve `curl`, so data read by either group cannot be sent to another host
+  without a permission prompt.
+- **Client meta-commands:** `query-db` and `analyze-db` refuse psql/mysql `\` commands, sqlite3 `.` commands, mysql
+  `system`/`source` and mongosh `require(`/`load(`/`process.`, which run commands or touch local files.
+- **Credentials:** the DBHub servers receive their connection string through the `DSN` environment variable, never on
+  the command line, so the password does not appear in `ps`.
+
 ### Read-only postures (prompt-level, with one code assist)
 
 Eleven skills declare a read-only posture — `analyze-db`, `crashlytics`, `doc-tracker-coverage`, `monday`,

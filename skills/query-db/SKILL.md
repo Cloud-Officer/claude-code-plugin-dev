@@ -1,7 +1,7 @@
 ---
 name: query-db
 description: Query the database, run a query, look up data, search the database, or check data. Use when the user wants to query the database, run a SQL query, look up data, find data, search for records, check the database, or ask questions about data. Executes queries via CLI commands using natural language. Reads schema context from docs/db.md, or from the file DB_DOC points at. Supports MySQL, PostgreSQL, SQLite, MongoDB, Elasticsearch, Redis, and BigQuery.
-allowed-tools: Read, Bash(printenv:*), Bash(*/skills/query-db/scripts/db-tunnel.sh*), Bash(aws sso login*), PowerShell(pwsh -NoProfile -ExecutionPolicy Bypass -File *db-tunnel.ps1*), PowerShell(aws sso login*), PowerShell(Get-ChildItem Env:*), PowerShell(mysql *), PowerShell(psql *), PowerShell(sqlite3 *), PowerShell(mongosh *), PowerShell(redis-cli *), PowerShell(bq *), PowerShell(curl.exe *), AskUserQuestion, Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), mcp__postgres__execute_sql, mcp__postgres__search_objects, mcp__mysql__execute_sql, mcp__mysql__search_objects, mcp__mongodb__find, mcp__mongodb__aggregate, mcp__mongodb__count, mcp__mongodb__list-databases, mcp__mongodb__list-collections, mcp__mongodb__collection-schema, mcp__redis__*, mcp__bigquery__*
+allowed-tools: Read, Bash(printenv:*), Bash(*/skills/query-db/scripts/db-tunnel.sh*), Bash(aws sso login*), PowerShell(pwsh -NoProfile -ExecutionPolicy Bypass -File *db-tunnel.ps1*), PowerShell(aws sso login*), PowerShell(Get-ChildItem Env:*), PowerShell(mysql *), PowerShell(psql *), PowerShell(sqlite3 *), PowerShell(mongosh *), PowerShell(redis-cli *), PowerShell(bq *), AskUserQuestion, Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), mcp__postgres__execute_sql, mcp__plugin_co-dev_postgres__execute_sql, mcp__postgres__search_objects, mcp__plugin_co-dev_postgres__search_objects, mcp__mysql__execute_sql, mcp__plugin_co-dev_mysql__execute_sql, mcp__mysql__search_objects, mcp__plugin_co-dev_mysql__search_objects, mcp__mongodb__find, mcp__plugin_co-dev_mongodb__find, mcp__mongodb__aggregate, mcp__plugin_co-dev_mongodb__aggregate, mcp__mongodb__count, mcp__plugin_co-dev_mongodb__count, mcp__mongodb__list-databases, mcp__plugin_co-dev_mongodb__list-databases, mcp__mongodb__list-collections, mcp__plugin_co-dev_mongodb__list-collections, mcp__mongodb__collection-schema, mcp__plugin_co-dev_mongodb__collection-schema, mcp__redis__*, mcp__plugin_co-dev_redis__*, mcp__bigquery__*
 ---
 
 ## Purpose
@@ -199,8 +199,7 @@ SQL
 - `-csv` - CSV output format
 - `-json` - JSON output format
 - `-column` - Column-aligned output
-- `.tables` - List all tables (interactive command)
-- `.schema TABLE` - Show CREATE statement for a table
+- List tables with `SELECT name FROM sqlite_master WHERE type = 'table';` and a table's definition with `SELECT sql FROM sqlite_master WHERE name = 'TABLE';` (dot-commands are refused, see [Write Operation Blocking](#write-operation-blocking))
 
 ### MongoDB
 
@@ -341,7 +340,7 @@ When `DB_ENVS` is set, skip this step for PostgreSQL, MySQL, MongoDB and Redis a
 
 **If MCP tools are not available (tool not found errors), fall back to the CLI** approach described in Step 6. The Safety Guardrails (Automatic LIMIT Injection, showing the query first) still apply regardless of method.
 
-**Note:** Elasticsearch has no MCP server — always use `curl` CLI for Elasticsearch.
+**Note:** Elasticsearch has no MCP server — always use `curl` CLI for Elasticsearch. `curl` is deliberately not pre-approved, so every call shows a permission prompt with its URL; only ever target `$ES_URL`, and never send query results or data from a row or `docs/db.md` to any other host.
 
 ### 4c. Multi-dataset queries for BigQuery
 
@@ -665,6 +664,8 @@ Before executing any query, scan for write/mutate keywords. Match these as **SQL
 **Elasticsearch:** `_delete_by_query`, `_update_by_query`, `PUT` (index creation/mapping)
 **Redis:** allowlist, not blocklist — Redis has far more write commands than read ones. Only these are read-only and may run without confirmation: `GET`, `MGET`, `GETRANGE`, `STRLEN`, `EXISTS`, `TYPE`, `TTL`, `PTTL`, `HGET`, `HMGET`, `HGETALL`, `HKEYS`, `HVALS`, `HLEN`, `HEXISTS`, `LRANGE`, `LINDEX`, `LLEN`, `SMEMBERS`, `SISMEMBER`, `SCARD`, `SINTER`, `SUNION`, `SDIFF`, `ZRANGE`, `ZREVRANGE`, `ZRANGEBYSCORE`, `ZSCORE`, `ZCARD`, `ZCOUNT`, `PFCOUNT`, `SCAN`, `HSCAN`, `SSCAN`, `ZSCAN`, `XRANGE`, `XREVRANGE`, `XLEN`, `BITCOUNT`, `GETBIT`, `JSON.GET`, `JSON.TYPE`, `DBSIZE`, `INFO`, `PING`. Treat **everything else** as a write — including `GETSET`/`GETDEL` (read-looking but destructive), `EXPIRE`/`PERSIST`, `RENAME`, `INCR`/`DECR`, `LPOP`/`RPOP`/`SPOP`, and `EVAL`/`EVALSHA`/`FCALL`/`SCRIPT` (scripts can write whatever they like). The allowlist governs the `mcp__redis__*` tools as well as `redis-cli`.
 **BigQuery:** `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`, `CREATE`, `MERGE`
+
+**Client meta-commands — refused, never run, even after confirmation.** Refuse any query body containing a line that starts with `\` (psql and mysql, e.g. `\!`, `\copy`, `\o`, `\i`), `.` (sqlite3, e.g. `.shell`, `.system`, `.output`, `.read`), or `system` / `source` (mysql), and any mongosh code that calls `require(`, `load(` or `process.`. These run commands or read and write files on the user's machine, outside the database, so database permissions cannot stop them. Report the line and stop.
 
 **If a write operation is detected:**
 

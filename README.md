@@ -800,20 +800,39 @@ This plugin bundles several MCP servers. By default, Claude Code will prompt for
   "permissions": {
     "allow": [
       "mcp__appstore__*",
+      "mcp__plugin_co-dev_appstore__*",
       "mcp__aws__*",
+      "mcp__plugin_co-dev_aws__*",
       "mcp__chrome-devtools__*",
+      "mcp__plugin_co-dev_chrome-devtools__*",
       "mcp__context7__*",
+      "mcp__plugin_co-dev_context7__*",
       "mcp__fetch__*",
+      "mcp__plugin_co-dev_fetch__*",
       "mcp__gcloud__*",
+      "mcp__plugin_co-dev_gcloud__*",
       "mcp__github__*",
+      "mcp__plugin_co-dev_github__*",
       "mcp__mongodb__*",
+      "mcp__plugin_co-dev_mongodb__*",
       "mcp__mysql__*",
-      "mcp__playstore__*",
+      "mcp__plugin_co-dev_mysql__*",
+      "mcp__playstore__get_app_details",
+      "mcp__playstore__get_reviews",
+      "mcp__playstore__validate_package_name",
+      "mcp__plugin_co-dev_playstore__get_app_details",
+      "mcp__plugin_co-dev_playstore__get_reviews",
+      "mcp__plugin_co-dev_playstore__validate_package_name",
       "mcp__playwright__*",
+      "mcp__plugin_co-dev_playwright__*",
       "mcp__playwright-webkit__*",
+      "mcp__plugin_co-dev_playwright-webkit__*",
       "mcp__postgres__*",
+      "mcp__plugin_co-dev_postgres__*",
       "mcp__redis__*",
-      "mcp__xcode__*"
+      "mcp__plugin_co-dev_redis__*",
+      "mcp__xcode__*",
+      "mcp__plugin_co-dev_xcode__*"
     ]
   }
 }
