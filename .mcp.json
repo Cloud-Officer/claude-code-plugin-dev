@@ -43,9 +43,7 @@
         "-y",
         "@bytebase/dbhub",
         "--transport",
-        "stdio",
-        "--config",
-        "${CLAUDE_PLUGIN_ROOT}/skills/query-db/dbhub/readonly.toml"
+        "stdio"
       ],
       "env": {
         "DSN": "postgres://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}"
@@ -57,9 +55,7 @@
         "-y",
         "@bytebase/dbhub",
         "--transport",
-        "stdio",
-        "--config",
-        "${CLAUDE_PLUGIN_ROOT}/skills/query-db/dbhub/readonly.toml"
+        "stdio"
       ],
       "env": {
         "DSN": "mysql://${MYSQL_USER}:${MYSQL_PASS}@${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DB}"
@@ -67,7 +63,7 @@
     },
     "mongodb": {
       "command": "npx",
-      "args": ["-y", "mongodb-mcp-server", "--readOnly"]
+      "args": ["-y", "mongodb-mcp-server"]
     },
     "redis": {
       "command": "uvx",

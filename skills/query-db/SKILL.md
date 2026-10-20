@@ -1,7 +1,7 @@
 ---
 name: query-db
 description: Query the database, run a query, look up data, search the database, or check data. Use when the user wants to query the database, run a SQL query, look up data, find data, search for records, check the database, or ask questions about data. Executes queries via CLI commands using natural language. Reads schema context from docs/db.md, or from the file DB_DOC points at. Supports MySQL, PostgreSQL, SQLite, MongoDB, Elasticsearch, Redis, and BigQuery.
-allowed-tools: Read, Bash(printenv:*), Bash(*/skills/query-db/scripts/db-tunnel.sh*), Bash(aws sso login*), PowerShell(pwsh -NoProfile -ExecutionPolicy Bypass -File *db-tunnel.ps1*), PowerShell(aws sso login*), PowerShell(Get-ChildItem Env:*), PowerShell(mysql *), PowerShell(psql *), PowerShell(sqlite3 *), PowerShell(mongosh *), PowerShell(redis-cli *), PowerShell(bq *), AskUserQuestion, Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), mcp__postgres__execute_sql, mcp__plugin_co-dev_postgres__execute_sql, mcp__postgres__search_objects, mcp__plugin_co-dev_postgres__search_objects, mcp__mysql__execute_sql, mcp__plugin_co-dev_mysql__execute_sql, mcp__mysql__search_objects, mcp__plugin_co-dev_mysql__search_objects, mcp__mongodb__find, mcp__plugin_co-dev_mongodb__find, mcp__mongodb__aggregate, mcp__plugin_co-dev_mongodb__aggregate, mcp__mongodb__count, mcp__plugin_co-dev_mongodb__count, mcp__mongodb__list-databases, mcp__plugin_co-dev_mongodb__list-databases, mcp__mongodb__list-collections, mcp__plugin_co-dev_mongodb__list-collections, mcp__mongodb__collection-schema, mcp__plugin_co-dev_mongodb__collection-schema, mcp__redis__scan_keys, mcp__plugin_co-dev_redis__scan_keys, mcp__redis__scan_all_keys, mcp__plugin_co-dev_redis__scan_all_keys, mcp__redis__type, mcp__plugin_co-dev_redis__type, mcp__redis__get, mcp__plugin_co-dev_redis__get, mcp__redis__hgetall, mcp__plugin_co-dev_redis__hgetall, mcp__redis__lrange, mcp__plugin_co-dev_redis__lrange, mcp__redis__zrange, mcp__plugin_co-dev_redis__zrange, mcp__redis__smembers, mcp__plugin_co-dev_redis__smembers, mcp__redis__llen, mcp__plugin_co-dev_redis__llen, mcp__redis__json_get, mcp__plugin_co-dev_redis__json_get, mcp__redis__dbsize, mcp__plugin_co-dev_redis__dbsize, mcp__redis__info, mcp__plugin_co-dev_redis__info, mcp__bigquery__query, mcp__bigquery__list_tables, mcp__bigquery__get_table_schema
+allowed-tools: Read, Bash(printenv:*), Bash(*/skills/query-db/scripts/db-tunnel.sh*), Bash(aws sso login*), PowerShell(pwsh -NoProfile -ExecutionPolicy Bypass -File *db-tunnel.ps1*), PowerShell(aws sso login*), PowerShell(Get-ChildItem Env:*), PowerShell(mysql *), PowerShell(psql *), PowerShell(sqlite3 *), PowerShell(mongosh *), PowerShell(redis-cli *), PowerShell(bq *), AskUserQuestion, Bash(mysql:*), Bash(psql:*), Bash(sqlite3:*), Bash(mongosh:*), Bash(redis-cli:*), Bash(bq:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(diff:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tee:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), mcp__postgres__execute_sql, mcp__plugin_co-dev_postgres__execute_sql, mcp__postgres__search_objects, mcp__plugin_co-dev_postgres__search_objects, mcp__mysql__execute_sql, mcp__plugin_co-dev_mysql__execute_sql, mcp__mysql__search_objects, mcp__plugin_co-dev_mysql__search_objects, mcp__mongodb__find, mcp__plugin_co-dev_mongodb__find, mcp__mongodb__aggregate, mcp__plugin_co-dev_mongodb__aggregate, mcp__mongodb__count, mcp__plugin_co-dev_mongodb__count, mcp__mongodb__list-databases, mcp__plugin_co-dev_mongodb__list-databases, mcp__mongodb__list-collections, mcp__plugin_co-dev_mongodb__list-collections, mcp__mongodb__collection-schema, mcp__plugin_co-dev_mongodb__collection-schema, mcp__redis__*, mcp__plugin_co-dev_redis__*, mcp__bigquery__*
 ---
 
 ## Purpose
@@ -24,9 +24,7 @@ This skill uses database MCP tools when available and falls back to CLI commands
 | BigQuery | `mcp__bigquery__query`, `list_tables`, `get_table_schema` | `bq` | `BQ_PROJECT`, `BQ_DATASETS` |
 | Elasticsearch | No MCP — CLI only | `curl` | `ES_URL`, `ES_API_KEY` |
 
-PostgreSQL and MySQL are both served by DBHub, which exposes exactly two tools per server: `execute_sql` (one `sql` string) and `search_objects` (`object_type`: `schema` | `table` | `view` | `column` | `procedure` | `function` | `index`, optional LIKE `pattern`, optional `schema` / `table` filters, `detail_level`: `names` | `summary` | `full`, `limit`). DBHub builds its DSN from the env vars in the table, so they must be set before Claude Code starts. The bundled DBHub servers run in read-only mode (`execute_sql` rejects anything but a read with `READONLY_VIOLATION`) and the bundled MongoDB server runs with `--readOnly`, so a write the user confirmed under [Write Operation Blocking](#write-operation-blocking) always runs through the CLI.
-
-Servers bundled with this plugin are exposed as `mcp__plugin_co-dev_<server>__<tool>` (e.g. `mcp__plugin_co-dev_postgres__execute_sql`); the same server registered by the user is `mcp__<server>__<tool>`. Both names are the same tool, and this file writes the short form.
+PostgreSQL and MySQL are both served by DBHub, which exposes exactly two tools per server: `execute_sql` (one `sql` string) and `search_objects` (`object_type`: `schema` | `table` | `view` | `column` | `procedure` | `function` | `index`, optional LIKE `pattern`, optional `schema` / `table` filters, `detail_level`: `names` | `summary` | `full`, `limit`). DBHub builds its DSN from the env vars in the table, so they must be set before Claude Code starts.
 
 **Prefer MCP tools** when available, except when `DB_ENVS` is set (see [Environments and Tunnels](#environments-and-tunnels)) — they handle connection management and provide structured output. If MCP tools return errors (tool not found, connection refused), fall back to the CLI. Database connection env vars must be set in the user's shell for both MCP servers and CLI tools to work.
 
@@ -101,12 +99,12 @@ Never print a connection variable's value. List which are defined by name only: 
 **2. Use that environment's variables.** In every command in this file, write each connection variable `$VAR` as `${VAR_<ENV>:-$VAR}`, and the Redis URL as `${REDIS_URL_<ENV>:-${CACHE_DSN_<ENV>:-${REDIS_URL:-$CACHE_DSN}}}`. For beta:
 
 ```bash
-MYSQL_PWD="${MYSQL_PASS_BETA:-$MYSQL_PASS}" mysql --init-command='SET SESSION TRANSACTION READ ONLY' -h "${MYSQL_HOST_BETA:-$MYSQL_HOST}" -P "${MYSQL_PORT_BETA:-$MYSQL_PORT}" -u "${MYSQL_USER_BETA:-$MYSQL_USER}" "${MYSQL_DB_BETA:-$MYSQL_DB}" <<'SQL'
+MYSQL_PWD="${MYSQL_PASS_BETA:-$MYSQL_PASS}" mysql -h "${MYSQL_HOST_BETA:-$MYSQL_HOST}" -P "${MYSQL_PORT_BETA:-$MYSQL_PORT}" -u "${MYSQL_USER_BETA:-$MYSQL_USER}" "${MYSQL_DB_BETA:-$MYSQL_DB}" <<'SQL'
 SQL_QUERY
 SQL
 ```
 
-`psql` reads its connection from the environment, so set it on the command: `PGHOST="${PGHOST_BETA:-$PGHOST}" PGPORT="${PGPORT_BETA:-$PGPORT}" PGUSER="${PGUSER_BETA:-$PGUSER}" PGPASSWORD="${PGPASSWORD_BETA:-$PGPASSWORD}" PGDATABASE="${PGDATABASE_BETA:-$PGDATABASE}" PGOPTIONS='-c default_transaction_read_only=on' psql --no-psqlrc -v ON_ERROR_STOP=1 -f - <<'SQL'`. Every read uses these read-endpoint variables. Only a write the user confirmed under [Write Operation Blocking](#write-operation-blocking) uses `${VAR_<ENV>_WRITE:-${VAR_<ENV>:-$VAR}}` and the `_WRITE` tunnel — tell the user it is going to the writer; a repo with no `_WRITE` variables has one endpoint that serves both. An environment whose resolved value is empty is an unobtainable value: name the missing `<VAR>_<ENV>` and stop.
+`psql` reads its connection from the environment, so set it on the command: `PGHOST="${PGHOST_BETA:-$PGHOST}" PGPORT="${PGPORT_BETA:-$PGPORT}" PGUSER="${PGUSER_BETA:-$PGUSER}" PGPASSWORD="${PGPASSWORD_BETA:-$PGPASSWORD}" PGDATABASE="${PGDATABASE_BETA:-$PGDATABASE}" psql -f - <<'SQL'`. Every read uses these read-endpoint variables. Only a write the user confirmed under [Write Operation Blocking](#write-operation-blocking) uses `${VAR_<ENV>_WRITE:-${VAR_<ENV>:-$VAR}}` and the `_WRITE` tunnel — tell the user it is going to the writer; a repo with no `_WRITE` variables has one endpoint that serves both. An environment whose resolved value is empty is an unobtainable value: name the missing `<VAR>_<ENV>` and stop.
 
 **3. CLI only for PostgreSQL, MySQL, MongoDB and Redis.** Their MCP servers connected once, at Claude Code startup, to whatever the plain variables pointed at, so they cannot reach a chosen environment. When `DB_ENVS` is set, run every query for these engines through the CLI form and never call their `mcp__*` tools.
 
@@ -144,8 +142,6 @@ Claude Code on Windows runs commands in PowerShell when its PowerShell tool is e
 | `command <<'SQL'` … `SQL` | `@'` … `'@ \| command`, a single-quoted here-string, never a double-quoted `@"` … `"@` one |
 | `curl …` | `curl.exe …` |
 
-The read-only hardening flags in the CLI Command Reference carry over unchanged, and `PGOPTIONS` is set through the `NAME="value" command …` row. `curl.exe` is not pre-approved either, so each Elasticsearch call goes through the permission prompt.
-
 A single-quoted here-string expands nothing, exactly like a quoted heredoc. Its closing `'@` must start a line, so a query line that itself starts with `'@` is reported and never run. Tunnels use the PowerShell twin of the script in [Environments and Tunnels](#environments-and-tunnels), run as its own PowerShell command with the same arguments and the same output lines: `pwsh -NoProfile -ExecutionPolicy Bypass -File "${CLAUDE_PLUGIN_ROOT}/skills/query-db/scripts/db-tunnel.ps1" ensure <engine> <env>` (and `close-all` / `close <engine> <env>` to close). It starts `ssm-jump` through the `ssm-jump.cmd` wrapper that the [ci-tools Windows installer](https://github.com/Cloud-Officer/ci-tools#windows-installation) puts in `%USERPROFILE%\bin`, which runs the bash script through Git Bash, and on close stops the wrapper's whole process tree and whatever still listens on the port. When it reports that `ssm-jump` is not recognized, tell the user to run that installer or add `%USERPROFILE%\bin` to their user `PATH`, then stop.
 
 ## CLI Command Reference
@@ -159,14 +155,12 @@ Use these exact command formats.
 ### MySQL
 
 ```bash
-MYSQL_PWD="$MYSQL_PASS" mysql --init-command='SET SESSION TRANSACTION READ ONLY' -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" <<'SQL'
+MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" <<'SQL'
 SQL_QUERY
 SQL
 ```
 
 > Pass the password via `MYSQL_PWD` (env var) instead of `--password=`. The latter exposes the password to other users via `ps`/process listings.
-
-**Read-only hardening, every engine:** the CLI forms in this file are the only ones to run, whatever form the "CLI Command" section of `docs/db.md` records. `mysql` gets `--init-command='SET SESSION TRANSACTION READ ONLY'`; `psql` gets `PGOPTIONS='-c default_transaction_read_only=on'`, `--no-psqlrc` and `-v ON_ERROR_STOP=1`; `sqlite3` gets `-readonly -safe`; `mongosh` gets `--norc`. Only a write the user confirmed under [Write Operation Blocking](#write-operation-blocking) drops the read-only parts (`--init-command`, `PGOPTIONS`, `-readonly`) and keeps the rest.
 
 **Useful flags:**
 
@@ -178,7 +172,7 @@ SQL
 ### PostgreSQL
 
 ```bash
-PGOPTIONS='-c default_transaction_read_only=on' psql --no-psqlrc -v ON_ERROR_STOP=1 -f - <<'SQL'
+psql -f - <<'SQL'
 SQL_QUERY
 SQL
 ```
@@ -193,7 +187,7 @@ SQL
 ### SQLite
 
 ```bash
-sqlite3 -readonly -safe "$SQLITE_DB" <<'SQL'
+sqlite3 "$SQLITE_DB" <<'SQL'
 SQL_QUERY
 SQL
 ```
@@ -205,13 +199,12 @@ SQL
 - `-csv` - CSV output format
 - `-json` - JSON output format
 - `-column` - Column-aligned output
-- `-readonly -safe` - Open the file read-only and disable dot-commands that reach outside it (`.shell`, `.system`, `.output`, `ATTACH`)
-- List tables with `SELECT name FROM sqlite_master WHERE type='table';` and a table's DDL with `SELECT sql FROM sqlite_master WHERE name='TABLE';`, never the `.tables` / `.schema` dot-commands, which [Write Operation Blocking](#write-operation-blocking) refuses
+- List tables with `SELECT name FROM sqlite_master WHERE type = 'table';` and a table's definition with `SELECT sql FROM sqlite_master WHERE name = 'TABLE';` (dot-commands are refused, see [Write Operation Blocking](#write-operation-blocking))
 
 ### MongoDB
 
 ```bash
-mongosh "$MONGODB_URI" --norc --quiet <<'JS'
+mongosh "$MONGODB_URI" --quiet <<'JS'
 JS_CODE
 JS
 ```
@@ -219,7 +212,6 @@ JS
 **Useful flags:**
 
 - `<<'JS' … JS` - Pipe the script on stdin via a quoted heredoc (universal quoting rule). Never `--file -`: `mongosh` has no stdin form of `--file` and fails with `ENOENT … open '…/-'`. Piped input is run line by line like the shell, so each result is preceded by a prompt such as `rs0 [direct: primary] app>`; ignore the prompts when reading the output
-- `--norc` - Skip `~/.mongoshrc.js`
 - `--quiet` - Suppress connection messages
 - `--json` - Output in JSON format
 
@@ -237,8 +229,6 @@ JSON
 - `index` - Written literally into the URL only after it passes the universal quoting rule's `^[A-Za-z0-9._-]+$` index-name check
 - `-s` - Silent mode (no progress)
 - Pipe to `| jq` for formatted JSON output
-
-`curl` is not pre-approved by this skill, so every Elasticsearch command goes through Claude Code's normal permission prompt, where the user sees the exact URL before it runs. Never send a request anywhere but `$ES_URL`.
 
 ### Redis
 
@@ -306,15 +296,15 @@ Look for the "CLI Command" section in `docs/db.md`. It specifies the command to 
 
 **Connectivity Tests:**
 
-| Database | Test Command |
-| --- | --- |
-| MySQL | `MYSQL_PWD="$MYSQL_PASS" mysql --init-command='SET SESSION TRANSACTION READ ONLY' -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "SELECT 1"` |
-| PostgreSQL | `PGOPTIONS='-c default_transaction_read_only=on' psql --no-psqlrc -c "SELECT 1"` |
-| SQLite | `sqlite3 -readonly -safe "$SQLITE_DB" "SELECT 1"` |
-| MongoDB | `mongosh "$MONGODB_URI" --norc --eval "db.runCommand({ping: 1})"` |
-| Elasticsearch | `curl -s "$ES_URL/_cluster/health"` |
-| Redis | `redis-cli -u "$REDIS_URL" PING` |
-| BigQuery | `bq query --use_legacy_sql=false --project_id="$BQ_PROJECT" "SELECT 1"` (auth: `gcloud auth application-default login`) |
+| Database      | Test Command                                                                                                            |
+|---------------|-------------------------------------------------------------------------------------------------------------------------|
+| MySQL         | `MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "SELECT 1"`            |
+| PostgreSQL    | `psql -c "SELECT 1"`                                                                                                    |
+| SQLite        | `sqlite3 "$SQLITE_DB" "SELECT 1"`                                                                                       |
+| MongoDB       | `mongosh "$MONGODB_URI" --eval "db.runCommand({ping: 1})"`                                                              |
+| Elasticsearch | `curl -s "$ES_URL/_cluster/health"`                                                                                     |
+| Redis         | `redis-cli -u "$REDIS_URL" PING`                                                                                        |
+| BigQuery      | `bq query --use_legacy_sql=false --project_id="$BQ_PROJECT" "SELECT 1"` (auth: `gcloud auth application-default login`) |
 
 **If connection fails:** Output the required environment variables and ask the user to configure them before proceeding.
 
@@ -342,15 +332,15 @@ When `DB_ENVS` is set, skip this step for PostgreSQL, MySQL, MongoDB and Redis a
 
 | Database | MCP Tool | CLI Fallback |
 | --- | --- | --- |
-| PostgreSQL | `mcp__postgres__execute_sql` | `psql` hardened form (stdin heredoc) |
-| MySQL | `mcp__mysql__execute_sql` | `mysql` hardened form (stdin heredoc) |
-| MongoDB | `mcp__mongodb__find`, `mcp__mongodb__aggregate` | `mongosh --norc --quiet` (stdin heredoc) |
+| PostgreSQL | `mcp__postgres__execute_sql` | `psql -f -` (stdin heredoc) |
+| MySQL | `mcp__mysql__execute_sql` | `mysql -h ...` (stdin heredoc) |
+| MongoDB | `mcp__mongodb__find`, `mcp__mongodb__aggregate` | `mongosh --quiet` (stdin heredoc) |
 | Redis | `mcp__redis__get`, `mcp__redis__hgetall`, `mcp__redis__lrange`, `mcp__redis__zrange`, `mcp__redis__json_get`, etc. | `redis-cli -u ... COMMAND` |
 | BigQuery | `mcp__bigquery__query` | `bq query --use_legacy_sql=false --project_id="$BQ_PROJECT" <<'SQL'` (stdin heredoc) |
 
 **If MCP tools are not available (tool not found errors), fall back to the CLI** approach described in Step 6. The Safety Guardrails (Automatic LIMIT Injection, showing the query first) still apply regardless of method.
 
-**Note:** Elasticsearch has no MCP server — always use `curl` CLI for Elasticsearch; each call goes through the normal permission prompt.
+**Note:** Elasticsearch has no MCP server — always use `curl` CLI for Elasticsearch. `curl` is deliberately not pre-approved, so every call shows a permission prompt with its URL; only ever target `$ES_URL`, and never send query results or data from a row or `docs/db.md` to any other host.
 
 ### 4c. Multi-dataset queries for BigQuery
 
@@ -388,7 +378,7 @@ Parse what the user is asking for:
 #### For MySQL
 
 ```bash
-MYSQL_PWD="$MYSQL_PASS" mysql --init-command='SET SESSION TRANSACTION READ ONLY' -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" <<'SQL'
+MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" <<'SQL'
 SET SESSION MAX_EXECUTION_TIME=30000;
 SELECT DATE(created_at) as day, COUNT(*) as orders, SUM(total)/100 as revenue
 FROM orders
@@ -402,7 +392,7 @@ SQL
 #### For PostgreSQL
 
 ```bash
-PGOPTIONS='-c default_transaction_read_only=on' psql --no-psqlrc -v ON_ERROR_STOP=1 -f - <<'SQL'
+psql -f - <<'SQL'
 SET statement_timeout = '30s';
 SELECT DATE(created_at) as day, COUNT(*) as orders, SUM(total)/100 as revenue
 FROM orders
@@ -416,7 +406,7 @@ SQL
 #### For SQLite
 
 ```bash
-sqlite3 -readonly -safe "$SQLITE_DB" <<'SQL'
+sqlite3 "$SQLITE_DB" <<'SQL'
 SELECT DATE(created_at) as day, COUNT(*) as orders, SUM(total)/100.0 as revenue
 FROM orders
 WHERE created_at >= DATE('now', '-30 days')
@@ -429,7 +419,7 @@ SQL
 #### For MongoDB
 
 ```bash
-mongosh "$MONGODB_URI" --norc --quiet <<'JS'
+mongosh "$MONGODB_URI" --quiet <<'JS'
 db.orders.aggregate([
   { $match: { createdAt: { $gte: new Date(Date.now() - 30*24*60*60*1000) } } },
   { $group: {
@@ -551,7 +541,7 @@ Run the appropriate CLI command with the generated query.
 - **PostgreSQL**: Use `-f -` with a quoted heredoc (see Step 6), `-t` for tuples only (no headers), `-A` for unaligned output
 - **SQLite**: Pass the query on stdin via a quoted heredoc (see Step 6), `-header` for column headers, `-csv` or `-json` for output format
 - **MongoDB**: Pipe the script on stdin with a quoted heredoc and `--quiet` (see Step 6); never `--file -`
-- **Elasticsearch**: Use `curl` with `-s` (silent) and `-d @-` reading the body from a quoted heredoc; pipe to `jq` for formatting. The call goes through the normal permission prompt
+- **Elasticsearch**: Use `curl` with `-s` (silent) and `-d @-` reading the body from a quoted heredoc; pipe to `jq` for formatting
 - **Redis**: Commands go to `redis-cli` on stdin via a quoted heredoc, one per line
 
 ### 9. Present results
@@ -580,7 +570,7 @@ The export path uses the same stdin-heredoc rail as Steps 6 and 8 (universal quo
 Example (MySQL):
 
 ```bash
-MYSQL_PWD="$MYSQL_PASS" mysql --init-command='SET SESSION TRANSACTION READ ONLY' -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -B <<'SQL' | tr '\t' ','
+MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -B <<'SQL' | tr '\t' ','
 QUERY
 SQL
 ```
@@ -667,15 +657,15 @@ When the user wants chart data, structure the output as:
 
 ### Write Operation Blocking
 
-Before executing any query, classify it against the read-only allowlists below. Classify every statement, not only the first: a body that holds several statements is a write if any one of them is. Anything an allowlist does not name is a write, so a statement this file never mentions is a write too. The fixed connectivity tests in Step 3 are the one exemption. Match keywords as **statements**, not as column names (e.g., `delete_log` or `update_count` are fine as column names).
+Before executing any query, scan for write/mutate keywords. Match these as **SQL statements**, not as column names (e.g., `delete_log` or `update_count` are fine as column names).
 
-**Refused client meta-commands, every engine:** the CLIs read stdin as their own interactive input, so the client itself runs meta-commands the shell never sees. Any line of a query body whose first non-blank characters are `\`, `.`, `system`, `source` or `require(` — e.g. psql `\!`, `\copy`, `\i`, `\o`; mysql `\!`, `system`, `source`; sqlite3 `.shell`, `.system`, `.output`, `.once`, `.import`, `.load`; mongosh `require('child_process')` — is refused and never run, even after confirmation. Report the line and stop.
-
-**SQL (MySQL/PostgreSQL/SQLite):** a statement is a read only when its first keyword is `SELECT`, `WITH`, `EXPLAIN`, `SHOW`, `DESCRIBE` or `DESC`, plus the exact timeout lines [Query Timeout](#query-timeout) prepends. Still a write: `SELECT … INTO` (`INTO OUTFILE`, `INTO DUMPFILE`, PostgreSQL's table-creating `SELECT INTO`), a `WITH` that holds `INSERT`/`UPDATE`/`DELETE`/`MERGE`, `EXPLAIN ANALYZE` of anything but a read, `SELECT … FOR UPDATE`/`FOR SHARE`, and a read that calls a function that writes or reaches the file system (`nextval`, `setval`, `pg_terminate_backend`, `lo_import`, `lo_export`, `pg_read_file`, `LOAD_FILE`). Everything else is a write, for example `INSERT`, `UPDATE`, `DELETE`, `REPLACE`, `MERGE`, `CREATE`, `ALTER`, `DROP`, `TRUNCATE`, `RENAME`, `GRANT`, `REVOKE`, `COPY`, `LOAD DATA`, `CALL`, `DO`, `SET`, `ATTACH`, `DETACH`, `PRAGMA`, `VACUUM`.
-**MongoDB:** a read calls only `find`, `findOne`, `aggregate`, `count`, `countDocuments`, `estimatedDocumentCount`, `distinct`, `getIndexes` or `getCollectionNames`, chained only with cursor modifiers (`sort`, `limit`, `skip`, `project`, `maxTimeMS`, `toArray`, `pretty`, `explain`), and an `aggregate` pipeline holds no `$out` or `$merge` stage. Everything else is a write, for example `insertOne`, `insertMany`, `updateOne`, `updateMany`, `replaceOne`, `deleteOne`, `deleteMany`, `remove`, `bulkWrite`, `findOneAndUpdate`, `findOneAndReplace`, `findOneAndDelete`, `createIndex`, `dropIndex`, `drop`, `dropDatabase`, `renameCollection`, `runCommand`, `adminCommand`, `eval`, `load`.
-**Elasticsearch:** a read is a `GET` with no body, or a body sent to a path ending in `_search` or `_count`. Everything else is a write, for example `-X DELETE`, `-X PUT`, a `POST` to `_doc`, `_bulk`, `_update`, `_delete_by_query`, `_update_by_query` or `_reindex`, and index creation or mapping changes.
+**SQL (MySQL/PostgreSQL/SQLite):** `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`, `CREATE`, `REPLACE`
+**MongoDB:** `insertOne`, `insertMany`, `updateOne`, `updateMany`, `deleteOne`, `deleteMany`, `drop`, `replaceOne`
+**Elasticsearch:** `_delete_by_query`, `_update_by_query`, `PUT` (index creation/mapping)
 **Redis:** allowlist, not blocklist — Redis has far more write commands than read ones. Only these are read-only and may run without confirmation: `GET`, `MGET`, `GETRANGE`, `STRLEN`, `EXISTS`, `TYPE`, `TTL`, `PTTL`, `HGET`, `HMGET`, `HGETALL`, `HKEYS`, `HVALS`, `HLEN`, `HEXISTS`, `LRANGE`, `LINDEX`, `LLEN`, `SMEMBERS`, `SISMEMBER`, `SCARD`, `SINTER`, `SUNION`, `SDIFF`, `ZRANGE`, `ZREVRANGE`, `ZRANGEBYSCORE`, `ZSCORE`, `ZCARD`, `ZCOUNT`, `PFCOUNT`, `SCAN`, `HSCAN`, `SSCAN`, `ZSCAN`, `XRANGE`, `XREVRANGE`, `XLEN`, `BITCOUNT`, `GETBIT`, `JSON.GET`, `JSON.TYPE`, `DBSIZE`, `INFO`, `PING`. Treat **everything else** as a write — including `GETSET`/`GETDEL` (read-looking but destructive), `EXPIRE`/`PERSIST`, `RENAME`, `INCR`/`DECR`, `LPOP`/`RPOP`/`SPOP`, and `EVAL`/`EVALSHA`/`FCALL`/`SCRIPT` (scripts can write whatever they like). The allowlist governs the `mcp__redis__*` tools as well as `redis-cli`.
-**BigQuery:** a statement is a read only when its first keyword is `SELECT` or `WITH` and the `bq query` command carries no `--destination_table`, `--append_table` or `--replace`. Everything else is a write, for example `INSERT`, `UPDATE`, `DELETE`, `MERGE`, `CREATE`, `ALTER`, `DROP`, `TRUNCATE`, `EXPORT DATA`, `CALL`.
+**BigQuery:** `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`, `CREATE`, `MERGE`
+
+**Client meta-commands — refused, never run, even after confirmation.** Refuse any query body containing a line that starts with `\` (psql and mysql, e.g. `\!`, `\copy`, `\o`, `\i`), `.` (sqlite3, e.g. `.shell`, `.system`, `.output`, `.read`), or `system` / `source` (mysql), and any mongosh code that calls `require(`, `load(` or `process.`. These run commands or read and write files on the user's machine, outside the database, so database permissions cannot stop them. Report the line and stop.
 
 **If a write operation is detected:**
 
@@ -683,7 +673,6 @@ Before executing any query, classify it against the read-only allowlists below. 
 2. **Show** the query to the user
 3. **Explain** the impact (what will be modified, how many rows/documents affected)
 4. **Ask** for explicit confirmation before proceeding
-5. **Run** a confirmed write through the CLI only, never an MCP tool, with the read-only parts of the hardening dropped as described in the CLI Command Reference; a refused meta-command line stays refused
 
 ### Automatic LIMIT Injection
 

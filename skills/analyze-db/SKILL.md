@@ -26,9 +26,7 @@ Prefer MCP tools when available — they handle connection management — except
 | BigQuery | `mcp__bigquery__query`, `list_tables`, `get_table_schema` | `bq` |
 | Elasticsearch | (no MCP) | `curl` |
 
-PostgreSQL and MySQL are both served by DBHub, which exposes exactly two tools per server: `execute_sql` (one `sql` string) and `search_objects` (`object_type`: `schema` | `table` | `view` | `column` | `procedure` | `function` | `index`, optional LIKE `pattern`, optional `schema` / `table` filters, `detail_level`: `names` | `summary` | `full`, `limit`). Use `search_objects` with `detail_level: full` to enumerate tables and columns, and `execute_sql` for anything else. The bundled DBHub servers run in read-only mode and the bundled MongoDB server runs with `--readOnly`.
-
-Servers bundled with this plugin are exposed as `mcp__plugin_co-dev_<server>__<tool>` (e.g. `mcp__plugin_co-dev_postgres__search_objects`); the same server registered by the user is `mcp__<server>__<tool>`. Both names are the same tool, and this file writes the short form.
+PostgreSQL and MySQL are both served by DBHub, which exposes exactly two tools per server: `execute_sql` (one `sql` string) and `search_objects` (`object_type`: `schema` | `table` | `view` | `column` | `procedure` | `function` | `index`, optional LIKE `pattern`, optional `schema` / `table` filters, `detail_level`: `names` | `summary` | `full`, `limit`). Use `search_objects` with `detail_level: full` to enumerate tables and columns, and `execute_sql` for anything else.
 
 ## Connection Environment Variables
 
@@ -71,12 +69,12 @@ Never print a connection variable's value. List which are defined by name only: 
 **2. Use that environment's variables.** In every command in this file, write each connection variable `$VAR` as `${VAR_<ENV>:-$VAR}`, and the Redis URL as `${REDIS_URL_<ENV>:-${CACHE_DSN_<ENV>:-${REDIS_URL:-$CACHE_DSN}}}`. For beta:
 
 ```bash
-MYSQL_PWD="${MYSQL_PASS_BETA:-$MYSQL_PASS}" mysql --init-command='SET SESSION TRANSACTION READ ONLY' -h "${MYSQL_HOST_BETA:-$MYSQL_HOST}" -P "${MYSQL_PORT_BETA:-$MYSQL_PORT}" -u "${MYSQL_USER_BETA:-$MYSQL_USER}" "${MYSQL_DB_BETA:-$MYSQL_DB}" <<'SQL'
+MYSQL_PWD="${MYSQL_PASS_BETA:-$MYSQL_PASS}" mysql -h "${MYSQL_HOST_BETA:-$MYSQL_HOST}" -P "${MYSQL_PORT_BETA:-$MYSQL_PORT}" -u "${MYSQL_USER_BETA:-$MYSQL_USER}" "${MYSQL_DB_BETA:-$MYSQL_DB}" <<'SQL'
 SQL_QUERY
 SQL
 ```
 
-`psql` reads its connection from the environment, so set it on the command: `PGHOST="${PGHOST_BETA:-$PGHOST}" PGPORT="${PGPORT_BETA:-$PGPORT}" PGUSER="${PGUSER_BETA:-$PGUSER}" PGPASSWORD="${PGPASSWORD_BETA:-$PGPASSWORD}" PGDATABASE="${PGDATABASE_BETA:-$PGDATABASE}" PGOPTIONS='-c default_transaction_read_only=on' psql --no-psqlrc -v ON_ERROR_STOP=1 -f - <<'SQL'`. An environment whose resolved value is empty is an unobtainable value: name the missing `<VAR>_<ENV>` and stop.
+`psql` reads its connection from the environment, so set it on the command: `PGHOST="${PGHOST_BETA:-$PGHOST}" PGPORT="${PGPORT_BETA:-$PGPORT}" PGUSER="${PGUSER_BETA:-$PGUSER}" PGPASSWORD="${PGPASSWORD_BETA:-$PGPASSWORD}" PGDATABASE="${PGDATABASE_BETA:-$PGDATABASE}" psql -f - <<'SQL'`. An environment whose resolved value is empty is an unobtainable value: name the missing `<VAR>_<ENV>` and stop.
 
 **3. CLI only for PostgreSQL, MySQL, MongoDB and Redis.** Their MCP servers connected once, at Claude Code startup, to whatever the plain variables pointed at, so they cannot reach a chosen environment. When `DB_ENVS` is set, run every query for these engines through the CLI form and never call their `mcp__*` tools.
 
@@ -120,14 +118,12 @@ A single-quoted here-string expands nothing, exactly like a quoted heredoc. Its 
 
 **One interpolation rule for every command and query in this skill — the same rule `query-db` states.** No query or identifier text that this skill generates or derives — from the database, the repository, an existing `docs/db.md`, or the environment — ever appears inside a shell-quoted argument. Every engine receives query text on stdin via a quoted heredoc (`<<'SQL'`, `<<'JS'`, `<<'CMD'` for redis-cli), so the shell never parses it; never `-e "query"` (mysql), `-c "query"` (psql), `--eval "code"` (mongosh), a `"QUERY"` positional argument (sqlite3, bq), or a redis command in argument position. Redis key names and key patterns are never placed in argument position — they ride the stdin heredoc, where a hostile key named `$(...)` is inert to the shell; the `^[A-Za-z0-9_]+$` identifier check governs SQL and BigQuery identifiers, not Redis key text (real keys contain `:` and `*`). Because redis-cli reads one command per line, a key or pattern containing CR, LF or any other control byte (U+0000–U+001F or U+007F) is reported and skipped, never written into the body — a key named `x\nFLUSHALL` would otherwise become a second command. Every other key or pattern is written as a redis-cli double-quoted string with each `\` escaped as `\\` and each `"` as `\"` (key `a"b` → `HGETALL "a\"b"`), never bare. Only fixed literal text written verbatim in this file (the Step 6 connectivity pings) may be passed as an argument. The heredoc fences the shell only, not the query body, and it also expands nothing — a shell variable is never written inside a quoted heredoc; read the value first, check it, and write it literally into the body. Any identifier not matching `^[A-Za-z0-9_]+$` (`^[A-Za-z0-9-]+$` for the GCP project id, which legitimately carries hyphens) is reported and skipped, never written into a query body — engine identifier quoting is not an escape hatch, because a MySQL backtick inside a double-quoted argument is shell command substitution and even inside a heredoc a hostile name reaches the database. BigQuery dataset names come only from `$BQ_DATASETS`, must match that pattern, and are always bound as Step 7's loop variable `$ds` — never any other variable.
 
-**Read-only hardening and allowlist — the same as `query-db`.** Run the CLI forms in this file exactly as written, whatever form an existing `docs/db.md` records: `mysql --init-command='SET SESSION TRANSACTION READ ONLY'`; `psql` with `PGOPTIONS='-c default_transaction_read_only=on'`, `--no-psqlrc` and `-v ON_ERROR_STOP=1`; `sqlite3 -readonly -safe`; `mongosh --norc`. Any line of a query body whose first non-blank characters are `\`, `.`, `system`, `source` or `require(` (psql `\!`, sqlite3 `.shell`, mongosh `require('child_process')`) is a client meta-command and is never sent. Every statement must be a read: SQL whose first keyword is `SELECT`, `WITH`, `EXPLAIN`, `SHOW`, `DESCRIBE` or `DESC` (never `SELECT … INTO` or `FOR UPDATE`); MongoDB `find`, `findOne`, `aggregate` without a `$out` or `$merge` stage, `count`, `countDocuments`, `estimatedDocumentCount`, `distinct`, `getIndexes` or `getCollectionNames`; an Elasticsearch `GET`, or a body sent to `_search` or `_count`; the Redis read commands this file uses (`SCAN`, `TYPE`, `TTL`, `GET`, `HGETALL`, `LRANGE`, `ZRANGE`, `SMEMBERS`, `LLEN`, `JSON.GET`, `DBSIZE`, `INFO`, `PING`); BigQuery `SELECT` or `WITH`, `bq ls` and `bq show`. A statement outside these is reported and never run; this skill has no confirmation path for writes.
-
 | Database | Connect / Query | List schema |
 | -------- | --------------- | ----------- |
-| MySQL | `MYSQL_PWD="$MYSQL_PASS" mysql --init-command='SET SESSION TRANSACTION READ ONLY' -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" <<'SQL'` (query on stdin) | `SELECT table_name, table_rows FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY table_rows DESC;` (estimates, instant) |
-| PostgreSQL | `PGOPTIONS='-c default_transaction_read_only=on' psql --no-psqlrc -v ON_ERROR_STOP=1 -f - <<'SQL'` (query on stdin) | `SELECT schemaname, relname, n_live_tup FROM pg_stat_user_tables ORDER BY n_live_tup DESC;` |
-| SQLite | `sqlite3 -readonly -safe "$SQLITE_DB" <<'SQL'` (query on stdin) | `SELECT name FROM sqlite_master WHERE type='table';` |
-| MongoDB | `mongosh "$MONGODB_URI" --norc --quiet <<'JS'` (script piped on stdin; never `--file -`, which `mongosh` reads as a file named `-`) | `db.getCollectionNames().forEach(c => print(c + ': ' + db[c].estimatedDocumentCount()))` |
+| MySQL | `MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" <<'SQL'` (query on stdin) | `SELECT table_name, table_rows FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY table_rows DESC;` (estimates, instant) |
+| PostgreSQL | `psql -f - <<'SQL'` (query on stdin) | `SELECT schemaname, relname, n_live_tup FROM pg_stat_user_tables ORDER BY n_live_tup DESC;` |
+| SQLite | `sqlite3 "$SQLITE_DB" <<'SQL'` (query on stdin) | `SELECT name FROM sqlite_master WHERE type='table';` |
+| MongoDB | `mongosh "$MONGODB_URI" --quiet <<'JS'` (script piped on stdin; never `--file -`, which `mongosh` reads as a file named `-`) | `db.getCollectionNames().forEach(c => print(c + ': ' + db[c].estimatedDocumentCount()))` |
 | Elasticsearch | `curl -s "$ES_URL/<endpoint>"` (add `-H "Authorization: ApiKey $ES_API_KEY"` if set) | `curl -s "$ES_URL/_cat/indices?v&h=index,docs.count,store.size"` |
 | Redis | `redis-cli -u "$REDIS_URL" <<'CMD'` (one command per line on stdin) | `DBSIZE`, `SCAN 0 MATCH "<pattern>" COUNT 100` (both on stdin) |
 | BigQuery | `bq query --use_legacy_sql=false --format=prettyjson --project_id="$BQ_PROJECT" <<'SQL'` (query on stdin) | inside Step 7's `for ds` loop: `bq ls --project_id="$BQ_PROJECT" "$ds"`; `bq show --schema --format=prettyjson --project_id="$BQ_PROJECT" "$ds.<table>"` |
@@ -236,9 +232,9 @@ When `DB_ENVS` is set, first pick the environment and bring its tunnel up ([Envi
 
 | Database | Test command |
 | -------- | ------------ |
-| MySQL | `MYSQL_PWD="$MYSQL_PASS" mysql --init-command='SET SESSION TRANSACTION READ ONLY' -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "SELECT 1"` |
-| PostgreSQL | `PGOPTIONS='-c default_transaction_read_only=on' psql --no-psqlrc -c "SELECT 1"` |
-| MongoDB | `mongosh "$MONGODB_URI" --norc --eval "db.runCommand({ping: 1})"` |
+| MySQL | `MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB" -e "SELECT 1"` |
+| PostgreSQL | `psql -c "SELECT 1"` |
+| MongoDB | `mongosh "$MONGODB_URI" --eval "db.runCommand({ping: 1})"` |
 | Elasticsearch | `curl -s "$ES_URL/_cluster/health"` |
 | Redis | `redis-cli -u "$REDIS_URL" PING` |
 | BigQuery | `bq query --use_legacy_sql=false --project_id="$BQ_PROJECT" "SELECT 1"` (if it fails, ask the user to run `gcloud auth application-default login` and `gcloud auth application-default set-quota-project $BQ_PROJECT`) |
@@ -263,7 +259,7 @@ If the user declines or can't provide credentials, **skip Steps 7-8** and procee
 
 Use the schema commands from the "CLI Command Reference" table above, then for each table/collection capture:
 
-- **Indexes** — MySQL: `SHOW INDEX FROM <table>;` sent via the stdin heredoc, with `<table>` already validated against `^[A-Za-z0-9_]+$` by the interpolation rule, so it needs no identifier quoting (a backtick-quoted name inside a double-quoted `-e` argument is shell command substitution — the form this rule exists to prevent). PostgreSQL: `PGOPTIONS='-c default_transaction_read_only=on' psql --no-psqlrc -v tbl="<table>" -c "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = :'tbl';"`. MongoDB: `db.getCollection("<coll>").getIndexes()`. Elasticsearch: `curl -s "$ES_URL/<index>/_mapping" | jq` with `<index>` URL-encoded.
+- **Indexes** — MySQL: `SHOW INDEX FROM <table>;` sent via the stdin heredoc, with `<table>` already validated against `^[A-Za-z0-9_]+$` by the interpolation rule, so it needs no identifier quoting (a backtick-quoted name inside a double-quoted `-e` argument is shell command substitution — the form this rule exists to prevent). PostgreSQL: `psql -v tbl="<table>" -c "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = :'tbl';"`. MongoDB: `db.getCollection("<coll>").getIndexes()`. Elasticsearch: `curl -s "$ES_URL/<index>/_mapping" | jq` with `<index>` URL-encoded.
 - **Date ranges** — `SELECT MIN(created_at), MAX(created_at) FROM <table>;` (or MongoDB `$min`/`$max` aggregation).
 - **Sample document** — MongoDB `db.<coll>.findOne()`; Redis `HGETALL`/`TTL`, key names on the stdin heredoc as escaped double-quoted strings, keys with control bytes skipped, per the interpolation rule.
 - **BigQuery** — iterate datasets: `for ds in $(echo "$BQ_DATASETS" | tr ',' ' '); do echo "=== $ds ==="; bq ls --project_id="$BQ_PROJECT" "$ds"; done`. For each table, inside the same `for ds` loop: `bq show --schema --format=prettyjson --project_id="$BQ_PROJECT" "$ds.<table>"` and `bq show --project_id="$BQ_PROJECT" "$ds.<table>"` (row count, partitioning).
@@ -308,7 +304,7 @@ Use safe sampling depending on table size:
 Required sections, in order:
 
 1. **Database Type** — MySQL / PostgreSQL / SQLite.
-2. **CLI Command** — used by `query-db` skill (e.g. `MYSQL_PWD="$MYSQL_PASS" mysql --init-command='SET SESSION TRANSACTION READ ONLY' -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB"` or `psql`).
+2. **CLI Command** — used by `query-db` skill (e.g. `MYSQL_PWD="$MYSQL_PASS" mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" "$MYSQL_DB"` or `psql`).
 3. **Framework** — detected framework name.
 4. **Database Overview** — one paragraph on what data this system holds.
 5. **All Tables** — single table listing **every** table: `Table | Purpose | Key Fields for Filtering/Grouping | Rows`.
@@ -330,7 +326,7 @@ Required sections, in order:
 Required sections:
 
 1. **Database Type** — MongoDB.
-2. **CLI Command** — `mongosh "$MONGODB_URI" --norc`.
+2. **CLI Command** — `mongosh "$MONGODB_URI"`.
 3. **Framework** — Mongoose / Doctrine ODM / MongoEngine / Mongoid / Spring Data MongoDB.
 4. **Database Overview**.
 5. **All Collections** — `Collection | Purpose | Key Fields for Filtering/Grouping | Document Count`.
@@ -418,6 +414,7 @@ If multiple DBs are used, the file has one H1 + a "Databases Used" list, then on
 
 - **Failure policy** — any command or query that fails or returns nothing stops that step and is reported with the exact command and its output; never continue on a fabricated or assumed value. Sanctioned deviations, exactly three: the MCP-to-CLI fallback (report the MCP error, then retry once via the CLI form; the policy applies if that also fails), Step 6's declined-credentials code-only path, and Step 7's per-object rule — an object that errors is still listed as `not readable — <error>` and the "Last verified" line records the partial coverage.
 - **Read-only, always** — every tool call and command this skill issues is read-only; never issue one that writes, deletes, expires or otherwise modifies data in any database.
+- **No client meta-commands** — never send a line starting with `\` (psql and mysql, e.g. `\!`, `\copy`), `.` (sqlite3, e.g. `.shell`, `.output`), or `system` / `source` (mysql), nor mongosh code calling `require(`, `load(` or `process.`; they run commands or touch files on the user's machine, outside the database.
 - Keep descriptions concise and focused on querying needs.
 - Use actual values from the codebase, not placeholders.
 - Note gotchas (soft deletes, tenant isolation, TTLs, partitioning).
