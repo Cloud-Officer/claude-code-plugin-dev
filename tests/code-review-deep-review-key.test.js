@@ -1,3 +1,5 @@
+'use strict'
+
 const assert = require('node:assert/strict')
 const { describe, it } = require('node:test')
 const { execFileSync } = require('node:child_process')
