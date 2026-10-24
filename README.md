@@ -10,6 +10,7 @@ Claude Code plugin for development workflow automation.
   * [Quick Start](#quick-start)
   * [Enable the Xcode MCP (macOS)](#enable-the-xcode-mcp-macos)
   * [Configure Remote MCPs (optional)](#configure-remote-mcps-optional)
+  * [Avoid repeated sign-ins (optional)](#avoid-repeated-sign-ins-optional)
   * [Google Workspace MCP (optional)](#google-workspace-mcp-optional)
   * [Complementary Plugins (optional)](#complementary-plugins-optional)
   * [Configure Environment Variables](#configure-environment-variables)
@@ -24,7 +25,7 @@ Claude Code plugin for development workflow automation.
 ## Introduction
 
 `claude-code-plugin-dev` is the source repository for **`co-dev`**, a Claude Code plugin that automates day-to-day
-development workflows. It bundles 35 skills — issue tracking, PR creation, deep code review, test generation, linting,
+development workflows. It bundles 36 skills — issue tracking, PR creation, deep code review, test generation, linting,
 documentation reviews, cloud cost audits, cloud, email-marketing, Xcode and app-store operations, and reporting — alongside 13 language servers and 15 MCP servers
 that Claude Code loads automatically once the plugin is installed.
 
@@ -420,6 +421,35 @@ claude mcp add atlassian-companyb --transport http https://mcp.atlassian.com/v1/
 
 This applies to every OAuth-at-connect remote MCP listed above (`atlassian`, `bigquery`, `cookieyes`, `figma`, `newrelic`, `paypal`) — not to stdio servers like
 `google-workspace`, which select identity per-call via a parameter. If you rename instances, update the [Recommended Permissions](#recommended-permissions) entries to allow each variant.
+
+### Avoid repeated sign-ins (optional)
+
+OAuth sessions for New Relic and Google expire, and Google Workspace orgs can force re-authentication on a schedule. To
+stop `newrelic`, `crashlytics`, `triage-monitoring` and `query-db` on BigQuery asking you to sign in again, give each
+project long-lived credentials in its `.envrc`:
+
+```bash
+# New Relic: a User API key (NRAK-…) has no expiry unless revoked. The newrelic CLI reads these directly, no profile needed
+export NEW_RELIC_API_KEY=NRAK-...
+export NEW_RELIC_ACCOUNT_ID=1234567
+export NEW_RELIC_REGION=US
+
+# Google Cloud: a service-account key file, used by bq instead of your gcloud login
+export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/gcloud/keys/<project>-bq-reader.json"
+export CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE="$GOOGLE_APPLICATION_CREDENTIALS"
+```
+
+To make the New Relic MCP use the same key instead of OAuth, register it with a header. The single quotes keep
+`${NEW_RELIC_API_KEY}` a runtime reference, never written into the stored config:
+
+```bash
+claude mcp add newrelic-<project> --transport http https://mcp.newrelic.com/mcp/ --header 'Api-Key: ${NEW_RELIC_API_KEY}'
+```
+
+The Google service account needs **BigQuery Job User** on `BQ_PROJECT` and **BigQuery Data Viewer** on the Crashlytics
+dataset. Keep the key file outside every repo with `chmod 600`, since it never expires; your organization's policy may
+block creating service-account keys. Set `CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE` only in projects where `bq` should use
+the key: it applies to every `gcloud` command run in that folder.
 
 ### Google Workspace MCP (optional)
 
@@ -891,7 +921,7 @@ vars, one-time auth commands, or remote MCP additions. Skills with no setup work
 | `code-standards`         | House standards for authoring code and tests — comment discipline and the diff sweep that enforces it                   | None — reference skill, no credentials or tools                                                                                                                                                                                                                                                                                           |
 | `create-issue`           | Create GitHub or Jira issues with proper templates                                                                      | GitHub: `gh auth login` *(or)* `GITHUB_TOKEN`. Jira: atlassian remote MCP *(or)* `jira init`                                                                                                                                                                                                                                              |
 | `create-pr`              | Generate PR content, open the PR, return to default branch                                                              | GitHub: `gh auth login` *(or)* `GITHUB_TOKEN`                                                                                                                                                                                                                                                                                             |
-| `crashlytics`            | Query Firebase Crashlytics crash data from BigQuery                                                                     | bigquery remote MCP *(or)* `gcloud auth application-default login`. Env: `BQ_PROJECT`, `BQ_CRASHLYTICS_DATASET`, `BQ_CRASHLYTICS_ANDROID_TABLE`, `BQ_CRASHLYTICS_IOS_TABLE`, `BQ_CRASHLYTICS_TVOS_TABLE`                                                                                                                                  |
+| `crashlytics`            | Query Firebase Crashlytics crash data from BigQuery                                                                     | bigquery remote MCP *(or)* `gcloud auth application-default login` *(or)* a service-account key (`GOOGLE_APPLICATION_CREDENTIALS` + `CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE`). Env: `BQ_PROJECT`, `BQ_CRASHLYTICS_DATASET`, `BQ_CRASHLYTICS_*_TABLE`                                                                                      |
 | `doc-tracker-coverage`   | Verify a Google Doc section's items are tracked in Monday/Jira                                                          | Google Doc read: Workspace Docs MCP *(or)* `claude.ai Google Drive` MCP *(or)* published-to-web doc. monday: `claude mcp add monday` (`${MONDAY_TOKEN}`). Jira: atlassian remote MCP *(or)* `jira init` Optional env: `DOC_TRACKER_COVERAGE_TEAMS`                                                                                        |
 | `gcloud`                 | Manage Google Cloud infrastructure and services                                                                         | `gcloud auth login && gcloud config set project <id>`. Optional: `CLOUDSDK_ACTIVE_CONFIG_NAME` for named configs                                                                                                                                                                                                                          |
 | `heroku`                 | Manage Heroku apps, dynos, logs, and databases                                                                          | `heroku login`                                                                                                                                                                                                                                                                                                                            |
@@ -899,7 +929,7 @@ vars, one-time auth commands, or remote MCP additions. Skills with no setup work
 | `migrate-code`           | Port a codebase to another language/framework via a six-step rulebook/translate/compile/test/verify engine              | None — uses the repo's own build/test commands + bundled `context7` MCP                                                                                                                                                                                                                                                                   |
 | `monday`                 | Manage monday.com boards, items, groups, columns, and updates                                                           | `claude mcp add monday` with a `${MONDAY_TOKEN}` Bearer header — see [Configure Remote MCPs](#configure-remote-mcps-optional). Token from avatar → Developers → My access tokens. MCP-only, no CLI fallback                                                                                                                               |
 | `monday-weekly-report`   | Weekly project-status report from monday.com board(s)                                                                   | `claude mcp add monday` with a `${MONDAY_TOKEN}` Bearer header (see `monday` above). For attribution enable dynamic API. Optional env: `MONDAY_WEEKLY_REPORT_BOARDS`, `MONDAY_WEEKLY_REPORT_TO` (required for `--send`), `MONDAY_WEEKLY_REPORT_CC`, `MONDAY_WEEKLY_REPORT_ROLES` / `MONDAY_WEEKLY_REPORT_STATUSES` (cache path overrides) |
-| `newrelic`               | Query New Relic observability data, alerts, and logs                                                                    | newrelic remote MCP *(or)* `newrelic profile add --name default --apiKey NRAK-... --accountId ...`                                                                                                                                                                                                                                        |
+| `newrelic`               | Query New Relic observability data, alerts, and logs                                                                    | newrelic remote MCP *(or)* env: `NEW_RELIC_API_KEY`, `NEW_RELIC_ACCOUNT_ID`, `NEW_RELIC_REGION` *(or)* `newrelic profile add --name default --apiKey NRAK-... --accountId ...`. See [Avoid repeated sign-ins](#avoid-repeated-sign-ins-optional)                                                                                          |
 | `ongage`                 | Manage Ongage email marketing — contacts, lists, segments, campaigns, transactional sends, and analytics (read/write)   | Env: `ONGAGE_API_KEY` (Ongage → API Keys; the plan must include API access), optional `ONGAGE_LIST_ID`. Calls the REST API with `curl` + `jq` — no MCP. Asks before every write, and before deletes and sends shows the exact target                                                                                                      |
 | `paypal`                 | Manage PayPal invoices, payments, and disputes                                                                          | paypal remote MCP **(required — no CLI fallback)**                                                                                                                                                                                                                                                                                        |
 | `playstore`              | Fetch, analyze, and respond to Google Play reviews                                                                      | Env: `GOOGLE_APPLICATION_CREDENTIALS` (path to service-account JSON; needs Google Play Developer API + Play Console access). Requires `uv`/`uvx` on PATH.                                                                                                                                                                                 |
@@ -914,6 +944,7 @@ vars, one-time auth commands, or remote MCP additions. Skills with no setup work
 | `run-linters`            | Run linters and fix any issues found                                                                                    | None — runs project linters already configured in the repo                                                                                                                                                                                                                                                                                |
 | `sendgrid`               | Manage Twilio SendGrid — sends, contacts, templates, suppressions, stats, account, senders, webhooks (read/write)       | Env: `SENDGRID_API_KEY` (Settings → API Keys), optional `SENDGRID_REGION=eu`, `SENDGRID_ON_BEHALF_OF` (subuser), `SENDGRID_VALIDATION_API_KEY`. Calls the v3 REST API with `curl` + `jq` — no MCP. Asks before every write, and before deletes and sends shows the exact target                                                           |
 | `sprint-summary`         | Summarize sprint items grouped by repo in ~3-day blocks                                                                 | atlassian remote MCP *(or)* `jira init`                                                                                                                                                                                                                                                                                                   |
+| `triage-monitoring`      | Triage prod/rc/beta across dashboard, New Relic, CloudWatch, Heroku, Crashlytics; propose issues                        | Sources it detects: see `query-db`, `newrelic`, `aws`, `heroku`, `crashlytics` rows. Run from the project top folder                                                                                                                                                                                                                      |
 | `verify-resolved-issues` | Audit resolved/fixed/done issues, verify fixes, close or reopen                                                         | GitHub: `gh auth login` *(or)* `GITHUB_TOKEN`. Jira: atlassian remote MCP *(or)* `jira init`                                                                                                                                                                                                                                              |
 | `weekly-dev-report`      | Weekly dev activity report from Jira sprint + GitHub                                                                    | atlassian remote MCP *(or)* `jira init`. GitHub: `gh auth login`. Optional env: `WEEKLY_DEV_REPORT_TO` (required for `--send`), `WEEKLY_DEV_REPORT_CC`, `GITHUB_USERNAME_MAP`, `WEEKLY_DEV_REPORT_ROLES` (cache path override)                                                                                                            |
 | `work-issue`             | Implement GitHub/Jira issue(s) end-to-end and open a PR                                                                 | GitHub: `gh auth login` *(or)* `GITHUB_TOKEN`. Jira: atlassian remote MCP *(or)* `jira init`                                                                                                                                                                                                                                              |
