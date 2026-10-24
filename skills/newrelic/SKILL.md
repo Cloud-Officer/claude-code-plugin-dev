@@ -23,7 +23,7 @@ Query observability data, alerts, and application health.
 | Analyze application logs | `mcp__newrelic__analyze_application_logs` | N/A (use NRQL via CLI) |
 | Get golden metrics | `mcp__newrelic__get_golden_metrics` | N/A (use NRQL via CLI) |
 
-**Note:** The `newrelic` CLI requires a User API key via `newrelic profile add --name default --apiKey NRAK-... --accountId ...`. If neither the MCP nor CLI is available, inform the user and stop.
+**Note:** The `newrelic` CLI needs a User API key (`NRAK-…`). It reads `NEW_RELIC_API_KEY`, `NEW_RELIC_ACCOUNT_ID` and `NEW_RELIC_REGION` (`US` or `EU`) straight from the environment, so when the project's `.envrc` sets them no profile or login is needed. Check by name only, never printing the key: `printenv | cut -d= -f1 | grep '^NEW_RELIC_'`. Without them, the CLI needs a stored profile: `newrelic profile add --name default --apiKey NRAK-... --accountId ...`. If neither the MCP nor CLI is available, inform the user and stop.
 
 ## Usage
 

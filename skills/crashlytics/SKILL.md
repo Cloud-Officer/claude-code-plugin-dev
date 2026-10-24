@@ -31,7 +31,7 @@ average or reconcile them into a single figure.
 | List tables | `mcp__bigquery__list_tables` | `bq ls --format=json $BQ_PROJECT:$BQ_CRASHLYTICS_DATASET` |
 | Get table schema | `mcp__bigquery__get_table_schema` | `bq show --format=json $BQ_PROJECT:$BQ_CRASHLYTICS_DATASET.TABLE` |
 
-**Note:** Both methods require GCP authentication. The MCP server uses Application Default Credentials; the `bq` CLI uses `gcloud auth application-default login`.
+**Note:** Both methods require GCP authentication. The MCP server uses its own OAuth sign-in; the `bq` CLI uses the active `gcloud` credentials. A service-account key avoids repeated sign-ins: when `GOOGLE_APPLICATION_CREDENTIALS` points at an existing key file, run every `bq` command with `CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE` set to that file (use the value from `.envrc` when it is already set), so `bq` uses the key and never asks for a login.
 
 ## Environment Variables
 
@@ -67,7 +67,7 @@ echo "BQ_CRASHLYTICS_TVOS_TABLE=$BQ_CRASHLYTICS_TVOS_TABLE"
 bq query --use_legacy_sql=false --project_id="$BQ_PROJECT" "SELECT 1"
 ```
 
-If this fails, tell the user to run `gcloud auth application-default login` and `gcloud auth application-default set-quota-project $BQ_PROJECT`.
+If this fails while a service-account key is configured (see the note above), report the error: the key file is missing, disabled, or lacks **BigQuery Job User** on `BQ_PROJECT` / **BigQuery Data Viewer** on the dataset, and signing in will not fix it. Otherwise, tell the user to run `gcloud auth application-default login` and `gcloud auth application-default set-quota-project $BQ_PROJECT`, or to set up a service-account key (README → *Avoid repeated sign-ins*).
 
 ### 3. Determine platform and query parameters
 
