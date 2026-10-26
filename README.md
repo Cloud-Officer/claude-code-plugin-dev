@@ -390,7 +390,7 @@ Some skills use remote MCP servers (no local install). Add only the ones you'll 
 **local scope**, so each is registered for the current folder only rather than always-loaded for every project:
 
 ```bash
-claude mcp add atlassian --transport http https://mcp.atlassian.com/v1/mcp
+claude mcp add atlassian --transport http https://mcp.atlassian.com/v2/mcp
 claude mcp add bigquery --transport http https://bigquery.googleapis.com/mcp
 claude mcp add cookieyes --transport http https://app.cookieyes.com/mcp
 claude mcp add figma --transport http https://mcp.figma.com/mcp
@@ -413,10 +413,10 @@ folder, even though local-scope registration looks isolated.
 
 ```bash
 # in ~/work/companya
-claude mcp add atlassian-companya --transport http https://mcp.atlassian.com/v1/mcp
+claude mcp add atlassian-companya --transport http https://mcp.atlassian.com/v2/mcp
 
 # in ~/work/companyb
-claude mcp add atlassian-companyb --transport http https://mcp.atlassian.com/v1/mcp
+claude mcp add atlassian-companyb --transport http https://mcp.atlassian.com/v2/mcp
 ```
 
 This applies to every OAuth-at-connect remote MCP listed above (`atlassian`, `bigquery`, `cookieyes`, `figma`, `newrelic`, `paypal`) — not to stdio servers like
