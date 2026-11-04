@@ -23,6 +23,8 @@ const input = readArgs(args)
 const issues = Array.isArray(input.issues) ? input.issues : []
 const defaultBranch = String(input.defaultBranch ?? '')
 const repoRoot = input.repoRoot || '.'
+const requestedParallel = Number.parseInt(input.maxParallel, 10)
+const maxParallel = Number.isFinite(requestedParallel) && requestedParallel > 0 ? requestedParallel : 4
 
 if (!/^[A-Za-z0-9][A-Za-z0-9._\/-]*$/.test(defaultBranch)) {
   log('rejected defaultBranch: ' + JSON.stringify(defaultBranch))
@@ -187,11 +189,25 @@ if (!issues.length) {
   return { defaultBranch, repoRoot, results: [] }
 }
 
-// Refs are not validated until buildImplementPrompt, so quote them.
-log('Implementing ' + issues.length + ' issues in parallel, each in its own git worktree: ' + issues.map(i => JSON.stringify(String(i.ref))).join(', '))
+async function boundedMap(items, limit, fn) {
+  const out = new Array(items.length)
+  let next = 0
+  const lane = async () => {
+    while (next < items.length) {
+      const i = next++
+      out[i] = await fn(items[i])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, lane))
+  return out
+}
 
-const results = await pipeline(
+// Refs are not validated until buildImplementPrompt, so quote them.
+log('Implementing ' + issues.length + ' issues, at most ' + maxParallel + ' at a time, each in its own git worktree: ' + issues.map(i => JSON.stringify(String(i.ref))).join(', '))
+
+const results = await boundedMap(
   issues,
+  maxParallel,
   (issue) => {
     let prompt
     try {

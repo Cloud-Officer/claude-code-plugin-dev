@@ -118,10 +118,20 @@ Workflow({
   args: {
     defaultBranch: "<DEFAULT_BRANCH>",
     repoRoot: "<REPO_ROOT>",
+    maxParallel: <MAX_PARALLEL>,
     issues: [ { ref: "123", tracker: "github" }, { ref: "124", tracker: "github" } ]   // tracker: exactly "github" or "jira", lowercase — the workflow tests it with === 'jira'
   }
 })
 ```
+
+`maxParallel` caps how many issues build and test at the same time; the rest queue and start as slots free up. Every agent runs a full build and test suite (Gradle, xcodebuild, PHPUnit), so an uncapped batch saturates the machine and freezes the desktop. Set it to half the CPU cores, at least 1:
+
+```bash
+CORES=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
+MAX_PARALLEL=$(( CORES / 2 > 0 ? CORES / 2 : 1 ))
+```
+
+The workflow defaults to 4 when `maxParallel` is missing.
 
 Each issue may also carry an optional `hint` string, such as a prior read-only analysis from `sprint-quick-wins`. The agent receives it in a fenced block as data to verify, never as a spec.
 

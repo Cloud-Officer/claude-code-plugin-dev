@@ -213,11 +213,23 @@ A 🔴 row can only be fixed when the user names it by number; an issue that is 
    args: {
      defaultBranch: "<DEFAULT_BRANCH>",
      repoRoot: "<REPO_ROOT>",
+     maxParallel: <this repo's share of the budget>,
      issues: [ { ref: "PROJ-412", tracker: "jira", hint: "<plan + test_plan + files from Step 4>" } ]
    }
    ```
 
    The tracker is per issue, so a repo can mix Jira and GitHub issues. `hint` is passed to the fixing agent as data, a starting point it must verify, not a spec. Each workflow returns in the background; wait for all of them.
+
+   **Cap the total load.** Every fixing agent runs a full build and test suite, and the repo workflows run at the same time, so 27 uncapped agents (15 Gradle, 9 xcodebuild, 3 PHPUnit) drove a 16-core Mac to a load of 64 and froze the desktop. The budget for **all** repos together is half the CPU cores, at least 1:
+
+   ```bash
+   CORES=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
+   BUDGET=$(( CORES / 2 > 0 ? CORES / 2 : 1 ))
+   ```
+
+   Split it across repos in proportion to their issue counts, at least 1 each, so the shares add up to `BUDGET` (round down, then hand leftover slots to the repos with the most issues). When there are more repos than slots, launch the repos one after another instead of all at once. Say the budget in the launch message (for example "8 agents at a time on 16 cores").
+
+   **Before launching on iOS, check that Xcode is ready without a password.** `xcodebuild -checkFirstLaunchStatus` must exit 0; otherwise a build or `simctl` call starts `xcodebuild -runFirstLaunch`, which shows a macOS administrator-password dialog that blocks the desktop and the agent. When it fails, skip that repo, list it under **Skipped**, and tell the user to run `sudo xcodebuild -runFirstLaunch` (and install any missing simulator runtime) first.
 
 ## Step 7: Review results
 
