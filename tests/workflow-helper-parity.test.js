@@ -6,7 +6,7 @@ const path = require('node:path')
 const { describe, it } = require('node:test')
 const { declarationSource, loadHelpers, workflowScripts } = require('../scripts/workflow-helpers.js')
 
-const SHARED = { normSev: 2, keepFinding: 2, chunk: 2, joinVerdicts: 2, safeAgent: 5, readArgs: 5 }
+const SHARED = { normSev: 2, keepFinding: 2, chunk: 3, joinVerdicts: 2, safeAgent: 6, readArgs: 6 }
 
 function copiesOf(name) {
   const copies = []

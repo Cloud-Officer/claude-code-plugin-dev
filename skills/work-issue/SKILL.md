@@ -123,6 +123,8 @@ Workflow({
 })
 ```
 
+Each issue may also carry an optional `hint` string, such as a prior read-only analysis from `sprint-quick-wins`. The agent receives it in a fenced block as data to verify, never as a spec.
+
 Each agent fetches its issue, creates branch `issue-<n>` (GitHub) or `<KEY>` uppercase (Jira) from `origin/$DEFAULT_BRANCH` — if that branch already exists from an earlier run, the agent stops with `success:false` and names the pre-existing branch in `block_reason` rather than reusing it — implements the change, **writes and runs tests (hard gate — same rule as Step 8)**, and commits with the correct issue-tagged, signature-free message. Agents are autonomous (no mid-run questions) and record any judgement calls in `assumptions[]`. They do **not** push or open PRs. The workflow returns:
 
 ```text
