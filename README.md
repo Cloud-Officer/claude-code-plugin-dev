@@ -62,6 +62,7 @@ install works across multiple accounts and tenants.
 * Google Cloud infrastructure management via gcloud
 * New Relic observability data and alert management
 * Heroku application management and deployment
+* Production / RC / beta monitoring triage across admin dashboards, New Relic, CloudWatch, Heroku, and Crashlytics, with severity-ranked proposed issues
 * Local Xcode build/run/test/debug loop for iOS, macOS, watchOS, tvOS and visionOS — schemes, destinations, test plans, LLDB, SwiftUI previews, simulator UI automation, String Catalogs, and Apple's crash and field performance reports
 * App Store Connect management (builds, TestFlight, reviews, IAPs, Xcode Cloud)
 * Google Play Store review management and analytics
