@@ -1,7 +1,7 @@
 ---
 name: sprint-quick-wins
 description: "Find the quick wins across the whole team and fix them in parallel. Lists every GitHub org member, matches them to their Jira user, collects their open issues (Jira: active sprint only; GitHub: open and assigned), drops anything someone already started, rates every remaining issue for how easily it can be fixed with parallel read-only agents, shows the ranked list for approval, then fixes the approved ones in parallel with work-issue and opens the PRs after a second approval. Use when the user wants to find easy issues, quick wins, low-hanging fruit, sweep the sprint for easy fixes, auto-fix the team's open issues, batch-fix sprint tickets, or clear simple bugs across every repo of a project."
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(jira:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(printf:*), Bash(sed:*), Bash(sort:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Read, Write, Glob, Grep, TodoWrite, Agent, Workflow, Skill, AskUserQuestion, mcp__github__*, mcp__plugin_co-dev_github__*, mcp__atlassian__*
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(jira:*), Bash(curl:*), Bash(awk:*), Bash(basename:*), Bash(cat:*), Bash(cut:*), Bash(dirname:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(printf:*), Bash(sed:*), Bash(sort:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(xargs:*), Read, Write, Glob, Grep, TodoWrite, Agent, Workflow, Skill, AskUserQuestion, mcp__github__*, mcp__plugin_co-dev_github__*, mcp__atlassian__*
 ---
 
 # Sprint Quick Wins
@@ -21,6 +21,8 @@ The run has two human gates and they are never merged: **approve the list** (Ste
 
 **Any-failure policy.** If any command, tool call, or dispatch exits non-zero, returns nothing, or yields an empty value where one is required, stop and report the command and its stderr — never continue with a partial value or guess a substitute. One exception, stated where it applies: a "not started" probe that fails for one issue marks **that issue** as *could not verify — skipped*, never as not started.
 
+**Completeness policy.** Every list this skill reads is paginated: Jira sprint issues, changelogs, org members, GitHub search. Read every page and check the count you hold against the API's `total` before moving on. A list that stops at exactly 50, 100 or 1000 items is a missed page, not a coincidence. Save every API response to a file in the scratchpad and run `jq` on the file; never pipe a shell variable through `echo` (zsh's `echo` turns `\n` inside JSON strings into real newlines and `jq` then fails or reads nothing).
+
 ## Interpolation Boundary
 
 Every value this skill does not control must match its pattern before it reaches a command line, JQL query, GraphQL variable, or URL, and is **rejected, never sanitised** when it does not. Free text (titles, bodies, comments) never reaches a command line: it travels as an MCP tool parameter or on stdin through a quoted heredoc.
@@ -32,6 +34,7 @@ Every value this skill does not control must match its pattern before it reaches
 - Jira project key: `^[A-Z][A-Z0-9]+$`
 - Jira issue key: `^[A-Z][A-Z0-9]+-[0-9]+$`
 - Jira issue id: `^[0-9]+$`
+- Jira board id and sprint id: `^[0-9]+$`
 - Jira account id: `^[A-Za-z0-9:-]+$`
 - Jira base URL (`$JIRA_URL`): `^https://[A-Za-z0-9.-]+/?$`
 - work-issue branch name: `^(?:issue-\d+|[A-Z][A-Z0-9]*-\d+)$`
@@ -53,7 +56,9 @@ Prefer MCP tools; fall back to the CLI when they are missing or error.
 | GitHub user profile | `mcp__github__search_users` (`user:<login>`) | `gh api users/<login> --jq '{login,name,email}'` |
 | GitHub issues per user | `mcp__github__search_issues` (`org:<org> is:issue is:open assignee:<login>`) | `gh search issues --owner <org> --assignee <login> --state open --json number,title,url,repository,labels,updatedAt --limit 200` |
 | Linked branches / PRs / Projects status | n/a | `gh api graphql` (Step 3) |
-| Sprint issues | `mcp__atlassian__searchJiraIssuesUsingJql` | `jira issue list --jql '<JQL>' --raw` |
+| Active sprint of the board | n/a | `curl -sf -u "$JIRA_EMAIL:$JIRA_API_TOKEN" "$JIRA_URL/rest/agile/1.0/board/<BOARD>/sprint?state=active"` |
+| Sprint issues (paginated) | n/a | `curl -sf -u "$JIRA_EMAIL:$JIRA_API_TOKEN" "$JIRA_URL/rest/agile/1.0/sprint/<SPRINT>/issue?startAt=<N>&maxResults=100&fields=summary,issuetype,status,assignee,labels,components"`, repeated until `startAt` reaches `total` |
+| All open PRs of the org | `mcp__github__search_pull_requests` (`org:<org> is:pr is:open`) | `gh search prs --owner <org> --state open --json url,title,body --limit 1000` (once, not per issue) |
 | Issue changelog | `mcp__atlassian__getJiraIssue` with `expand: changelog` | `curl -s -u "$JIRA_EMAIL:$JIRA_API_TOKEN" "$JIRA_URL/rest/api/3/issue/<KEY>/changelog"` |
 | Project status categories | n/a | `curl -s -u "$JIRA_EMAIL:$JIRA_API_TOKEN" "$JIRA_URL/rest/api/3/project/<KEY>/statuses"` |
 | Jira dev-info (branches, commits, PRs) | n/a | `curl -s -u "$JIRA_EMAIL:$JIRA_API_TOKEN" "$JIRA_URL/rest/dev-status/latest/issue/summary?issueId=<ID>"` |
@@ -67,17 +72,20 @@ Run from the **project's top folder** (for example `~/Downloads/ugm`), whose dir
 3. Resolve the Jira project per `--project`, else from the `jira` CLI config:
 
    ```bash
-   PROJECT=$(grep -h '^project:' ~/.config/.jira/.config.yml ~/.jira/.config.yml "${XDG_CONFIG_HOME:-$HOME/.config}/.jira/.config.yml" 2>/dev/null | head -n1 | awk '{print $2}')
+   CFG=${JIRA_CONFIG_FILE:-$(ls ~/.config/.jira/.config.yml ~/.jira/.config.yml "${XDG_CONFIG_HOME:-$HOME/.config}/.jira/.config.yml" 2>/dev/null | head -n1)}
+   PROJECT=$(awk '/^project:/{f=1} f&&/key:/{print $2; exit}' "$CFG")
+   BOARD=$(awk '/^board:/{f=1} f&&/id:/{print $2; exit}' "$CFG")
    ```
 
-   Empty → ask the user for the key. A project with no active sprint → say so and continue with GitHub only.
+   `$JIRA_CONFIG_FILE` (set by the folder's `.envrc`) wins over the default config, since one machine often holds a config per client. `project:` and `board:` are YAML blocks (`key:` and `id:` on the next lines), not one-line values. Empty project → ask the user for the key. Empty board → list the project's boards (`/rest/agile/1.0/board?projectKeyOrId=<KEY>`) and ask which one.
+4. Resolve the **one** active sprint of that board: `/rest/agile/1.0/board/<BOARD>/sprint?state=active`, keep `id` and `name`. Never use `sprint in openSprints()`: it matches the active sprints of every board that shows the project, which pulls in issues the user does not see on their board. No active sprint → say so and continue with GitHub only. More than one → ask which.
 
 Create a TodoWrite list of Steps 0–9.
 
 ## Step 1: Users and identities
 
 1. **GitHub users** — every org member (`gh api orgs/<org>/members --paginate`), or only the `--user` logins. Fetch each member's `name` and public `email`. Skip bot accounts (`[bot]` suffix, or `type` `Bot`).
-2. **Jira users** — the distinct assignees of the active sprint, from the Step 2 Jira query (run it once without the assignee filter, keep `assignee.accountId`, `displayName`, `emailAddress`).
+2. **Jira users** — the distinct assignees of the active sprint, from **all pages** of the Step 2 sprint fetch (keep `assignee.accountId`, `displayName`, `emailAddress`). Fetch the sprint before matching: an assignee whose issues sit only on page 2 is otherwise never matched and their GitHub login gets cached as "no Jira user".
 3. **Match** each GitHub login to a Jira account id, first rule that hits:
    1. the identity cache: `${SPRINT_QUICK_WINS_IDENTITIES:-$HOME/.config/sprint-quick-wins/identities.json}`, `{ "<login>": { "accountId": "<id or empty>", "confirmedAt": "<date>" } }` — an empty `accountId` means "confirmed: no Jira user";
    2. equal email, case-insensitive;
@@ -86,13 +94,20 @@ Create a TodoWrite list of Steps 0–9.
 
 ## Step 2: Collect open issues
 
-- **Jira** (active sprint only):
+- **Jira** (the board's active sprint from Step 0, by id): page through `/rest/agile/1.0/sprint/<SPRINT>/issue` 100 at a time until `startAt >= total`, appending each page's `issues[]` to one JSONL file, then assert the line count equals `total`. Keep issues whose `statusCategory.key` is not `done`. Keep `key`, `id`, `summary`, `issuetype.name`, `status.name`, `status.statusCategory.key`, `assignee`, `labels`, `components`.
 
-  ```text
-  project = <KEY> AND sprint in openSprints() AND statusCategory != Done AND assignee in (<accountIds>) AND issuetype not in (Epic) ORDER BY rank
+  ```bash
+  : > "$S/sprint.jsonl"; start=0
+  while :; do
+    curl -sf -u "$JIRA_EMAIL:$JIRA_API_TOKEN" "$JIRA_URL/rest/agile/1.0/sprint/$SPRINT/issue?startAt=$start&maxResults=100&fields=summary,issuetype,status,assignee,labels,components" -o "$S/page.json" || { echo "sprint page $start failed"; exit 1; }
+    jq -c '.issues[]' "$S/page.json" >> "$S/sprint.jsonl"
+    total=$(jq .total "$S/page.json"); n=$(jq '.issues|length' "$S/page.json"); start=$((start+n))
+    [ "$n" -eq 0 ] || [ "$start" -ge "$total" ] && break
+  done
+  [ "$(wc -l < "$S/sprint.jsonl")" -eq "$total" ] || echo "MISSING ISSUES: fetched $(wc -l < "$S/sprint.jsonl") of $total"
   ```
 
-  Keep `key`, `id`, `summary`, `issuetype.name`, `status.name`, `status.statusCategory.key`, `assignee`, `labels`, `components`.
+- **Choose the people.** Print the open issues per assignee (To Do / blocked / started) and ask with `AskUserQuestion` which assignees to sweep: the developers only (recommended), developers plus everyone else, or a named list. QA testers and content people often hold Bugs that are test runs or scenario issues, not code. `--user` skips the question.
 - **GitHub** (no sprints on GitHub): every open issue in the org assigned to each matched login. Drop pull requests and issues in archived repos.
 
 Drop Epics, Stories, and GitHub issues labelled `feature`, `enhancement`, `story`, `epic`, or `design` — they need design discussion and belong to `work-issue` in sequential mode. Count them under **Skipped**.
@@ -110,7 +125,9 @@ Collect each workspace repo's remote branch list once, from inside the repo: `gi
 3. **History** — the changelog must show no transition into any status whose category is `indeterminate` (map historical status ids to categories with the project statuses call). One → *previously started, moved back*.
 4. **Dev-info** — with `$JIRA_URL`, `$JIRA_EMAIL`, `$JIRA_API_TOKEN` set, the dev-status summary must show zero branches, commits, and pull requests. Any → *has linked code*. Without credentials, rely on checks 5–6 and say so in the report header.
 5. **Branches** — no remote branch in any workspace repo matches the key.
-6. **PRs** — `gh search prs --owner <org> --state open --json url,title "<KEY>"` returns nothing.
+6. **PRs** — no open PR in the org mentions the key (`<KEY>` followed by a non-digit or the end) in its title or body. Fetch the org's open PRs **once** (see Tools) and match locally: one `gh search prs` per issue hits GitHub's search rate limit (30 a minute) after a few dozen issues.
+
+Run checks 3–4 for many issues with `xargs -P 8` over a small script that writes each response to a file, so a 200-issue sprint takes a minute, not twenty. Changelogs over 100 entries need their next page too.
 
 ### GitHub
 
@@ -145,7 +162,7 @@ The analysis agents re-check for softer signals — a comment saying "on it", a 
 
 ## Step 4: Analyse (parallel, read-only)
 
-Apply `--limit`, then give each candidate a `repoHint`: for GitHub, the repo the issue lives in; for Jira, a workspace repo whose name equals one of its components or labels, else none.
+Apply `--limit`; when candidates exceed it, ask whether to analyse them all (say how many agents and roughly how many tokens) rather than silently dropping the rest. Then give each candidate a `repoHint`: for GitHub, the repo the issue lives in; for Jira, a workspace repo whose name equals one of its components or labels, else one named in a title prefix such as `[pnp-api]`, or the platform prefix `[iOS]` / `[Android]` / `[Web]` mapped to the matching repo kind, else none. Every `repos` entry needs `path`; the workflow drops entries without one.
 
 The Workflow tool refuses a `scriptPath` outside the working directory, and the plugin root always is, so pass the script inline: Read the whole `${CLAUDE_PLUGIN_ROOT}/skills/sprint-quick-wins/sprint-quick-wins.workflow.js` with the Read tool and send its text verbatim as `script`, without Read's line-number prefixes.
 
@@ -196,11 +213,23 @@ A 🔴 row can only be fixed when the user names it by number; an issue that is 
    args: {
      defaultBranch: "<DEFAULT_BRANCH>",
      repoRoot: "<REPO_ROOT>",
+     maxParallel: <this repo's share of the budget>,
      issues: [ { ref: "PROJ-412", tracker: "jira", hint: "<plan + test_plan + files from Step 4>" } ]
    }
    ```
 
    The tracker is per issue, so a repo can mix Jira and GitHub issues. `hint` is passed to the fixing agent as data, a starting point it must verify, not a spec. Each workflow returns in the background; wait for all of them.
+
+   **Cap the total load.** Every fixing agent runs a full build and test suite, and the repo workflows run at the same time, so 27 uncapped agents (15 Gradle, 9 xcodebuild, 3 PHPUnit) drove a 16-core Mac to a load of 64 and froze the desktop. The budget for **all** repos together is half the CPU cores, at least 1:
+
+   ```bash
+   CORES=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
+   BUDGET=$(( CORES / 2 > 0 ? CORES / 2 : 1 ))
+   ```
+
+   Split it across repos in proportion to their issue counts, at least 1 each, so the shares add up to `BUDGET` (round down, then hand leftover slots to the repos with the most issues). When there are more repos than slots, launch the repos one after another instead of all at once. Say the budget in the launch message (for example "8 agents at a time on 16 cores").
+
+   **Before launching on iOS, check that Xcode is ready without a password.** `xcodebuild -checkFirstLaunchStatus` must exit 0; otherwise a build or `simctl` call starts `xcodebuild -runFirstLaunch`, which shows a macOS administrator-password dialog that blocks the desktop and the agent. When it fails, skip that repo, list it under **Skipped**, and tell the user to run `sudo xcodebuild -runFirstLaunch` (and install any missing simulator runtime) first.
 
 ## Step 7: Review results
 
