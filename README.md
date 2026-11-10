@@ -26,7 +26,7 @@ Claude Code plugin for development workflow automation.
 
 `claude-code-plugin-dev` is the source repository for **`co-dev`**, a Claude Code plugin that automates day-to-day
 development workflows. It bundles 36 skills — issue tracking, PR creation, deep code review, test generation, linting,
-documentation reviews, cloud cost audits, cloud, email-marketing, Xcode and app-store operations, and reporting — alongside 13 language servers and 15 MCP servers
+documentation reviews, cloud cost audits, cloud, email-marketing, Xcode and app-store operations, and reporting — plus a read-only research subagent, 13 language servers and 15 MCP servers
 that Claude Code loads automatically once the plugin is installed.
 
 It is aimed at engineering teams that want these workflows available in every repository without wiring up each
@@ -36,6 +36,7 @@ install works across multiple accounts and tenants.
 ### Features
 
 * Issue tracking integration (GitHub Issues and Jira)
+* Cross-source research — a read-only subagent answers "why", "what was decided" and "who owns" questions from code, git history, PRs, Jira and Confluence, and returns a short cited answer instead of raw results
 * Resolved-issue audits — verify a claimed fix exists in the current codebase, then close or reopen the issue
 * Automated deep code reviews using parallel agents
 * PR generation with commit messages
@@ -992,6 +993,17 @@ key with the **Admin** role, or **App Manager** with Xcode Cloud access.
   telemetry by default; the skill runs it with `ASC_TELEMETRY_DISABLED=1`, and you can opt out globally with
   `asc telemetry disable`. The skill never uses the CLI's `asc web` commands, which log in with your Apple ID against
   Apple's private web API.
+
+### Subagents
+
+| Agent                       | Description                                                                                                                        | Setup                                                                                                                                        |
+|-----------------------------|------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| `co-dev:context-researcher` | Read-only research across code, git history, PRs, Jira and Confluence; returns an answer, cited evidence, conflicts and confidence | GitHub: bundled `github` MCP *(or)* `gh auth login`. Jira/Confluence: atlassian remote MCP *(or)* `jira init`. Without them it uses git only |
+
+Claude delegates to it on its own for questions about history, rationale, decisions, ownership or conventions; you can
+also ask for it by name. It never writes: its `tools` list holds only read tools, and `check-repo-consistency.js` fails
+the build if a write tool or an MCP wildcard is added. Its Atlassian grants use the bare `atlassian` server name, so a
+tenant-suffixed server such as `atlassian-companya` is not reachable from it; it falls back to the `jira` CLI there.
 
 ### Language Servers (LSPs)
 

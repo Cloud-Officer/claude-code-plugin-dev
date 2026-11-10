@@ -1,7 +1,7 @@
 # Architecture Design
 
 `claude-code-plugin-dev` is the source repository for **`co-dev`**, a Claude Code plugin. It ships no server, no CLI and
-no runtime library. What it ships is a set of *instructions that another process executes*: 37 skill definitions, 6
+no runtime library. What it ships is a set of *instructions that another process executes*: 37 skill definitions, 1 subagent definition, 6
 JavaScript orchestration scripts that the Claude Code **Workflow** tool runs, 15 MCP server declarations and 13 language
 server declarations. The executing runtime — Claude Code itself — is not in this repository.
 
@@ -101,13 +101,14 @@ many agents run at once.
 | Marketplace manifest | `.claude-plugin/marketplace.json` | Distribution entry; `name` and `description` must match `plugin.json`. Neither manifest sets `version`, so installs track the latest commit | `plugin.json` |
 | MCP manifest | `.mcp.json` | 15 stdio MCP servers and the environment variables their credentials come from | host `node`/`uv`, external packages |
 | Skills | `skills/<name>/SKILL.md` (37) | One self-contained procedure each: frontmatter trigger + tool grant, body procedure. Templates and rules live in the single file | the tools listed in `allowed-tools` |
+| Research subagent | `agents/context-researcher.md` | A read-only subagent the main session delegates cross-source "why / what was decided / who owns" questions to. It searches code, git history, PRs, Jira and Confluence, applies its source-precedence rules, and returns an answer under 300 words with cited evidence, conflicts and confidence, so raw search results stay out of the caller's context. Its `tools` frontmatter is an explicit read-only list; no wildcard | `Read`, `Grep`, `Glob`, `Bash`, read-only `github` and `atlassian` MCP tools |
 | Shared authoring standard | `skills/code-standards/SKILL.md` | The one skill other skills delegate *to* rather than being invoked directly by a user: comment discipline and the diff sweep that enforces it, for every change to source or test files. `write-tests`, `work-issue` and `migrate-code` route to it | `Read`, `Grep`, `Glob`, `Bash(git:*)`, `Bash(grep:*)` |
 | Workflow scripts | `skills/<name>/<name>.workflow.js` (6) | Multi-phase agent orchestration for the six heavy skills. 3,618 lines total; `review-aws-cost` (1,201) and `code-review-deep` (952) are the largest | harness globals only |
 | Tunnel script | `skills/query-db/scripts/db-tunnel.sh`, `db-tunnel.ps1` | The one executable a skill ships. `query-db` and `analyze-db` call it to validate, open, reuse, reopen and close the `ssm-jump` tunnel declared by `<ENGINE>_TUNNEL_<ENV>`, so neither skill probes ports by hand (users commonly deny `nc`). The `.ps1` twin runs on Windows | host `bash` or PowerShell, `ssm-jump` |
 | Harness/slicing library | `scripts/workflow-helpers.js` | The one `require()`-able shared module. Discovers workflow scripts, emulates the harness wrapper (`harnessSource`), and slices named declarations out of workflow source (`declarationSource`, `loadHelpers`) | `node:fs`, `node:path` |
 | Syntax gate | `scripts/check-workflow-syntax.js` | Wraps each workflow script in the harness shape and runs `node --check` on it; fails if zero scripts are found | `workflow-helpers.js` |
-| Consistency gate | `scripts/check-repo-consistency.js` | Cross-checks the three manifests, every skill's frontmatter, every `${CLAUDE_PLUGIN_ROOT}` path in docs and skills, and every `plugin.json` keyword (unique, and present in the repo's own text) | `workflow-helpers.js` (`ROOT`), `node:fs`, `node:path` |
-| Tests | `tests/*.test.js` (19 files, 30 suites, 336 tests) | Pure-function tests over sliced workflow declarations, the `safeAgent` and `readArgs` behaviour of all six scripts, a parity check on helpers copied between scripts, a one-line comment cap on every script, and contract tests that read `SKILL.md` text — guardrail cross-references, heredoc fencing, interpolation-boundary patterns — two of which extract a skill's `bash` block and execute it, and one that drives `db-tunnel.sh` against a fake `ssm-jump` | `node:test`, `node:assert`, `workflow-helpers.js`, host `bash` |
+| Consistency gate | `scripts/check-repo-consistency.js` | Cross-checks the three manifests, every skill's frontmatter, every agent's frontmatter (and that its `tools` list holds no write tool and no wildcard), every `${CLAUDE_PLUGIN_ROOT}` path in docs and skills, and every `plugin.json` keyword (unique, and present in the repo's own text) | `workflow-helpers.js` (`ROOT`), `node:fs`, `node:path` |
+| Tests | `tests/*.test.js` (19 files, 32 suites, 342 tests) | Pure-function tests over sliced workflow declarations, the `safeAgent` and `readArgs` behaviour of all six scripts, a parity check on helpers copied between scripts, a one-line comment cap on every script, and contract tests that read `SKILL.md` text — guardrail cross-references, heredoc fencing, interpolation-boundary patterns — two of which extract a skill's `bash` block and execute it, and one that drives `db-tunnel.sh` against a fake `ssm-jump` | `node:test`, `node:assert`, `workflow-helpers.js`, host `bash` |
 | CI | `.github/workflows/build.yml` | The `js_unit_tests` job runs `npm ci`, the two gates and `node --test 'tests/*.test.js'`; separate jobs run actionlint, ESLint, markdownlint, Semgrep, ShellCheck and yamllint | GitHub Actions |
 
 ### Why workflow scripts are not modules
@@ -377,6 +378,10 @@ they happen on the developer's machine rather than in the database:
   the command line, so the password does not appear in `ps`.
 
 ### Read-only postures (prompt-level, with one code assist)
+
+The `context-researcher` subagent is the one read-only posture the runtime enforces for MCP tools: its frontmatter
+`tools` list names only read tools, so write tools are never available to it. Its `Bash` grant is the exception — the
+read-only command list in its body is a prompt-level obligation like the skills below.
 
 Twelve skills declare a read-only posture — `analyze-db`, `crashlytics`, `doc-tracker-coverage`, `monday`,
 `monday-weekly-report`, `newrelic`, `query-db`, `review-aws-cost`, `sprint-summary`, `triage-monitoring`,

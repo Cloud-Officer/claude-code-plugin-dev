@@ -8,12 +8,12 @@ const { spawnSync } = require('node:child_process')
 const { after, describe, it } = require('node:test')
 
 const ROOT = path.join(__dirname, '..')
-const COPIED = ['.claude-plugin', '.mcp.json', 'README.md', 'docs', 'scripts', 'skills']
+const COPIED = ['.claude-plugin', '.mcp.json', 'README.md', 'agents', 'docs', 'scripts', 'skills']
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-consistency-'))
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }))
 
-function fixture(name, edit = () => {}) {
+function fixture(name, edit = () => {}, editAgent = text => text) {
   const dir = path.join(tmp, name)
 
   for (const entry of COPIED) fs.cpSync(path.join(ROOT, entry), path.join(dir, entry), { recursive: true })
@@ -23,6 +23,8 @@ function fixture(name, edit = () => {}) {
   const marketplace = JSON.parse(fs.readFileSync(path.join(manifests, 'marketplace.json'), 'utf8'))
 
   edit(plugin, marketplace.plugins.find(entry => entry.name === plugin.name))
+  const agentFile = path.join(dir, 'agents', 'context-researcher.md')
+  fs.writeFileSync(agentFile, editAgent(fs.readFileSync(agentFile, 'utf8')))
   fs.writeFileSync(path.join(manifests, 'plugin.json'), JSON.stringify(plugin, null, 2))
   fs.writeFileSync(path.join(manifests, 'marketplace.json'), JSON.stringify(marketplace, null, 2))
 
@@ -55,5 +57,29 @@ describe('check-repo-consistency.js plugin version', () => {
     assert.equal(result.status, 1)
     assert.match(result.stderr, /marketplace\.json pins plugin version "2\.0\.0"/)
     assert.doesNotMatch(result.stderr, /plugin\.json pins version/)
+  })
+})
+
+describe('check-repo-consistency.js agents', () => {
+  it('fails when a read-only agent is granted a write tool', () => {
+    const result = fixture('agent-write', () => {}, text => text.replace('tools: Read,', 'tools: Read, Write, mcp__atlassian__editJiraIssue,'))
+
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /granted write tool Write/)
+    assert.match(result.stderr, /granted write tool mcp__atlassian__editJiraIssue/)
+  })
+
+  it('fails when an agent uses an MCP wildcard', () => {
+    const result = fixture('agent-wildcard', () => {}, text => text.replace('tools: Read,', 'tools: Read, mcp__atlassian__*,'))
+
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /tool wildcard mcp__atlassian__\* would grant write tools too/)
+  })
+
+  it('fails when an agent has no tools list', () => {
+    const result = fixture('agent-no-tools', () => {}, text => text.replace(/^tools: .*\n/m, ''))
+
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /frontmatter tools is missing/)
   })
 })
