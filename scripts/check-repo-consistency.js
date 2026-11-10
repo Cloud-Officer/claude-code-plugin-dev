@@ -8,6 +8,8 @@ const PLUGIN = path.join(ROOT, '.claude-plugin', 'plugin.json')
 const MARKETPLACE = path.join(ROOT, '.claude-plugin', 'marketplace.json')
 const MCP = path.join(ROOT, '.mcp.json')
 const SKILLS = path.join(ROOT, 'skills')
+const AGENTS = path.join(ROOT, 'agents')
+const WRITE_TOOL = /^(Write|Edit|NotebookEdit|Agent|Workflow)$|^mcp__.*__(add|create|delete|edit|fork|merge|push|request|sub_issue_write|transition|update|issue_write|pull_request_review_write|assign)/
 const SEARCH_ONLY_KEYWORDS = new Set(['meta-tags', 'ux-writing', 'tone-of-voice', 'modernization', 'language-migration', 'framework-migration'])
 
 const errors = []
@@ -125,7 +127,27 @@ for (const skill of skills) {
   if (!meta['allowed-tools']) fail(rel(file) + ': frontmatter allowed-tools is missing or empty')
 }
 
-const sources = [path.join(ROOT, 'README.md'), ...filesUnder(path.join(ROOT, 'docs')), ...skills.flatMap(skill => filesUnder(path.join(SKILLS, skill)))]
+const agents = fs.existsSync(AGENTS) ? fs.readdirSync(AGENTS).filter(f => f.endsWith('.md')).sort() : []
+
+for (const agent of agents) {
+  const file = path.join(AGENTS, agent)
+  const meta = frontmatter(file)
+
+  if (!meta) continue
+  if (meta.name !== agent.slice(0, -3)) fail(rel(file) + ': frontmatter name ' + JSON.stringify(meta.name) + ' does not match file name')
+  if (!meta.description) fail(rel(file) + ': frontmatter description is missing or empty')
+  if (!meta.tools) {
+    fail(rel(file) + ': frontmatter tools is missing, so the agent would inherit every tool')
+    continue
+  }
+
+  for (const tool of meta.tools.split(',').map(t => t.trim())) {
+    if (WRITE_TOOL.test(tool)) fail(rel(file) + ': read-only agent is granted write tool ' + tool)
+    if (tool.includes('*')) fail(rel(file) + ': tool wildcard ' + tool + ' would grant write tools too')
+  }
+}
+
+const sources = [path.join(ROOT, 'README.md'), ...filesUnder(path.join(ROOT, 'docs')), ...skills.flatMap(skill => filesUnder(path.join(SKILLS, skill))), ...agents.map(agent => path.join(AGENTS, agent))]
 
 for (const file of sources) {
   const text = fs.readFileSync(file, 'utf8')
@@ -163,5 +185,6 @@ if (errors.length) process.exit(1)
 
 console.log('ok   3 manifests parse, agree and pin no plugin version')
 console.log('ok   ' + skills.length + ' skills declare name, description and allowed-tools')
+console.log('ok   ' + agents.length + ' agents declare name, description and a read-only tools list')
 console.log('ok   every ${CLAUDE_PLUGIN_ROOT} path resolves')
 console.log('ok   ' + (plugin.keywords || []).length + ' keywords are unique and map to live skills or documentation')
