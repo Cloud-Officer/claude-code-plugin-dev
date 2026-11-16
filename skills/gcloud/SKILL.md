@@ -25,7 +25,7 @@ The `gcloud` MCP server wraps the `gcloud` CLI and provides access to all GCP se
 | IAM | `mcp__gcloud__run_gcloud_command` | `gcloud iam service-accounts list` |
 | Pub/Sub | `mcp__gcloud__run_gcloud_command` | `gcloud pubsub topics list` |
 
-Every value substituted into a gcloud, gsutil or kubectl command — from the user's words or from a previous command's output — is single-quoted and rejected unless it matches `^[A-Za-z0-9._:/@-]+$`; never paste a user phrase into a command line verbatim. The rule quantifies over the substitution channel itself, so it covers every placeholder below and any a future example adds.
+Every value substituted into a gcloud, gsutil or kubectl command — from the user's words or from a previous command's output — is single-quoted and rejected unless it matches `^[A-Za-z0-9._:/@][A-Za-z0-9._:/@-]*$`; never paste a user phrase into a command line verbatim. The rule quantifies over the substitution channel itself, so it covers every placeholder below and any a future example adds.
 
 **Common CLI examples:**
 

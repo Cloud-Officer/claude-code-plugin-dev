@@ -25,3 +25,17 @@ describe('review-aws-cost Interpolation Boundary', () => {
     for (const bad of ['0', '2', '31', '3654', '30 ', '30; aws s3 rb s3://x', '$(id)', '']) assert.ok(!RETENTION_DAYS.test(bad), bad)
   })
 })
+
+describe('gcloud substituted-value allowlist', () => {
+  const text = fs.readFileSync(path.join(__dirname, '..', 'skills', 'gcloud', 'SKILL.md'), 'utf8')
+  const rule = text.split('\n').find((l) => l.startsWith('Every value substituted into a gcloud'))
+  const allowlist = new RegExp(rule.match(/`(\^[^`]+\$)`/)[1])
+
+  it('rejects values that would parse as a flag', () => {
+    for (const bad of ['--log-http', '--quiet', '-q', '-', "x' ; id", '$(id)', 'a b', '']) assert.ok(!allowlist.test(bad), bad)
+  })
+
+  it('admits ordinary resource identifiers', () => {
+    for (const ok of ['my-project-123', 'us-central1-a', 'gs://bucket/path/obj.txt', 'svc@proj.iam.gserviceaccount.com', 'projects/p:topic']) assert.ok(allowlist.test(ok), ok)
+  })
+})
