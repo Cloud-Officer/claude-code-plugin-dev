@@ -297,7 +297,7 @@ Use safe sampling depending on table size:
 
 `docs/db.md` always starts with H1 `# Database Schema Documentation` and the "Last verified" line. The body sections depend on the DB type. Below are the required sections per DB. Fill them with discovered content; do not paste placeholder rows.
 
-**Row order, every table in every template below** (All Tables, Field Mappings & Enums, Business Definitions, Common Business Questions, Date/Time Fields, and the rest — the examples are not the boundary): sort rows by the first column's value (for Common Business Questions, the Question column, assigning `#` after sorting), bytewise ascending under `LC_ALL=C`. Two runs over an unchanged schema must emit identical tables; neither engine enumeration order nor code-scan encounter order is stable.
+**Row order, every table and every list in every template below** (All Tables, Field Mappings & Enums, Business Definitions, Common Business Questions, Date/Time Fields, Relationships, Soft Deletes, Indexes, Data Structures, and the rest — the examples are not the boundary): sort table rows by the first column's value (for Common Business Questions, the Question column, assigning `#` after sorting), and sort list items by their first token, both bytewise ascending under `LC_ALL=C`. The one exception is the multi-database Databases Used list, which keeps the template order stated under Multi-database projects. Two runs over an unchanged schema must emit identical tables and lists; neither engine enumeration order nor code-scan encounter order is stable.
 
 ### SQL (MySQL / PostgreSQL / SQLite)
 
