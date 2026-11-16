@@ -56,7 +56,7 @@ This skill uses MCP tools when available and falls back gracefully if they are u
 | Operation | MCP Tool | CLI Fallback |
 | --- | --- | --- |
 | Get repo metadata | `mcp__github__get_file_contents` (path: `/`) for top-level structure; for richer metadata use the CLI fallback | `gh repo view --json owner,name,visibility,licenseInfo,description` |
-| Get file contents | `mcp__github__get_file_contents` | `cat <file>` |
+| Get file contents | `mcp__github__get_file_contents` | `cat -- "<file>"` |
 | Get repo owner/name | Parse from `git remote get-url origin` | `gh repo view --json owner,name` |
 
 ### Library Documentation (Context7)
