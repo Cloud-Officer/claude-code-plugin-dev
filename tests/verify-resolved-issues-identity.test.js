@@ -44,10 +44,22 @@ test('jira resolver never takes the display name the agent echoes', () => {
   assert.equal(mergeResult(c, { ...forged, resolver: 'Real Dev' }, 'jira').resolver, 'acc-real')
 })
 
-test('agent resolver is used only when the caller supplied none', () => {
+test('agent resolver is never used when the caller supplied none', () => {
   const c = { ...caller, resolver: undefined }
   assert.equal(mergeResult(c, { outcome: 'SKIP_INSUFFICIENT' }, 'github').resolver, '')
-  assert.equal(mergeResult(c, { resolver: 'from-agent' }, 'jira').resolver, 'from-agent')
+  assert.equal(mergeResult(c, { resolver: 'from-agent' }, 'github').resolver, '')
+  assert.equal(mergeResult(c, { resolver: 'from-agent' }, 'jira').resolver, '')
+})
+
+test('agent resolver is ignored when the caller has only a display name', () => {
+  const c = { ...caller, resolver: { displayName: 'Real Dev' } }
+  assert.equal(mergeResult(c, forged, 'github').resolver, '')
+  assert.equal(mergeResult(c, forged, 'jira').resolver, '')
+})
+
+test('github resolver without a login never falls back to the agent value', () => {
+  const c = { ...caller, resolver: { name: 'dependabot[bot]' } }
+  assert.equal(mergeResult(c, { ...forged, resolver: 'attacker' }, 'github').resolver, '')
 })
 
 test('no mismatch log when the agent echoes the caller id', () => {
