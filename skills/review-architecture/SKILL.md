@@ -64,7 +64,7 @@ Prefer MCP tools when available; fall back to CLI on errors.
 
 | Operation | Preferred | Fallback |
 | --- | --- | --- |
-| Get file contents | `mcp__github__get_file_contents` | `cat <file>` |
+| Get file contents | `mcp__github__get_file_contents` | `cat -- "<file>"` |
 | Repo metadata | `gh repo view --json owner,name,visibility,description` | n/a |
 | Library docs | `mcp__context7__*` | `WebSearch` → `mcp__fetch__fetch` |
 
