@@ -136,7 +136,7 @@ If the user explicitly asks to change strictness (e.g. "be aggressive — keep e
 
 The workflow's `docs` agent checks only presence, stubs and required files; content accuracy of `README.md`, `docs/architecture.md` and `docs/user-guide.md` is this step. Run it only when the user opted in — their request asked for a documentation, README, architecture or user-guide accuracy review. When the invocation is interactive and the request did not mention it, ask once via `AskUserQuestion` whether to add the deep documentation pass (default: no). A non-interactive run that did not ask for it skips this step.
 
-When opted in, invoke each of these via the `Skill` tool, one at a time, with the argument `review-only: report findings only, do not create, write, or edit any file`:
+When opted in, invoke each of these via the `Skill` tool, one at a time, with exactly the argument `mode=review-only`, so each reports findings only and creates, writes, or edits no file:
 
 1. `review-readme`
 2. `review-architecture`
