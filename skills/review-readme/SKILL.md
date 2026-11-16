@@ -216,7 +216,7 @@ If no build.yml exists, the first line should be:
 Verify the README contains these H2 sections in order:
 
 ```bash
-grep "^## " README.md
+grep "^## " {readme_file}
 ```
 
 **Expected output must be exactly:**
