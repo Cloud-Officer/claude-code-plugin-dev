@@ -44,7 +44,7 @@ Amazon DocumentDB is analysed as MongoDB. Reached through a tunnel, its `MONGODB
 
 ## Schema Document Location
 
-`DB_DOC` optionally points at the schema document `query-db` reads, so one file can serve several repositories (e.g. `~/src/api/docs/db.md`). Resolve it once, before Step 0: run `printenv DB_DOC`; empty output means `docs/db.md` in the project root. Otherwise use that value, replacing a leading `~/` with the home directory and resolving a relative path against the project root. Everywhere else in this file, `docs/db.md` means this resolved path.
+`DB_DOC` optionally points at the schema document `query-db` reads, so one file can serve several repositories (e.g. `~/src/api/docs/db.md`). Resolve it once, before Step 0: run `printenv DB_DOC`; empty output means `docs/db.md` in the project root. Otherwise use that value, replacing a leading `~/` with the home directory and resolving a relative path against the project root. When the value contains any character outside `^[A-Za-z0-9._/~-]+$`, tell the user `DB_DOC` holds characters a path may not use here, and stop. Everywhere else in this file, `docs/db.md` means this resolved path.
 
 When the resolved path lies outside the current repository, the code scanned in Steps 1-4 may not be the code behind that document. Before Step 5 writes anything, ask with `AskUserQuestion` whether to write to that path, to `docs/db.md` in this repository instead, or to stop. Never write outside the repository without that confirmation.
 
@@ -222,7 +222,7 @@ Look for:
 
 ### Step 5 — Generate initial `docs/db.md` draft
 
-Create the document's parent directory: `mkdir -p docs` for the default path, otherwise `mkdir -p "<resolved parent directory>"` written literally.
+Create the document's parent directory: `mkdir -p docs` for the default path, otherwise `mkdir -p "<resolved parent directory>"`, built only from a `DB_DOC` value that passed the character check in [Schema Document Location](#schema-document-location).
 
 Write the initial draft using the per-DB template (see "Document Templates" below).
 
@@ -297,7 +297,7 @@ Use safe sampling depending on table size:
 
 `docs/db.md` always starts with H1 `# Database Schema Documentation` and the "Last verified" line. The body sections depend on the DB type. Below are the required sections per DB. Fill them with discovered content; do not paste placeholder rows.
 
-**Row order, every table in every template below** (All Tables, Field Mappings & Enums, Business Definitions, Common Business Questions, Date/Time Fields, and the rest — the examples are not the boundary): sort rows by the first column's value (for Common Business Questions, the Question column, assigning `#` after sorting), bytewise ascending under `LC_ALL=C`. Two runs over an unchanged schema must emit identical tables; neither engine enumeration order nor code-scan encounter order is stable.
+**Row order, every table and every list in every template below** (All Tables, Field Mappings & Enums, Business Definitions, Common Business Questions, Date/Time Fields, Relationships, Soft Deletes, Indexes, Data Structures, and the rest — the examples are not the boundary): sort table rows by the first column's value (for Common Business Questions, the Question column, assigning `#` after sorting), and sort list items by their first token, both bytewise ascending under `LC_ALL=C`. The one exception is the multi-database Databases Used list, which keeps the template order stated under Multi-database projects. Two runs over an unchanged schema must emit identical tables and lists; neither engine enumeration order nor code-scan encounter order is stable.
 
 ### SQL (MySQL / PostgreSQL / SQLite)
 
@@ -412,7 +412,7 @@ If multiple DBs are used, the file has one H1 + a "Databases Used" list, then on
 
 ## Rules
 
-- **Failure policy** — any command or query that fails or returns nothing stops that step and is reported with the exact command and its output; never continue on a fabricated or assumed value. Sanctioned deviations, exactly three: the MCP-to-CLI fallback (report the MCP error, then retry once via the CLI form; the policy applies if that also fails), Step 6's declined-credentials code-only path, and Step 7's per-object rule — an object that errors is still listed as `not readable — <error>` and the "Last verified" line records the partial coverage.
+- **Failure policy** — any command or query that fails, or returns nothing where the step needs a value to proceed (a connection check, a schema listing), stops that step and is reported with the exact command and its output; never continue on a fabricated or assumed value. An empty result from a per-object sampling or `SCAN` batch is a valid result, recorded as such (0 rows, no keys), and the step continues — a `SCAN` batch with no keys and a non-zero cursor continues iterating. Sanctioned deviations, exactly three: the MCP-to-CLI fallback (report the MCP error, then retry once via the CLI form; the policy applies if that also fails), Step 6's declined-credentials code-only path, and Step 7's per-object rule — an object that errors is still listed as `not readable — <error>` and the "Last verified" line records the partial coverage.
 - **Read-only, always** — every tool call and command this skill issues is read-only; never issue one that writes, deletes, expires or otherwise modifies data in any database.
 - **No client meta-commands** — never send a line starting with `\` (psql and mysql, e.g. `\!`, `\copy`), `.` (sqlite3, e.g. `.shell`, `.output`), or `system` / `source` (mysql), nor mongosh code calling `require(`, `load(` or `process.`; they run commands or touch files on the user's machine, outside the database.
 - Keep descriptions concise and focused on querying needs.
