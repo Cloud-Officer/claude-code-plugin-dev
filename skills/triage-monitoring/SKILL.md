@@ -137,7 +137,7 @@ Run each reachable source in parallel. Use one sub-agent per source with `Agent`
 
 Merge every signal into **findings**. A finding is one root cause seen from one or more sources.
 
-- **Fingerprint**: `<project>:<kind>:<normalised key>`. For example: `ugm:failed-message:App\Message\SendEmail:SMTP timeout`, `ugm:dashboard:flattening-error:TIMEOUT`, `in:nr-error:Doctrine\DBAL\Exception:connection refused`, `ugm:crash:ios:EXC_BAD_ACCESS:PlayerView.swift`.
+- **Fingerprint**: `<project>:<kind>:<normalised key>`. After normalising, replace every character outside `[A-Za-z0-9:._\\/-]` with `-`, then collapse each run of `-` into one, so the fingerprint can never contain `--` or `>` and break out of the hidden marker. For example: `ugm:failed-message:App\Message\SendEmail:SMTP-timeout`, `ugm:dashboard:flattening-error:TIMEOUT`, `in:nr-error:Doctrine\DBAL\Exception:connection-refused`, `ugm:crash:ios:EXC_BAD_ACCESS:PlayerView.swift`.
 - **Merge across sources** when the signals share an exception class plus a normalised message, or a message class with its handler, or a deploy and the code path it changed. For example, the `failed` queue growing with `SendEmailMessage`, a New Relic `TransportException` in `pnp-worker-prod`, and an SMTP error log line are one finding, not three.
 - For each finding, record: the sources, the env, volume in the window, the two comparison volumes, first and last seen, the affected entities, apps, and screens, and the user-facing effect if it can be inferred (for example "emails not sent" or "video not rendered").
 
