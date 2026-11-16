@@ -57,6 +57,11 @@ test('agent resolver is ignored when the caller has only a display name', () => 
   assert.equal(mergeResult(c, forged, 'jira').resolver, '')
 })
 
+test('github resolver without a login never falls back to the agent value', () => {
+  const c = { ...caller, resolver: { name: 'dependabot[bot]' } }
+  assert.equal(mergeResult(c, { ...forged, resolver: 'attacker' }, 'github').resolver, '')
+})
+
 test('no mismatch log when the agent echoes the caller id', () => {
   logged.length = 0
   mergeResult(caller, { id: 42 }, 'github')
