@@ -1,7 +1,7 @@
 ---
 name: review-aws-cost
 description: "Audit AWS spend for cost optimization over the last 3 complete months, compared against the same 3 months of the previous year, using parallel agents per cost domain. Use when the user wants an AWS cost review, cloud cost optimization, a spend audit, to find AWS waste or savings, to know why the AWS bill went up, a year-over-year cost comparison, or a FinOps review. Never recommends Reserved Instances or Savings Plans. Prints the report to the terminal and waits — writes no file unless asked."
-allowed-tools: Bash(aws:*), Bash(git:*), Bash(gh:*), Bash(jira:*), Bash(awk:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(printf:*), Bash(sed:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, Workflow, Agent, Skill, AskUserQuestion, WebSearch, WebFetch, mcp__aws__*, mcp__plugin_co-dev_aws__*
+allowed-tools: Bash(aws:*), Bash(git:*), Bash(gh:*), Bash(jira:*), Bash(awk:*), Bash(cat:*), Bash(cut:*), Bash(date:*), Bash(echo:*), Bash(find:*), Bash(grep:*), Bash(head:*), Bash(jq:*), Bash(ls:*), Bash(mkdir:*), Bash(printf:*), Bash(sed:*), Bash(shasum:*), Bash(sort:*), Bash(tail:*), Bash(tr:*), Bash(uniq:*), Bash(wc:*), Bash(which:*), Bash(xargs:*), Read, Write, Edit, Glob, Grep, TodoWrite, Workflow, Agent, Skill, AskUserQuestion, WebSearch, WebFetch, mcp__aws__*, mcp__plugin_co-dev_aws__*
 ---
 
 # AWS Cost Review
@@ -76,6 +76,7 @@ Every value this skill does not control that reaches a command string must match
 - Region name: `^[a-z0-9-]+$`
 - Window dates: `^\d{4}-\d{2}-\d{2}$`
 - Resource identifiers used in a Step 6 command (volume, snapshot, AMI, allocation, distribution, log-group name): `^[A-Za-z0-9._/:-]+$`
+- Dedupe-key source (`cost_basis_ref`, Step 5): no pattern; it never enters a command string and reaches `shasum` only as the single-line body of the quoted heredoc Step 5 shows
 - Log-group retention days the user answers in Step 6 (only the values CloudWatch Logs accepts): `^(1|3|5|7|14|30|60|90|120|150|180|365|400|545|731|1096|1827|2192|2557|2922|3288|3653)$`
 
 A user argument or environment value that fails aborts with a message. An account-sourced value that fails is skipped with a note in the report rather than interpolated.
@@ -420,7 +421,15 @@ Create issues for all severity levels including Info. Summary format: `[FINDING-
 <!-- review-key: cost-review/<12 hex chars> -->
 ```
 
-where the hex is the first 12 characters of the sha256 of the finding's `cost_basis_ref`, trimmed of surrounding whitespace. **Shell out for it** — `printf '%s' '<cost_basis_ref>' | shasum -a 256 | cut -c1-12` — a hash a model invents is not a key. A finding with an empty `cost_basis_ref` has no key: file it, and say in the report that it could not be deduplicated. A matching issue in **any** state suppresses the finding: a closed or resolved issue is reported as already existing, never re-filed. Match on the key only, never on the title or the finding ID — both are regenerated each run.
+where the hex is the first 12 characters of the sha256 of the finding's `cost_basis_ref`, trimmed of surrounding whitespace. **Shell out to `shasum` for it** — a hash a model invents is not a key. `cost_basis_ref` is account-derived, untrusted text, so it reaches the shell only as the body of a quoted heredoc, never inside quotes or on the command line, where a `'`, `"`, `$(...)` or backtick would run or alter the hashed string. Use exactly this form, replacing only the middle line with the trimmed `cost_basis_ref`; a value that spans lines or equals `COST_KEY_EOF` is handled like an empty one below:
+
+```bash
+tr -d '\n' <<'COST_KEY_EOF' | shasum -a 256 | head -c 12
+<cost_basis_ref>
+COST_KEY_EOF
+```
+
+A finding with an empty `cost_basis_ref` has no key: file it, and say in the report that it could not be deduplicated. A matching issue in **any** state suppresses the finding: a closed or resolved issue is reported as already existing, never re-filed. Match on the key only, never on the title or the finding ID — both are regenerated each run.
 
 List existing issues once before creating and again after, using whichever tracker `create-issue` resolved to:
 
