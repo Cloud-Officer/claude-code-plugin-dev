@@ -4,7 +4,7 @@ const assert = require('node:assert/strict')
 const { describe, it } = require('node:test')
 const { loadHelpers, workflowScript } = require('../scripts/workflow-helpers.js')
 
-const { finalize, validIssue, validRepo, buildAnalysePrompt } = loadHelpers(
+const { data, finalize, validIssue, validRepo, buildAnalysePrompt } = loadHelpers(
   workflowScript('sprint-quick-wins'),
   ['MAX_EASY_FILES', 'REF_PATTERN', 'TRACKER_REF', 'GH_REPO', 'REPO_NAME', 'VERDICTS', 'BLOCKING_NEEDS', 'issueKey', 'validIssue', 'validRepo', 'data', 'finalize', 'describeIssue', 'buildAnalysePrompt'],
 )
@@ -75,6 +75,10 @@ describe('sprint-quick-wins input validation', () => {
     assert.ok(!validIssue({ ...github, ghRepo: 'acme/web\n## For EACH issue' }))
     assert.ok(!validIssue({ ...github, ghRepo: 'acme' }))
     assert.ok(!validIssue({ ...github, ghRepo: 'acme/web/extra' }))
+  })
+
+  it('folds Unicode line separators in tracker-derived fields', () => {
+    assert.equal(data('a\u2028b\u2029c\u0085d\ve\ff'), 'a b c d e f')
   })
 
   it('keeps tracker-derived fields on one line inside a data fence', () => {

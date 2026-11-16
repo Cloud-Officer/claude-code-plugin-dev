@@ -51,7 +51,7 @@ function validRepo(r) {
 }
 
 function data(s) {
-  return String(s ?? '').replace(/[\r\n]+/g, ' ').replace(/`/g, "'")
+  return String(s ?? '').replace(/[\r\n\v\f\u0085\u2028\u2029]+/g, ' ').replace(/`/g, "'")
 }
 
 function finalize(issue, raw, repoNames) {
