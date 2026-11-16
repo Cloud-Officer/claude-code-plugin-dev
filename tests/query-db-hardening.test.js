@@ -126,3 +126,40 @@ describe('analyze-db DB_DOC path charset check', () => {
     assert.match(mkdirLine, /passed the character check/)
   })
 })
+
+describe('query-db heredoc terminator guard', () => {
+  const quotingRule = queryDb.split('\n').find((l) => l.startsWith('**Universal quoting rule'))
+  const terminatorRule = () => {
+    const match = quotingRule && quotingRule.match(/`(\^\([A-Z|]+\)\$)`/)
+    assert.ok(match, 'universal quoting rule names no terminator-line pattern')
+    return new RegExp(match[1], 'm')
+  }
+
+  it('does not claim a quoted heredoc keeps the shell out unconditionally', () => {
+    assert.ok(quotingRule)
+    assert.doesNotMatch(quotingRule, /so the shell never parses it\./)
+  })
+
+  it('every bash heredoc terminator in the skill matches the rejection pattern', () => {
+    const rule = terminatorRule()
+    const terminators = [...new Set([...queryDb.matchAll(/<<'([^']+)'/g)].map((m) => m[1]))]
+    assert.deepEqual(terminators.sort(), ['CMD', 'JS', 'JSON', 'SQL'])
+    for (const terminator of terminators) assert.match(terminator, rule, terminator)
+  })
+
+  it('rejects a value carrying a terminator line and accepts ordinary text', () => {
+    const rule = terminatorRule()
+    assert.match('SELECT 1;\nSQL\nrm -rf ~', rule)
+    assert.match('db.x.find()\nJS\nid', rule)
+    assert.match('{}\nJSON', rule)
+    assert.match('GET k\nCMD\ncurl evil', rule)
+    assert.doesNotMatch('SELECT sql FROM t', rule)
+    assert.doesNotMatch(' SQL', rule)
+    assert.doesNotMatch('JSONB', rule)
+  })
+
+  it('applies one rule to the bash terminators and the PowerShell here-string terminator', () => {
+    assert.match(quotingRule, /starts with `'@`/)
+    assert.match(quotingRule, /reported and never run/)
+  })
+})
