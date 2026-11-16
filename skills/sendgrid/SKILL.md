@@ -59,6 +59,12 @@ SENDGRID_JSON
 Use `-X PUT`, `-X PATCH` or `-X DELETE` the same way. Each Bash call is a fresh shell, so keep the heredoc and the
 `curl` in the same call. If the JSON itself contains a line reading exactly `SENDGRID_JSON`, pick another delimiter.
 
+**Path and query values.** Every value substituted into a URL path or query string (an email address, username,
+subuser name, domain, ID or Email Activity `query`, whether it came from the user or from an API response) is
+percent-encoded first, as in `jane%40example.com`: `@`, `/`, `?`, `#`, `&`, `%`, `+`, `=` and spaces never reach the
+URL raw. Before encoding, reject any value containing `$`, a backtick or `"`: report it and do not build the call,
+rather than cleaning it up.
+
 **Subusers (`on-behalf-of`).** When `SENDGRID_ON_BEHALF_OF` is set, add `-H "on-behalf-of: $SENDGRID_ON_BEHALF_OF"` to
 every call whose section below says it accepts the header. When the user names a different subuser for one call, write
 that username literally in the header — only if it matches `^[A-Za-z0-9._@+-]+$`; reject anything else rather than
@@ -672,8 +678,10 @@ curl -sS -w '\nHTTP %{http_code}\n' -X PUT -H "Authorization: Bearer $SENDGRID_A
 SENDGRID_JSON
 ```
 
-Note the `job_id`, poll `GET /v3/marketing/contacts/imports/<job_id>` until `status` is `completed` or `errored`, and
-report `results` (`requested_count`, `created_count`, `updated_count`, `errored_count`) and any `errors_url`.
+Note the `job_id`, poll `GET /v3/marketing/contacts/imports/<job_id>` until `status` is `completed`, `errored` or
+`failed` (at most 20 polls), and report `results` (`requested_count`, `created_count`, `updated_count`,
+`errored_count`) and any `errors_url`. If no terminal status arrives within 20 polls, stop and report the job ID and
+last status.
 
 **Unsubscribe an address from everything:**
 
@@ -707,10 +715,12 @@ SENDGRID_JSON
 ```
 
 **Asynchronous jobs** (contact upserts, imports and exports, Email Activity CSVs, bulk validation): note the returned
-ID, poll its status endpoint every 10–15 seconds with `sleep` (at most ~20 polls), then fetch the result. Save CSV or
-JSON downloads to a file with `-o` in the current directory and report the path — never dump a whole contact export
-into the conversation. Upload URLs and download URLs are presigned: use them as returned, and do not send the
-`Authorization` header to them.
+ID and poll its status endpoint every 10–15 seconds with `sleep` until a terminal status (`completed`, `errored`,
+`failed`, `Done`, `Error`, `ready`) or 20 polls. On `completed`, `Done` or `ready`, fetch the result; on `errored`,
+`failed` or `Error`, report the status and any error details. If no terminal status is reached within 20 polls, stop
+and report the job ID and last status instead of fetching the result. Save CSV or JSON downloads to a file with `-o`
+in the current directory and report the path — never dump a whole contact export into the conversation. Upload URLs
+and download URLs are presigned: use them as returned, and do not send the `Authorization` header to them.
 
 ## Full Request Details
 
