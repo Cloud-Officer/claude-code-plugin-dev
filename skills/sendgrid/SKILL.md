@@ -59,6 +59,12 @@ SENDGRID_JSON
 Use `-X PUT`, `-X PATCH` or `-X DELETE` the same way. Each Bash call is a fresh shell, so keep the heredoc and the
 `curl` in the same call. If the JSON itself contains a line reading exactly `SENDGRID_JSON`, pick another delimiter.
 
+**Path and query values.** Every value substituted into a URL path or query string (an email address, username,
+subuser name, domain, ID or Email Activity `query`, whether it came from the user or from an API response) is
+percent-encoded first, as in `jane%40example.com`: `@`, `/`, `?`, `#`, `&`, `%`, `+`, `=` and spaces never reach the
+URL raw. Before encoding, reject any value containing `$`, a backtick or `"`: report it and do not build the call,
+rather than cleaning it up.
+
 **Subusers (`on-behalf-of`).** When `SENDGRID_ON_BEHALF_OF` is set, add `-H "on-behalf-of: $SENDGRID_ON_BEHALF_OF"` to
 every call whose section below says it accepts the header. When the user names a different subuser for one call, write
 that username literally in the header — only if it matches `^[A-Za-z0-9._@+-]+$`; reject anything else rather than
