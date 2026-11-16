@@ -225,6 +225,27 @@ Summarize concisely:
 - **`code-review-deep`** → its tests phase flags coverage gaps; this skill closes them.
 - **CI** → when adding a new suite to a repo that had none, offer to wire a GitHub Actions job consistent with the repo's existing `build.yml` conventions.
 
+## For workflow authors
+
+A fan-out agent does not load skills; its prompt is all it gets. Paste this into any agent prompt that must meet this skill's gate, so the workflows cannot drift from this file:
+
+```text
+Tests (write-tests): use the framework already in the repo, resolved per directory
+— match the nearest existing tests; never add a new framework or mix two in one
+file. Before writing, list the cases: happy path; edges and boundaries (empty,
+zero, one, max, off-by-one, unicode, timezone, rounding); error paths (invalid
+input, failed dependency, timeout); each branch and enum/state value; and for a bug
+a regression test that fails on the old behaviour and passes on the fix. Mock only
+real boundaries (network, DB, clock, filesystem, third-party SDKs); keep tests
+deterministic, isolated and order-independent. Run every test you write and
+iterate to green — never skip, weaken or delete a test, or edit runner or coverage
+config, to get there. Coverage floor on the changed code: line >= 80% and branch >=
+80%, or the repo's configured bar when higher (never lower it). Go has no branch
+coverage: meet statement >= 80% with a table row per branch. Swift and Rust report
+region/line: treat region as branch and say so. Where a metric is unavailable,
+say so rather than implying it was met. Report the real numbers.
+```
+
 ## Important Rules
 
 - **Match the existing framework — resolved per directory/module, not repo-wide.** A repo may legitimately hold several frameworks for one language (different layers, or a migration in progress). Match the framework of the nearest existing tests to the code under test; when two are plausible at the same layer and none is nearby, ask the user which to use rather than guessing. Never introduce a *new* framework into a repo that already has one unless the user asks, and never mix two frameworks in one file. Greenfield defaults apply only when no tests exist anywhere.
