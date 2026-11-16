@@ -209,7 +209,7 @@ function mergeResult(c, r, tracker) {
     id: c.id,
     title: c.title,
     url: c.url,
-    resolver: callerResolver || r.resolver || '',
+    resolver: callerResolver || '',
     mergedPRs: c.mergedPRs || [],
   }
 }
