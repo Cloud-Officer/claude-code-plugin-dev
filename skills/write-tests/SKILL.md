@@ -149,7 +149,7 @@ Run the suite (narrowly — just the new/affected tests first), read failures, f
 | JS/TS (Playwright) | `npx playwright test path` | `--reporter=html` |
 | C#/.NET | `dotnet test --filter Name` → `dotnet test` | `dotnet test --collect:"XPlat Code Coverage"` |
 | Swift (SwiftPM) | `swift test --filter Name` → `swift test` | `swift test --enable-code-coverage` |
-| Swift (Xcode) | `RunSomeTests` with identifiers from `GetTestList` → `RunAllTests` (fallback: `xcodebuild test -scheme "$SCHEME" -destination "$DESTINATION" -only-testing:"$ID"`) | `xcodebuild test -enableCodeCoverage YES -resultBundlePath "$DIR/out.xcresult"` — see Step 6 |
+| Swift (Xcode) | `RunSomeTests` with identifiers from `GetTestList` → `RunAllTests` (fallback: `xcodebuild test -scheme '<scheme>' -destination '<destination>' -only-testing:'<test id>'`) | `xcodebuild test -enableCodeCoverage YES -resultBundlePath "$DIR/out.xcresult"` — see Step 6 |
 | Kotlin/Android (unit) | `./gradlew :module:test --tests X` → `./gradlew test` | `./gradlew koverHtmlReport` / JaCoCo |
 | Kotlin/Android (instrumented) | `./gradlew connectedAndroidTest` (needs device/emulator) | — |
 | Go | `go test -run TestName ./pkg` → `go test ./...` (+`-race`) | `go test -cover ./...` |
@@ -163,6 +163,9 @@ alone with `GetBuildLog` (`severity: "error"`), fix, and use `XcodeRefreshCodeIs
 recheck it without a full rebuild. Once it builds, `RunSomeTests` with `{ targetName, testIdentifier }` pairs taken
 verbatim from `GetTestList` for the narrow pass, then `RunAllTests` for the full one. Report failures by test identifier
 with the assertion message.
+
+The scheme, destination and test id come from the project and `GetTestList`, so in any `xcodebuild` command each goes
+in single quotes with every embedded `'` written `'\''` — never double quotes, where `$(...)`, backticks and `\` stay live.
 
 **Instrumented mobile tests** (Android `connectedAndroidTest`, iOS on a simulator) need a device/emulator. If none is
 available, generate the tests, state clearly that they were **not executed** for lack of a device, and run whatever
