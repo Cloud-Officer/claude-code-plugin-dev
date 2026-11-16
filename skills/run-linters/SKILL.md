@@ -86,6 +86,22 @@ Repeat until all issues are resolved.
 - Always fix the actual code, not the linter rules
 - If an issue seems impossible to fix properly, ask the user for guidance
 
+## For workflow authors
+
+A fan-out agent does not load skills; its prompt is all it gets. Paste this into any agent prompt that must lint its changes, so the workflows cannot drift from this file:
+
+```text
+Lint (run-linters): run `linters` when `which linters` finds it. Otherwise run the
+linters the repo configures — its own `npm run lint`, `rake lint` or `make lint`
+when present, else eslint, rubocop, ruff, golangci-lint, cargo clippy,
+`swiftlint lint --strict`, markdownlint-cli2, yamllint or shellcheck for each
+config or file type present. Fix every diagnostic at severity error or warning in
+the source and re-run until clean. Never edit a linter config or add an inline
+disable (eslint-disable, @ts-ignore, noqa, nolint, rubocop:disable, #[allow]) to
+silence one. Never report lint success unless a linter actually ran; if none is
+found, say which configs you looked for.
+```
+
 ## Forbidden Files - NEVER Modify
 
 The following configuration files must NEVER be edited to work around linting issues:
