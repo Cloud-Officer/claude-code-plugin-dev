@@ -37,3 +37,26 @@ describe('loco heredoc fencing', () => {
     assert.doesNotMatch(' LOCO_EOF', rule)
   })
 })
+
+describe('loco scan found-key set', () => {
+  const scan = skill.slice(skill.indexOf('**Efficient batch approach:**'), skill.indexOf('#### Step 5: Report Results'))
+  const catalogStep = skill.split('\n').find((line) => line.startsWith('3. Add every key the catalog declares'))
+
+  it('every found-key path appends to the named found-key file', () => {
+    assert.match(scan, /every found key, from any path, is appended to `\/tmp\/loco-found\.txt`/)
+    assert.doesNotMatch(scan, /Collect the set of keys that were found\.$/m)
+    assert.ok(catalogStep)
+    assert.match(catalogStep, /`\/tmp\/loco-found\.txt`/)
+  })
+
+  it('sorts the found-key file with LC_ALL=C sort -u before comm -23', () => {
+    const sortAt = scan.indexOf('env LC_ALL=C sort -u -o /tmp/loco-found.txt /tmp/loco-found.txt')
+    const commAt = scan.indexOf('env LC_ALL=C comm -23 /tmp/loco-keys.txt /tmp/loco-found.txt')
+    assert.ok(sortAt >= 0)
+    assert.ok(commAt > sortAt)
+  })
+
+  it('sorts the Loco key list with the same collation comm compares under', () => {
+    assert.match(skill, /jq -r '\.\[\]\.id' \| env LC_ALL=C sort -u \| tee \/tmp\/loco-keys\.txt/)
+  })
+})

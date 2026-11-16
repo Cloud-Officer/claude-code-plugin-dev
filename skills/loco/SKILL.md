@@ -430,7 +430,7 @@ Use this flow when the user wants to find unused translation keys in the codebas
 #### Step 2: Fetch All Asset Keys
 
 ```bash
-curl -s -f -H "Authorization: Loco $LOCO_API_KEY" https://localise.biz/api/assets | jq -r '.[].id' | sort -u | tee /tmp/loco-keys.txt
+curl -s -f -H "Authorization: Loco $LOCO_API_KEY" https://localise.biz/api/assets | jq -r '.[].id' | env LC_ALL=C sort -u | tee /tmp/loco-keys.txt
 ```
 
 Write the full list to a file — later commands run in a fresh shell and cannot read it from a variable.
@@ -453,6 +453,12 @@ Auto-detect which platforms exist in the repository by checking for indicator fi
 | Python      | `requirements.txt`, `pyproject.toml`, `django`, `gettext`                                    |
 
 #### Step 4: Search Codebase for Key Usage
+
+Start the found-key file empty, before any path below (catalog reads included) adds to it:
+
+```bash
+cat /dev/null > /tmp/loco-found.txt
+```
 
 For each detected platform, search the codebase using platform-appropriate patterns:
 
@@ -510,19 +516,25 @@ AppLocalizations.of(context).KEY
 **Efficient batch approach:**
 
 1. Search the codebase for every key in `/tmp/loco-keys.txt`.
-2. Collect the set of keys that were found.
+2. Record the found keys: every found key, from any path, is appended to `/tmp/loco-found.txt`, one per line — the per-key Grep tool search, the batch grep, and the String Catalog keys alike.
 3. Compute the difference: keys in Loco but not found in code = potentially unused.
 
-For small key sets (<100 keys), use the Grep tool once per key. For larger sets, one batch pass emits the matched keys directly — `-o` prints each matching key, `-h` suppresses the filename prefix:
+For small key sets (<100 keys), use the Grep tool once per key and append each key it finds to `/tmp/loco-found.txt`. For larger sets, one batch pass appends the matched keys directly — `-o` prints each matching key, `-h` suppresses the filename prefix:
 
 ```bash
-grep -F -o -h -r -f /tmp/loco-keys.txt --include="*.swift" --include="*.m" --include="*.strings" --include="*.xml" --include="*.rb" --include="*.yml" --include="*.js" --include="*.ts" --include="*.vue" --include="*.jsx" --include="*.tsx" --include="*.dart" --include="*.arb" --include="*.resx" --include="*.go" --include="*.py" . | sort -u > /tmp/loco-found.txt
+grep -F -o -h -r -f /tmp/loco-keys.txt --include="*.swift" --include="*.m" --include="*.strings" --include="*.xml" --include="*.rb" --include="*.yml" --include="*.js" --include="*.ts" --include="*.vue" --include="*.jsx" --include="*.tsx" --include="*.dart" --include="*.arb" --include="*.resx" --include="*.go" --include="*.py" . >> /tmp/loco-found.txt
+```
+
+Whichever paths ran, sort the found-key file in place with the same collation as `/tmp/loco-keys.txt` — `comm` needs both inputs sorted identically:
+
+```bash
+env LC_ALL=C sort -u -o /tmp/loco-found.txt /tmp/loco-found.txt
 ```
 
 The unused keys are then the keys present in Loco but absent from the matched set:
 
 ```bash
-comm -23 /tmp/loco-keys.txt /tmp/loco-found.txt
+env LC_ALL=C comm -23 /tmp/loco-keys.txt /tmp/loco-found.txt
 ```
 
 #### Step 5: Report Results
@@ -577,7 +589,7 @@ report the refusal and stop — do not invent the skill, and do not fall back to
 2. `StringCatalogRead` with the catalog's `filePath` and `targetLocaleIdentifier`, paging with `keyLimit` / `offset`
    until the catalog is exhausted. Partial paging silently shrinks the key set, which is the same failure as an empty
    fetch — the **Stop on any failure** guardrail applies.
-3. Add every key the catalog declares to the in-use set before Scan compares against the Loco key list.
+3. Add every key the catalog declares to the in-use set by appending it to `/tmp/loco-found.txt`, one per line, before Scan sorts that file and compares it against the Loco key list.
 4. `StringCatalogContext` when the source-language text of a key is needed, for an audit or before translating.
 
 ### Writing
