@@ -23,6 +23,8 @@ Manage AWS infrastructure and services.
 
 The AWS MCP server provides access to 15,000+ AWS APIs. The `aws` CLI provides equivalent access for all services.
 
+Every value substituted into an `aws` command — from the user's words or from a previous command's output — is single-quoted and rejected unless it matches `^[A-Za-z0-9._:/@][A-Za-z0-9._:/@=-]*$`; never paste a user phrase into a command line verbatim. The rule quantifies over the substitution channel itself, so it covers every placeholder above and below and any a future example adds.
+
 **Common CLI examples:**
 
 ```bash
