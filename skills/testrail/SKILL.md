@@ -44,6 +44,17 @@ echo, log or paste the key, and never put it in a URL.
 **URL.** Every call is `$TESTRAIL_URL/index.php?/api/v2/<endpoint>`. Because the URL already contains `?`, query
 parameters are appended with `&`, not `?` — for example `get_cases/1&suite_id=2&limit=50`. Quote the whole URL.
 
+**User values.** Every value the skill did not write itself — an email, a title or `filter` text, a `refs` string, a
+file path — follows one rule. In a URL it is URL-encoded first with `jq`, so `&`, `#`, `?` and spaces cannot add or cut
+off parameters; in a command it is single-quoted, never double-quoted, so `$(...)`, backticks and `$` stay inert (write
+a `'` inside the value as `'\''`). Encode into a variable in the same Bash call, then reference the variable:
+
+```bash
+v=$(jq -rn --arg v 'Login & "reset" #2' '$v|@uri'); curl -sS -w '\nHTTP %{http_code}\n' -u "$TESTRAIL_USER:$TESTRAIL_API_KEY" -H "Content-Type: application/json" "$TESTRAIL_URL/index.php?/api/v2/get_cases/1&suite_id=2&filter=$v"
+```
+
+File paths given to `-F 'attachment=@<path>'` and `-o '<path>'` are single-quoted the same way.
+
 **Reads** are `GET` with basic auth:
 
 ```bash
@@ -194,8 +205,8 @@ There is no API to update or delete a case field; do that in **Administration** 
 
 | Method | Path                   | Access | Purpose / key fields                                                                                               |
 |--------|------------------------|--------|--------------------------------------------------------------------------------------------------------------------|
-| GET    | `get_bdd/<case_id>`    | R      | Export the case as a Gherkin `.feature` file — save with `-o <file>.feature`                                       |
-| POST   | `add_bdd/<section_id>` | W      | Import a `.feature` file as a new case: multipart upload, `-F "attachment=@<file>.feature"` (no JSON content type) |
+| GET    | `get_bdd/<case_id>`    | R      | Export the case as a Gherkin `.feature` file — save with `-o '<file>.feature'`                                     |
+| POST   | `add_bdd/<section_id>` | W      | Import a `.feature` file as a new case: multipart upload, `-F 'attachment=@<file>.feature'` (no JSON content type) |
 
 ### Labels — 9.0+
 
@@ -293,7 +304,7 @@ them unless you go through `get_plan`.
 
 | Method | Path                                                  | Access | Purpose / key fields                                                                     |
 |--------|-------------------------------------------------------|--------|------------------------------------------------------------------------------------------|
-| POST   | `add_attachment_to_case/<case_id>`                    | W      | Multipart upload: `-F "attachment=@<path>"` — returns `attachment_id`                    |
+| POST   | `add_attachment_to_case/<case_id>`                    | W      | Multipart upload: `-F 'attachment=@<path>'` — returns `attachment_id`                    |
 | POST   | `add_attachment_to_result/<result_id>`                | W      | Same — screenshots and logs for a result (use the result ID that `add_result*` returned) |
 | POST   | `add_attachment_to_run/<run_id>`                      | W      | Same                                                                                     |
 | POST   | `add_attachment_to_plan/<plan_id>`                    | W      | Same                                                                                     |
@@ -303,7 +314,7 @@ them unless you go through `get_plan`.
 | GET    | `get_attachments_for_run/<run_id>`                    | R      | `limit`, `offset`                                                                        |
 | GET    | `get_attachments_for_plan/<plan_id>`                  | R      | `limit`, `offset`                                                                        |
 | GET    | `get_attachments_for_plan_entry/<plan_id>/<entry_id>` | R      | `limit`, `offset`                                                                        |
-| GET    | `get_attachment/<attachment_id>`                      | R      | The file itself — always save with `-o <path>`, never print it                           |
+| GET    | `get_attachment/<attachment_id>`                      | R      | The file itself — always save with `-o '<path>'`, never print it                         |
 | POST   | `delete_attachment/<attachment_id>`                   | D      | Deletes the file                                                                         |
 
 Attachment IDs are integers on Server and strings (UUIDs) on Cloud 7.1+; use them as returned. Uploads must not send
@@ -350,7 +361,7 @@ Only reports created in the UI with the API access option appear; the API cannot
 | GET    | `get_current_user`            | R      | 6.6+. The user the key belongs to — the quickest auth check                                                                                                                                                  |
 | GET    | `get_users`                   | R      | Admin for all users; non-admins call `get_users/<project_id>` for the users of one project. `limit`, `offset`                                                                                                |
 | GET    | `get_user/<user_id>`          | R      | One user                                                                                                                                                                                                     |
-| GET    | `get_user_by_email&email=<e>` | R      | Look up a user ID by email (URL-encode `@` as `%40`)                                                                                                                                                         |
+| GET    | `get_user_by_email&email=<e>` | R      | Look up a user ID by email — URL-encode the whole address with `jq` (see **User values**)                                                                                                                    |
 | POST   | `add_user`                    | W      | Admin, 7.3+. `name`, `email`, `is_active`, `is_admin`, `role_id`, `group_ids`, `assigned_projects`, `email_notifications`, `mfa_required`, `sso_enabled` — sends an invitation email and may use a paid seat |
 | POST   | `update_user/<user_id>`       | W      | Admin, 7.3+. Same fields. `is_active: false` deactivates the user; there is no delete                                                                                                                        |
 | GET    | `get_roles`                   | R      | Roles (`id`, `name`, `is_default`)                                                                                                                                                                           |
@@ -418,7 +429,7 @@ parses JUnit XML directly; mention it when the user wants this wired into CI per
 **Attach a screenshot to a result:**
 
 ```bash
-curl -sS -w '\nHTTP %{http_code}\n' -u "$TESTRAIL_USER:$TESTRAIL_API_KEY" -X POST -F "attachment=@screenshots/login-failure.png" "$TESTRAIL_URL/index.php?/api/v2/add_attachment_to_result/98765"
+curl -sS -w '\nHTTP %{http_code}\n' -u "$TESTRAIL_USER:$TESTRAIL_API_KEY" -X POST -F 'attachment=@screenshots/login-failure.png' "$TESTRAIL_URL/index.php?/api/v2/add_attachment_to_result/98765"
 ```
 
 **Create cases with separated steps** — read `get_case_fields` and `get_templates` first to find the steps template
