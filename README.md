@@ -1049,6 +1049,10 @@ agents) becomes meaningfully more accurate.
 Install commands per LSP are in the [macOS](#macos-homebrew) and [Windows](#windows-scoop) Quick Start sections. **Install only the LSPs for languages
 you actually write** — each one adds a small startup cost only when its file types appear in a workspace.
 
+### Worktree guard hook
+
+The plugin ships one `PreToolUse` hook (`hooks/worktree-guard.js`, needs `node`). It blocks `git worktree add` when the new worktree is not inside the repository under `.claude/worktrees/` or `.worktrees/`, so sessions cannot leave `<repo>-<branch>` folders next to the repo. The denial tells Claude where to put the worktree instead.
+
 ### Local Development
 
 ```bash

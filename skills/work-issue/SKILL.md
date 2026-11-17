@@ -1,6 +1,6 @@
 ---
 name: work-issue
-description: "Implement one or more GitHub issues or Jira tickets end-to-end — explore, design, implement, and open a PR. Multiple issues run in parallel. Use when the user wants to work on an issue, implement a ticket, fix a bug from a tracker, or take a GitHub issue or Jira key from description to pull request."
+description: "Implement one or more GitHub issues or Jira tickets end-to-end — explore, design, implement, and open a PR. Multiple issues run in parallel. Use whenever code changes are made for a GitHub issue number or Jira key — the user wants to work on, fix, implement, resolve, tackle, or investigate-and-fix an issue or ticket, picks tickets to fix after a triage, sprint listing, or investigation, or takes a GitHub issue or Jira key from description to pull request. Use it instead of creating branches or git worktrees by hand."
 allowed-tools: Bash(git:*), Bash(gh:*), Bash(jira:*), Bash(awk:*), Bash(cat:*), Bash(echo:*), Bash(grep:*), Bash(jq:*), Bash(sed:*), Bash(tr:*), Read, Edit, Write, Glob, Grep, TodoWrite, Agent, Workflow, Skill, AskUserQuestion, mcp__github__*, mcp__plugin_co-dev_github__*, mcp__atlassian__*, mcp__figma__*
 ---
 
@@ -155,6 +155,18 @@ Every `branch` in `results` is an agent return, not a locally derived value — 
 
 Present a compact per-issue summary from `results`: outcome, branch, `test_status`, `files_changed`, and any `assumptions`. For any `success:false`, show `block_reason` and **exclude it from PR creation** — offer to retry it in sequential mode. Without auto-PR mode, let the user eyeball the diffs (`git diff origin/$DEFAULT_BRANCH...<branch>`) and confirm before opening anything. With auto-PR mode on, print the summary and go straight to P4 without waiting.
 
+### P3b — Remove the batch's worktrees
+
+The harness keeps an agent's worktree under `$REPO_ROOT/.claude/worktrees/` whenever the agent committed, which every successful one did, so they are not gone on their own — and while a branch is checked out in one of them, P4's `git checkout <branch>` in the main checkout fails. Before P4, remove the worktree of every result whose `branch` passed the P3 check; the commits stay on the branch:
+
+```bash
+git -C "$REPO_ROOT" worktree list --porcelain | awk -v b="refs/heads/$BRANCH" '$1=="worktree"{p=substr($0,10)} $1=="branch" && $2==b{print p}' | while IFS= read -r wt; do
+  case "$wt" in "$REPO_ROOT"/.claude/worktrees/*) git -C "$REPO_ROOT" worktree remove "$wt" ;; esac
+done
+```
+
+Run it once per validated `$BRANCH`. Never pass `--force`: `git worktree remove` refuses a worktree with uncommitted changes, and that refusal is reported to the user with the worktree path rather than overridden.
+
 ### P4 — Pick separate or combined PRs (no question)
 
 Choose the shape yourself; do **not** ask with `AskUserQuestion`:
@@ -168,7 +180,7 @@ State the choice in one line (e.g. "Separate PRs for #123, #124; combined PR for
 - **Separate PRs (one per issue)** — `create-pr` takes no branch argument; it pushes and opens the PR for whatever branch is checked out. So for each successful result, `git checkout <branch>` in the main checkout **first**, then verify `git rev-parse --abbrev-ref HEAD` equals `<branch>` before invoking `create-pr` — if it does not (the checkout failed: branch never created, dirty tree), skip that issue and report it, or `create-pr` would push and open a PR from whatever branch is checked out, typically the default branch. Then invoke `create-pr` with its `pr_title`, adding its `closing_keyword` to the PR **body** (GitHub). `create-pr` returns the tree to the default branch, so the next result starts clean.
 - **Combined PR (per conflicting group, or all when asked)** — create one integration branch from `origin/$DEFAULT_BRANCH`, merge each of the group's issue branches into it (`git merge --no-ff <branch>` per issue; resolve any conflicts, re-run tests), then open one PR via `create-pr`. Put **every** issue's closing keyword on its own line in the body (`Closes #123`, `Fixes #124`, …) so all of them auto-close on merge.
 
-In both cases the `create-pr` skill handles pushing, opening the PR, and watching CI (via the Actions runs REST API) — do not `git push` / `gh pr create` yourself. After PRs are open, run Steps 10–11 (update issue, post the tester QA checklist) per issue, and for Jira transition each to **Code Review**. No worktree cleanup is needed here: the workflow's worktrees are harness-managed and already gone, and the issue branches persist in the shared object store — leave them until the PRs merge.
+In both cases the `create-pr` skill handles pushing, opening the PR, and watching CI (via the Actions runs REST API) — do not `git push` / `gh pr create` yourself. After PRs are open, run Steps 10–11 (update issue, post the tester QA checklist) per issue, and for Jira transition each to **Code Review**. The issue branches persist in the shared object store — leave them until the PRs merge.
 
 ---
 
