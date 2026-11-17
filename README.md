@@ -941,6 +941,7 @@ vars, one-time auth commands, or remote MCP additions. Skills with no setup work
 | `review-aws-cost`        | Audit AWS spend for optimization: last 3 complete months vs the same 3 months of the previous year                      | `aws configure`, or env: `AWS_PROFILE` *(or)* `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` + `AWS_REGION`. Cost Explorer must be enabled; caller needs `ce:Get*`/`ce:List*` plus read on the services audited                                                                                                                            |
 | `review-copy`            | Audit user-facing copy — microcopy, form/help text, voice & tone, i18n readiness, marketing; writes docs/copy-review.md | None — uses `git` + optional `loco` handoff for i18n keys                                                                                                                                                                                                                                                                                 |
 | `review-design`          | Compare UI code against Figma designs (Android, iOS, web)                                                               | figma remote MCP **(required — no CLI fallback)**. Optional for rendered comparison: bundled `chrome-devtools` (web) and the `xcode` MCP (iOS); without them the review falls back to source-only                                                                                                                                         |
+| `review-pr`              | ISO-aware PR review: /code-review at a level + ISO 27001/13485 scope + PR evidence                                      | GitHub: `gh auth login` *(or)* `GITHUB_TOKEN`; repo custom properties `compliance` and `iec62304_class`                                                                                                                                                                                                                                   |
 | `review-readme`          | Review or create README.md to match standards                                                                           | None — uses bundled `fetch` + `context7` MCPs                                                                                                                                                                                                                                                                                             |
 | `review-seo`             | Audit SEO + GEO + front-end web quality (perf, Core Web Vitals, accessibility) for a codebase and/or live URL           | None — uses `curl` + bundled `fetch` + `chrome-devtools` MCPs; optional remote `cookieyes` MCP adds consent-banner checks                                                                                                                                                                                                                 |
 | `review-user-guide`      | Review or create docs/user-guide.md with user documentation                                                             | None — uses bundled `fetch` + `context7` MCPs                                                                                                                                                                                                                                                                                             |
@@ -1049,9 +1050,22 @@ agents) becomes meaningfully more accurate.
 Install commands per LSP are in the [macOS](#macos-homebrew) and [Windows](#windows-scoop) Quick Start sections. **Install only the LSPs for languages
 you actually write** — each one adds a small startup cost only when its file types appear in a workspace.
 
+### ISO review context hook
+
+`hooks/iso-review-context.js` (needs `node` and `gh`) gives Claude's built-in `/code-review` the repository's ISO scope, at every level except `ultra`, with no file committed to the reviewed repository. When `/code-review` is typed or invoked as a skill, it adds a checklist to the session and to every subagent the review starts, then clears it when the turn ends. Each finding that maps to a control is tagged, e.g. `[ISO27001 A.8.15]`, `[ISO13485 7.3.9]`, `[IEC62304 5.5.4]`.
+
+The scope comes from two GitHub repository custom properties. Define them once at the organization level (Settings → Custom properties), set an org default, and override per repository:
+
+| Property | Values |
+| --- | --- |
+| `compliance` | `none`, `iso27001`, `iso13485`, `both` |
+| `iec62304_class` | `none`, `A`, `B`, `C` |
+
+Values are cached for 24 hours in `~/.cache/co-dev/compliance/`; delete the file to pick up a change sooner. `CO_DEV_COMPLIANCE` and `CO_DEV_IEC62304_CLASS` override them for repositories not on GitHub. Repositories set to `none`, unset, or unreadable get nothing. `/review-pr <level> <PR>` wraps `/code-review` and adds the PR-record evidence checks (ticket, independent approval, CI, requirement, risk and CAPA links), and covers `ultra`, whose cloud run does not see local hooks.
+
 ### Worktree guard hook
 
-The plugin ships one `PreToolUse` hook (`hooks/worktree-guard.js`, needs `node`). It blocks `git worktree add` when the new worktree is not inside the repository under `.claude/worktrees/` or `.worktrees/`, so sessions cannot leave `<repo>-<branch>` folders next to the repo. The denial tells Claude where to put the worktree instead.
+The plugin also ships a `PreToolUse` hook on `Bash` (`hooks/worktree-guard.js`, needs `node`). It blocks `git worktree add` when the new worktree is not inside the repository under `.claude/worktrees/` or `.worktrees/`, so sessions cannot leave `<repo>-<branch>` folders next to the repo. The denial tells Claude where to put the worktree instead.
 
 ### Local Development
 

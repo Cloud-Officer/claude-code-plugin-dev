@@ -8,7 +8,7 @@ const { spawnSync } = require('node:child_process')
 const { after, describe, it } = require('node:test')
 
 const ROOT = path.join(__dirname, '..')
-const COPIED = ['.claude-plugin', '.mcp.json', 'README.md', 'agents', 'docs', 'scripts', 'skills']
+const COPIED = ['.claude-plugin', '.mcp.json', 'README.md', 'agents', 'docs', 'hooks', 'scripts', 'skills']
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-consistency-'))
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }))
