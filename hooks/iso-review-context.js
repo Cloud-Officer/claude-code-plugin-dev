@@ -15,6 +15,7 @@ const SESSION = /^[A-Za-z0-9_-]{1,128}$/
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const MARKER_TTL_MS = 6 * 60 * 60 * 1000
 const MAX_CONTEXT = 10000
+const INVALID_SCOPE_NOTICE = '# Compliance context for this code review\n\nThis repository\'s `compliance` or `iec62304_class` GitHub custom property holds an unrecognized value, so its ISO scope could not be determined. State this at the top of your review so the repository owner fixes the property. Review the change as you normally would.\n'
 
 function defaults() {
   const cacheHome = process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache')
@@ -105,7 +106,7 @@ function resolveScope(cwd, deps = defaults()) {
 function buildContext(scope) {
   if (!scope) return null
   if (!scope.valid && scope.rawCompliance != null && String(scope.rawCompliance).trim() !== '') {
-    return '# Compliance context for this code review\n\nThis repository\'s compliance scope could not be determined: the GitHub custom properties hold compliance=' + JSON.stringify(String(scope.rawCompliance).slice(0, 40)) + ' and iec62304_class=' + JSON.stringify(String(scope.rawClass ?? '').slice(0, 40)) + ', which are not valid values (compliance: none, iso27001, iso13485, both; iec62304_class: none, A, B, C). State this at the top of your review so the property gets fixed. Review the change as you normally would.\n'
+    return INVALID_SCOPE_NOTICE
   }
   if (scope.compliance === 'none') return null
 
@@ -147,7 +148,7 @@ function startReview(input, deps) {
   if (!context) return null
 
   const marker = markerPath(input.session_id, deps)
-  if (marker) writePrivate(marker, JSON.stringify({ ts: deps.now, rawCompliance: scope.rawCompliance, rawClass: scope.rawClass }))
+  if (marker) writePrivate(marker, JSON.stringify({ ts: deps.now, compliance: scope.valid ? scope.compliance : 'invalid', iecClass: scope.iecClass }))
   return output(input.hook_event_name, context)
 }
 
@@ -162,8 +163,10 @@ function decide(input, deps = defaults()) {
 
   if (event === 'SubagentStart') {
     const saved = readJson(marker)
-    if (!saved || !(deps.now - saved.ts < MARKER_TTL_MS)) return null
-    const context = buildContext(finish({ rawCompliance: saved.rawCompliance, rawClass: saved.rawClass }))
+    if (!saved || !(deps.now - saved.ts < MARKER_TTL_MS) || !CLASS_VALUES.has(saved.iecClass)) return null
+    if (saved.compliance === 'invalid') return output(event, INVALID_SCOPE_NOTICE)
+    if (!COMPLIANCE_VALUES.has(saved.compliance)) return null
+    const context = buildContext({ compliance: saved.compliance, iecClass: saved.iecClass, valid: true })
     return context && context.length <= MAX_CONTEXT ? output(event, context) : null
   }
 
