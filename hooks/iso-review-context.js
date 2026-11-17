@@ -4,12 +4,13 @@
 const path = require('node:path')
 const os = require('node:os')
 const fs = require('node:fs')
+const crypto = require('node:crypto')
 const { execFileSync } = require('node:child_process')
 
 const REFERENCES = path.join(__dirname, '..', 'skills', 'review-pr', 'references')
 const COMPLIANCE_VALUES = new Set(['none', 'iso27001', 'iso13485', 'both'])
 const CLASS_VALUES = new Set(['none', 'A', 'B', 'C'])
-const NAME = /^[A-Za-z0-9._-]+$/
+const NAME = /^(?!\.{1,2}$)[A-Za-z0-9._-]{1,100}$/
 const SESSION = /^[A-Za-z0-9_-]{1,128}$/
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const MARKER_TTL_MS = 6 * 60 * 60 * 1000
@@ -21,7 +22,7 @@ function defaults() {
     env: process.env,
     now: Date.now(),
     cacheDir: path.join(cacheHome, 'co-dev', 'compliance'),
-    markerDir: path.join(os.tmpdir(), 'co-dev-iso-review'),
+    markerDir: path.join(cacheHome, 'co-dev', 'iso-review-sessions'),
     git: (cwd, args) => execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 3000 }).trim(),
     gh: apiPath => execFileSync('gh', ['api', apiPath], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 8000 }),
   }
@@ -85,15 +86,16 @@ function resolveScope(cwd, deps = defaults()) {
   }
   if (!remote) return null
 
-  const cacheFile = path.join(deps.cacheDir, (remote.owner + '__' + remote.repo).toLowerCase() + '.json')
+  const key = crypto.createHash('sha256').update((remote.owner + '/' + remote.repo).toLowerCase()).digest('hex')
+  const cacheFile = path.join(deps.cacheDir, key + '.json')
   const cached = readJson(cacheFile)
   if (cached && deps.now - cached.ts < CACHE_TTL_MS) return finish({ ...remote, source: 'cache', rawCompliance: cached.rawCompliance, rawClass: cached.rawClass })
 
   let props
   try {
-    props = fromProperties(JSON.parse(deps.gh('repos/' + remote.owner + '/' + remote.repo + '/properties/values')))
+    props = fromProperties(JSON.parse(deps.gh('repos/' + encodeURIComponent(remote.owner) + '/' + encodeURIComponent(remote.repo) + '/properties/values')))
   } catch {
-    return null
+    return cached ? finish({ ...remote, source: 'stale-cache', rawCompliance: cached.rawCompliance, rawClass: cached.rawClass }) : null
   }
 
   writePrivate(cacheFile, JSON.stringify({ ts: deps.now, ...props }))
@@ -101,7 +103,11 @@ function resolveScope(cwd, deps = defaults()) {
 }
 
 function buildContext(scope) {
-  if (!scope || scope.compliance === 'none') return null
+  if (!scope) return null
+  if (!scope.valid && scope.rawCompliance != null && String(scope.rawCompliance).trim() !== '') {
+    return '# Compliance context for this code review\n\nThis repository\'s compliance scope could not be determined: the GitHub custom properties hold compliance=' + JSON.stringify(String(scope.rawCompliance).slice(0, 40)) + ' and iec62304_class=' + JSON.stringify(String(scope.rawClass ?? '').slice(0, 40)) + ', which are not valid values (compliance: none, iso27001, iso13485, both; iec62304_class: none, A, B, C). State this at the top of your review so the property gets fixed. Review the change as you normally would.\n'
+  }
+  if (scope.compliance === 'none') return null
 
   const standards = { iso27001: ['ISO/IEC 27001:2022'], iso13485: ['ISO 13485:2016'], both: ['ISO/IEC 27001:2022', 'ISO 13485:2016'] }[scope.compliance]
   const files = { iso27001: ['iso27001.md'], iso13485: ['iso13485.md'], both: ['iso27001.md', 'iso13485.md'] }[scope.compliance]
@@ -136,11 +142,12 @@ function output(event, context) {
 }
 
 function startReview(input, deps) {
-  const context = buildContext(resolveScope(input.cwd, deps))
+  const scope = resolveScope(input.cwd, deps)
+  const context = buildContext(scope)
   if (!context) return null
 
   const marker = markerPath(input.session_id, deps)
-  if (marker) writePrivate(marker, JSON.stringify({ ts: deps.now, context }))
+  if (marker) writePrivate(marker, JSON.stringify({ ts: deps.now, rawCompliance: scope.rawCompliance, rawClass: scope.rawClass }))
   return output(input.hook_event_name, context)
 }
 
@@ -155,7 +162,9 @@ function decide(input, deps = defaults()) {
 
   if (event === 'SubagentStart') {
     const saved = readJson(marker)
-    return saved?.context && deps.now - saved.ts < MARKER_TTL_MS ? output(event, saved.context) : null
+    if (!saved || !(deps.now - saved.ts < MARKER_TTL_MS)) return null
+    const context = buildContext(finish({ rawCompliance: saved.rawCompliance, rawClass: saved.rawClass }))
+    return context && context.length <= MAX_CONTEXT ? output(event, context) : null
   }
 
   if (event === 'Stop' || event === 'SessionEnd') fs.rmSync(marker, { force: true })

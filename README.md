@@ -1061,7 +1061,7 @@ The scope comes from two GitHub repository custom properties. Define them once a
 | `compliance` | `none`, `iso27001`, `iso13485`, `both` |
 | `iec62304_class` | `none`, `A`, `B`, `C` |
 
-Values are cached for 24 hours in `~/.cache/co-dev/compliance/`; delete the file to pick up a change sooner. `CO_DEV_COMPLIANCE` and `CO_DEV_IEC62304_CLASS` override them for repositories not on GitHub. Repositories set to `none`, unset, or unreadable get nothing. `/review-pr <level> <PR>` wraps `/code-review` and adds the PR-record evidence checks (ticket, independent approval, CI, requirement, risk and CAPA links), and covers `ultra`, whose cloud run does not see local hooks.
+Values are cached for 24 hours in `~/.cache/co-dev/compliance/` (the last cached value is used if `gh` fails); delete the cache files to pick up a change sooner. An invalid value makes the review say the scope could not be determined. `CO_DEV_COMPLIANCE` and `CO_DEV_IEC62304_CLASS` override them for repositories not on GitHub. Repositories set to `none`, unset, or unreadable get nothing. `/review-pr <level> <PR>` wraps `/code-review` and adds the PR-record evidence checks (ticket, independent approval, CI, requirement, risk and CAPA links), and covers `ultra`, whose cloud run does not see local hooks.
 
 ### Worktree guard hook
 
