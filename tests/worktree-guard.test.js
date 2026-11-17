@@ -7,7 +7,7 @@ const { spawnSync } = require('node:child_process')
 const { decide } = require('../hooks/worktree-guard.js')
 
 const CWD = '/Users/dev/ugm/pnp-api'
-const run = command => decide({ tool_name: 'Bash', cwd: CWD, tool_input: { command } })
+const run = command => decide({ tool_name: 'Bash', cwd: CWD, repoRoot: CWD, tool_input: { command } })
 const denied = command => run(command)?.hookSpecificOutput?.permissionDecision === 'deny'
 
 test('denies sibling and absolute worktrees outside the repo', () => {
@@ -16,6 +16,15 @@ test('denies sibling and absolute worktrees outside the repo', () => {
   assert.ok(denied('git worktree add /Users/dev/ugm/pnp-api-DEV-6670 -b DEV-6670 origin/master 2>&1 | tail -2'))
   assert.ok(denied('git -C /Users/dev/ugm/pnp-api worktree add "../pnp-api-X" -b X'))
   assert.ok(denied('git worktree add "$WT" -b X origin/master'))
+  assert.ok(denied('git worktree add ~/pnp-api-X -b X'))
+})
+
+test('denies in-repo-looking paths that escape the repo and quoting tricks', () => {
+  assert.ok(denied('git worktree add ../other/.claude/worktrees/X -b X'))
+  assert.ok(denied('git worktree add /tmp/.worktrees/X -b X'))
+  assert.ok(denied('git worktree add .claude/worktrees/a/b -b X'))
+  assert.ok(denied('git "work"tree add ../x'))
+  assert.ok(denied('git work\\tree add ../x'))
 })
 
 test('allows worktrees under .claude/worktrees or .worktrees', () => {

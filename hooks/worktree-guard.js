@@ -2,6 +2,9 @@
 'use strict'
 
 const path = require('node:path')
+const os = require('node:os')
+const fs = require('node:fs')
+const { execFileSync } = require('node:child_process')
 
 const ALLOWED_PARENTS = ['.claude/worktrees', '.worktrees']
 const GIT_OPTS_WITH_VALUE = new Set(['-C', '-c', '--git-dir', '--work-tree', '--namespace', '--exec-path', '--config-env'])
@@ -84,21 +87,36 @@ function worktreeAddTargets(command) {
   return targets
 }
 
-function isAllowed(target, gitDir, cwd) {
-  const base = gitDir ? path.resolve(cwd || '/', gitDir) : (cwd || '/')
-  const resolved = target.startsWith('/') || target.startsWith('~') ? path.normalize(target) : path.resolve(base, target)
-  const parent = path.dirname(resolved).split(path.sep).join('/')
+function realpath(dir) {
+  try {
+    return fs.realpathSync(dir)
+  } catch {
+    return dir
+  }
+}
 
-  return ALLOWED_PARENTS.some(p => parent === p || parent.endsWith('/' + p))
+function repoRoot(dir) {
+  try {
+    return execFileSync('git', ['-C', dir, 'rev-parse', '--show-toplevel'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || dir
+  } catch {
+    return dir
+  }
+}
+
+function isAllowed(target, gitDir, cwd, root) {
+  const base = realpath(gitDir ? path.resolve(cwd || '/', gitDir) : (cwd || '/'))
+  const expanded = target === '~' || target.startsWith('~/') ? path.join(os.homedir(), target.slice(1)) : target
+  const resolved = path.resolve(base, expanded)
+  const top = root ?? repoRoot(base)
+
+  return ALLOWED_PARENTS.some(p => path.dirname(resolved) === path.join(top, p))
 }
 
 function decide(input) {
   if (input?.tool_name !== 'Bash') return null
 
   const command = String(input.tool_input?.command ?? '')
-  if (!/\bworktree\b/.test(command)) return null
-
-  const bad = worktreeAddTargets(command).filter(({ target, gitDir }) => !isAllowed(target, gitDir, input.cwd))
+  const bad = worktreeAddTargets(command).filter(({ target, gitDir }) => !isAllowed(target, gitDir, input.cwd, input.repoRoot))
   if (!bad.length) return null
 
   return {
@@ -128,4 +146,4 @@ if (require.main === module) {
   })
 }
 
-module.exports = { decide, worktreeAddTargets, isAllowed, tokenize }
+module.exports = { decide, worktreeAddTargets, isAllowed, tokenize, repoRoot }
