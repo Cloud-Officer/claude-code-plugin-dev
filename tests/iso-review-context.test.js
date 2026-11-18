@@ -200,6 +200,10 @@ test('Stop keeps the marker while background work runs, then clears it', () => {
   assert.strictEqual(sub(), null)
 
   hook.decide({ hook_event_name: 'PreToolUse', tool_name: 'Skill', tool_input: { skill: 'code-review' }, session_id: 's5', cwd: '.' }, deps)
+  hook.decide({ hook_event_name: 'Stop', session_id: 's5', background_tasks: 'running' }, deps)
+  assert.strictEqual(sub(), null)
+
+  hook.decide({ hook_event_name: 'PreToolUse', tool_name: 'Skill', tool_input: { skill: 'code-review' }, session_id: 's5', cwd: '.' }, deps)
   hook.decide({ hook_event_name: 'SessionEnd', session_id: 's5', background_tasks: [{ status: 'running' }] }, deps)
   assert.strictEqual(sub(), null)
 })

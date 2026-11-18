@@ -170,7 +170,7 @@ function decide(input, deps = defaults()) {
     return context && context.length <= MAX_CONTEXT ? output(event, context) : null
   }
 
-  const backgroundRunning = event === 'Stop' && (input.background_tasks || []).some(task => task?.status === 'running')
+  const backgroundRunning = event === 'Stop' && Array.isArray(input.background_tasks) && input.background_tasks.some(task => task?.status === 'running')
   if ((event === 'Stop' || event === 'SessionEnd') && !backgroundRunning) fs.rmSync(marker, { force: true })
   return null
 }
