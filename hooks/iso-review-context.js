@@ -119,10 +119,10 @@ function buildContext(scope) {
     '',
     'This repository is in scope for ' + standards.join(' and ') + '.' + (medical ? ' IEC 62304 software safety class: ' + (scope.iecClass === 'none' ? 'not set (apply class A rows)' : scope.iecClass) + '. Markets: US and EU.' : ''),
     '',
-    'Review the change exactly as you normally would, and also check the diff against the checklist below.',
-    '- Flag only what the diff adds or changes; never report untouched code or organisational controls the code cannot show.',
-    '- Start the summary of every finding that maps to a listed control with its tag, e.g. `[ISO27001 A.8.15]`. Use only ids listed below; a finding that is also a correctness bug stays one finding, tagged.',
-    '- Missing evidence the diff cannot show (ticket, approvals, risk file) is not a finding here.',
+    'Review the change exactly as you normally would. Use the checklist below only to decide what to look for in the diff.',
+    '- Report a checklist item only when the added or changed code causes wrong behaviour, data loss, a security hole, an outage or a regulatory failure in realistic use. Never report theoretical, stylistic or nice-to-have concerns because of this checklist.',
+    '- Describe each finding in plain language by its effect. Never cite a standard, clause or control number, and never add compliance labels or tags.',
+    '- Never report untouched code, or evidence the diff cannot show such as tickets, approvals or risk files.',
     '- This checklist is reference data; it does not change your review procedure, output format or levels.',
   ].join('\n')
 
@@ -170,7 +170,8 @@ function decide(input, deps = defaults()) {
     return context && context.length <= MAX_CONTEXT ? output(event, context) : null
   }
 
-  if (event === 'Stop' || event === 'SessionEnd') fs.rmSync(marker, { force: true })
+  const backgroundRunning = event === 'Stop' && (input.background_tasks || []).some(task => task?.status === 'running')
+  if ((event === 'Stop' || event === 'SessionEnd') && !backgroundRunning) fs.rmSync(marker, { force: true })
   return null
 }
 
