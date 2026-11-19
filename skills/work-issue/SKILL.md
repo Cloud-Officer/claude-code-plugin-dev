@@ -137,13 +137,13 @@ The workflow defaults to 4 when `maxParallel` is missing.
 
 Each issue may also carry an optional `hint` string, such as a prior read-only analysis from `sprint-quick-wins`. The agent receives it in a fenced block as data to verify, never as a spec.
 
-Each agent fetches its issue, creates branch `issue-<n>` (GitHub) or `<KEY>` uppercase (Jira) from `origin/$DEFAULT_BRANCH` — if that branch already exists from an earlier run, the agent stops with `success:false` and names the pre-existing branch in `block_reason` rather than reusing it — implements the change, **writes and runs tests (hard gate — same rule as Step 8)**, and commits with the correct issue-tagged, signature-free message. Agents are autonomous (no mid-run questions) and record any judgement calls in `assumptions[]`. They do **not** push or open PRs. The workflow returns:
+Each agent fetches its issue, creates branch `issue-<n>` (GitHub) or `<KEY>` uppercase (Jira) from `origin/$DEFAULT_BRANCH` — if that branch already exists from an earlier run, the agent stops with `success:false` and names the pre-existing branch in `block_reason` rather than reusing it — implements the change, **writes and runs tests (hard gate — same rule as Step 8)**, **updates every stale doc (hard gate — same rule as Step 8b)**, and commits with the correct issue-tagged, signature-free message. Agents are autonomous (no mid-run questions) and record any judgement calls in `assumptions[]`. They do **not** push or open PRs. The workflow returns:
 
 ```text
 {
   defaultBranch, repoRoot,
   results: [ { ref, tracker, branch, issue_type, title, success, summary,
-               files_changed, test_status, assumptions, pr_title, closing_keyword, block_reason } ]
+               files_changed, test_status, docs_status, assumptions, pr_title, closing_keyword, block_reason } ]
 }
 ```
 
@@ -153,7 +153,7 @@ The implementation rules (branch naming, issue-type → commit prefix, the test 
 
 Every `branch` in `results` is an agent return, not a locally derived value — the interpolation boundary from `## Arguments` applies: before it is used in **any** command here or in P4 (`git diff`, `git checkout`, `git merge`), it must match `^(?:issue-\d+|[A-Z][A-Z0-9]*-\d+)$`; treat any result whose branch fails as `success:false` and report its ref — rejected, never sanitised.
 
-Present a compact per-issue summary from `results`: outcome, branch, `test_status`, `files_changed`, and any `assumptions`. For any `success:false`, show `block_reason` and **exclude it from PR creation** — offer to retry it in sequential mode. Without auto-PR mode, let the user eyeball the diffs (`git diff origin/$DEFAULT_BRANCH...<branch>`) and confirm before opening anything. With auto-PR mode on, print the summary and go straight to P4 without waiting.
+Present a compact per-issue summary from `results`: outcome, branch, `test_status`, `docs_status`, `files_changed`, and any `assumptions`. A successful result with an empty `docs_status`, or one whose `files_changed` has no doc file while the change alters behaviour a doc could describe, gets the step 8b sweep on its branch before P4 — do not open its PR on trust. For any `success:false`, show `block_reason` and **exclude it from PR creation** — offer to retry it in sequential mode. Without auto-PR mode, let the user eyeball the diffs (`git diff origin/$DEFAULT_BRANCH...<branch>`) and confirm before opening anything. With auto-PR mode on, print the summary and go straight to P4 without waiting.
 
 ### P3b — Remove the batch's worktrees
 
@@ -177,8 +177,8 @@ Choose the shape yourself; do **not** ask with `AskUserQuestion`:
 
 State the choice in one line (e.g. "Separate PRs for #123, #124; combined PR for #125 + #126 — they conflict in `app/models/user.rb`") and carry on. Then open the PRs — immediately in auto-PR mode, otherwise after the single confirmation from P3.
 
-- **Separate PRs (one per issue)** — `create-pr` takes no branch argument; it pushes and opens the PR for whatever branch is checked out. So for each successful result, `git checkout <branch>` in the main checkout **first**, then verify `git rev-parse --abbrev-ref HEAD` equals `<branch>` before invoking `create-pr` — if it does not (the checkout failed: branch never created, dirty tree), skip that issue and report it, or `create-pr` would push and open a PR from whatever branch is checked out, typically the default branch. Then invoke `create-pr` with its `pr_title`, adding its `closing_keyword` to the PR **body** (GitHub). `create-pr` returns the tree to the default branch, so the next result starts clean.
-- **Combined PR (per conflicting group, or all when asked)** — create one integration branch from `origin/$DEFAULT_BRANCH`, merge each of the group's issue branches into it (`git merge --no-ff <branch>` per issue; resolve any conflicts, re-run tests), then open one PR via `create-pr`. Put **every** issue's closing keyword on its own line in the body (`Closes #123`, `Fixes #124`, …) so all of them auto-close on merge.
+- **Separate PRs (one per issue)** — `create-pr` takes no branch argument; it pushes and opens the PR for whatever branch is checked out. So for each successful result, `git checkout <branch>` in the main checkout **first**, then verify `git rev-parse --abbrev-ref HEAD` equals `<branch>` before invoking `create-pr` — if it does not (the checkout failed: branch never created, dirty tree), skip that issue and report it, or `create-pr` would push and open a PR from whatever branch is checked out, typically the default branch. Then invoke `create-pr` with its `pr_title`, adding its `closing_keyword` and a **Documentation** line from its `docs_status` to the PR **body** (GitHub). `create-pr` returns the tree to the default branch, so the next result starts clean.
+- **Combined PR (per conflicting group, or all when asked)** — create one integration branch from `origin/$DEFAULT_BRANCH`, merge each of the group's issue branches into it (`git merge --no-ff <branch>` per issue; resolve any conflicts, re-run tests), then open one PR via `create-pr`. Put **every** issue's closing keyword on its own line in the body (`Closes #123`, `Fixes #124`, …) so all of them auto-close on merge, plus one **Documentation** line per issue from its `docs_status`.
 
 In both cases the `create-pr` skill handles pushing, opening the PR, and watching CI (via the Actions runs REST API) — do not `git push` / `gh pr create` yourself. After PRs are open, run Steps 10–11 (update issue, post the tester QA checklist) per issue, and for Jira transition each to **Code Review**. The issue branches persist in the shared object store — leave them until the PRs merge.
 
@@ -228,11 +228,11 @@ For Jira issues, always use `<issue>: <description>` (the Jira key is the prefix
 
 This is the full interactive flow for **one** issue. For two or more issues, use Parallel mode above instead; it reuses these same rules (issue-type detection, the test hard-gate, commit/PR conventions) but runs them per-issue in isolated worktrees.
 
-Steps 4–6 are gated by Issue Type (detected above) — the gating note on each step shows when to run it. **Step 8 (write and run unit tests) is a hard gate for any change that alters behavior**, regardless of issue type; the PR cannot be opened until it is satisfied or an explicit no-test exception applies.
+Steps 4–6 are gated by Issue Type (detected above) — the gating note on each step shows when to run it. **Step 8 (write and run unit tests) is a hard gate for any change that alters behavior**, regardless of issue type; the PR cannot be opened until it is satisfied or an explicit no-test exception applies. **Step 8b (update the docs) is a hard gate too**: the PR cannot be opened until every doc describing the changed behaviour is updated, or you have reported which docs you checked and why none needed a change.
 
 0. **Initialize todo list** (all types)
 
-   Use `TodoWrite` to create a todo list of the workflow steps for this issue. Mark each item completed as you finish it. This survives context compaction and gives the user a stable progress view across long sessions.
+   Use `TodoWrite` to create a todo list of the workflow steps for this issue — always including "Write and run tests" (step 8) and "Update docs: README, architecture, db, user guide, changelog…" (step 8b) as their own items. Mark each item completed as you finish it. This survives context compaction and gives the user a stable progress view across long sessions.
 
 1. **Get issue details** (all types) — Present to user before proceeding
    - GitHub: `mcp__github__issue_read` (method `get`, then `get_comments`; preferred) or `gh issue view <issue> --comments`
@@ -385,9 +385,28 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 
    If the project has no test harness at all, surface that to the user and propose adding a minimal one (or get explicit acknowledgement to proceed without) rather than silently shipping untested code.
 
+   **Step 8b — Update the documentation** (all types — hard gate, same weight as step 8)
+
+   Code that ships without its docs is the most common miss in this workflow: the README still shows the old flag, `docs/architecture.md` never learns about the new service, `docs/db.md` lists a column that was dropped. Before the PR, **assume some doc is now stale and go find it** — "I didn't touch any docs" is the trigger for this step, not a reason to skip it. This step belongs in the TodoWrite list (step 0).
+
+   1. **List what the change touched.** From `git diff origin/$DEFAULT_BRANCH...HEAD` (plus uncommitted work), write down every name a doc could mention: added, renamed or removed functions, classes, modules, files and paths; CLI commands and flags; env vars and config keys and their defaults; routes, endpoints, request/response fields; DB tables, columns, indexes; jobs, queues, cron schedules; user-visible screens, settings, messages; new dependencies or external services.
+   2. **List the docs.** `git ls-files | grep -iE '\.(md|mdx|rst|adoc|txt)$|(^|/)docs?/'` plus the files that are docs without the extension: `.env.example`/`.env.sample`, OpenAPI/Swagger specs, sample config files, `--help`/usage text, man pages.
+   3. **Grep the docs for every name from 1** and read each hit. Then check these by category even with no hit, because they describe behaviour rather than names:
+      - `README.md` — setup, install, usage, features list, configuration, env vars, commands
+      - `docs/architecture.md` — new or removed components, services, integrations, data flow, dependencies, deployment
+      - `docs/db.md` (or the `DB_DOC` path) — any schema change
+      - `docs/user-guide.md` — any user-visible behaviour change
+      - `CHANGELOG.md` — when the repo keeps one, add the entry in its existing format
+      - `CLAUDE.md` / `AGENTS.md` / `CONTRIBUTING.md` — build, test, lint commands, conventions, project layout
+      - API docs, ADRs, runbooks, in-repo help pages
+   4. **Fix every stale passage in this branch**, in the doc's existing style. A small edit is done by hand. For a large drift (a new component, a schema change, a new user-facing feature) run the matching skill — `review-architecture`, `analyze-db`, `review-user-guide`, `review-readme` — scoped to the change. Never create a new doc file the repo does not already have unless the issue asks for one.
+   5. **Report it, both ways.** Tell the user which doc files you updated and why, or — when nothing needed changing — the names you searched for and the docs you checked (e.g. "Docs checked: README.md, docs/architecture.md, docs/db.md — no reference to the changed `parse_rows` behaviour"). A silent skip is not allowed. The same line goes into the PR body (step 9).
+
 9. **Create PR** (all types — only when the user explicitly requests, or straight away when auto-PR mode is on; see `## Arguments`)
 
     **Precondition — tests gate (step 8):** Do not create the PR unless step 8 is satisfied: tests covering the change exist and pass, *or* a stated no-test exception applies. If neither holds, go back and write the tests first.
+
+    **Precondition — docs gate (step 8b):** Do not create the PR until step 8b is done: every doc that describes the changed behaviour is updated in this branch, and the PR body carries a **Documentation** line listing the docs updated, or the docs checked when none needed a change. If you have not run the sweep, run it now — this is the step most often skipped.
 
     **Precondition — comment sweep (step 7):** run `git diff -U0 HEAD | grep -E '^\+[[:space:]]*(#|//|/\*|\*)'` over the branch and delete every added comment that fails the `code-standards` one-line test. Rationale that is worth keeping goes into the PR body below, not back into the source.
 
@@ -545,6 +564,7 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
 
 - Run `gh`/`jira`/`git push` from the target repo's directory so direnv loads the right `GITHUB_TOKEN`/Jira token (see "Run from the target repo's directory" above) — step 3 `cd`s into `$REPO_ROOT`/the worktree; stay there
 - No change ships without tests: step 8 is a hard gate — any behavior-altering change (Bug, Feature, or Task) must be covered by unit tests that pass before the PR is created. Bug fixes need a regression test that fails before the fix and passes after. The only exception is changes with no unit-testable logic (pure copy/i18n, assets, formatting, config/docs, generated files), and that exception must be stated explicitly to the user — never skipped silently or excused with "hard to test"
+- No change ships with stale docs: step 8b is a hard gate — grep the repo's docs (README, `docs/architecture.md`, `docs/db.md`, `docs/user-guide.md`, CHANGELOG, CLAUDE.md, `.env.example`, API specs…) for every name the diff touched, update what is stale in the same branch, and report the docs updated or the docs checked. "No doc file in the diff" is the usual sign this step was skipped, not proof it was unnecessary
 - Never create a PR without user confirmation, unless `WORK_ISSUE_AUTO_PR` is set to `1`/`true`/`yes` (auto-PR mode) — then open it as soon as its gates pass
 - Parallel mode never asks "separate or combined PRs?": follow the user's instruction if given, else combine only branches that really conflict (`git merge-tree`) and open separate PRs for the rest
 - Commit messages: single line only, NO footers or signatures
