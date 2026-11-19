@@ -40,6 +40,15 @@ for (const issue of [{ tracker: 'github', ref: '42' }, { tracker: 'jira', ref: '
     assert.doesNotMatch(buildImplementPrompt(issue), /rather than from a restatement here/)
   })
 
+  test('implement prompt carries the docs gate before the commit (' + issue.tracker + ')', () => {
+    const prompt = buildImplementPrompt(issue)
+    const docs = prompt.indexOf('Docs are a HARD GATE')
+    assert.ok(docs >= 0)
+    assert.ok(docs < prompt.indexOf('Commit on your branch'))
+    assert.ok(prompt.includes('docs/architecture.md'))
+    assert.ok(prompt.includes('`docs_status`'))
+  })
+
   test('implement prompt keeps the added-comment sweep (' + issue.tracker + ')', () => {
     assert.ok(buildImplementPrompt(issue).includes("git diff -U0 HEAD | grep -E '^\\+[[:space:]]*(#|//|/\\*|\\*)'"))
   })
