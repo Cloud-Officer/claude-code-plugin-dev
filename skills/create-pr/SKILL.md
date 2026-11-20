@@ -115,6 +115,18 @@ The message arrives on stdin through a quoted heredoc, never as a double-quoted 
 
 ## Step 4: Push the Branch
 
+Every commit on the branch must be signed. Before pushing, list any commit ahead of the base that carries no signature:
+
+```bash
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+for c in $(git rev-list "origin/$DEFAULT_BRANCH..HEAD"); do git cat-file commit "$c" | grep -q '^gpgsig' || git log -1 --format='UNSIGNED %h %s' "$c"; done
+```
+
+If any `UNSIGNED` line prints, stop: do not push. Report the unsigned commits and ask the user to unlock their signing agent (for example 1Password), then re-sign them with `git rebase --exec 'git commit --amend --no-edit -S' "origin/$DEFAULT_BRANCH"` and run this check again. Never bypass signing (`--no-gpg-sign`, `-c commit.gpgsign=false`) to get a commit through. The check reads the commit object for a signature header rather than using `%G?`, which reports `E` for valid SSH signatures when no `gpg.ssh.allowedSignersFile` is configured.
+
+When the check prints nothing, push:
+
 ```bash
 git push -u origin "$CURRENT_BRANCH"
 ```
