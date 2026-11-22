@@ -42,7 +42,11 @@ aws cloudwatch get-metric-statistics --namespace AWS/EC2 --metric-name CPUUtiliz
 aws rds describe-db-instances --query 'DBInstances[].{ID:DBInstanceIdentifier,Status:DBInstanceStatus,Engine:Engine}'
 ```
 
-**Note:** The `aws` CLI requires credentials via `aws configure` or env vars (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`). Set `AWS_PROFILE` to select a specific named profile (e.g., `export AWS_PROFILE=production`). Both the MCP server and CLI respect this variable. If any MCP call or CLI command fails, exits non-zero, or returns output that does not parse, stop, report the exact error text to the user, and never present an empty or partial result as an answer — do not retry or substitute another region, profile or command.
+**Note:** The `aws` CLI requires credentials via `aws configure`, an SSO profile (`aws configure sso`), or env vars (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`). Set `AWS_PROFILE` to select a specific named profile (e.g., `export AWS_PROFILE=production`). Both the MCP server and CLI respect this variable. If any MCP call or CLI command fails, exits non-zero, or returns output that does not parse, stop, report the exact error text to the user, and never present an empty or partial result as an answer — do not retry or substitute another region, profile or command. The one exception is the expired SSO session below.
+
+**Expired SSO session.** When a call fails because the SSO session is missing or expired — the error contains `Token has expired and refresh failed`, `Error loading SSO Token`, `The SSO session associated with this profile has expired` or `ExpiredToken` — run `aws sso login` yourself, adding `--profile '<profile>'` when the call used one, with the Bash tool's `run_in_background: true`. Tell the user in one line that a browser tab is waiting for them to sign in, and once the command exits, retry the failed call **once**. A second failure falls under the stop-and-report rule above. A profile with a static access key never returns these errors, so it is unaffected.
+
+**The MCP server is bound to one profile.** The bundled AWS MCP server reads the `AWS_PROFILE` (or key pair) that was set when Claude started, and cannot switch. When the account or profile the user names differs from the one the MCP server reports (`sts get-caller-identity`), use the `aws` CLI with `--profile '<profile>'` for that work instead of the MCP tools.
 
 ## Usage
 
