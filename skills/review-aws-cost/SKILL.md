@@ -123,6 +123,8 @@ aws iam list-account-aliases --output json 2>/dev/null || echo '{"AccountAliases
 echo "AWS_PROFILE=${AWS_PROFILE:-<default>} AWS_REGION=${AWS_REGION:-<unset>}"
 ```
 
+If `get-caller-identity` fails because the SSO session is missing or expired (`Token has expired and refresh failed`, `Error loading SSO Token`, `The SSO session associated with this profile has expired`, `ExpiredToken`), run `aws sso login` yourself, with `--profile '<profile>'` when `--profile` was passed, using the Bash tool's `run_in_background: true`. Tell the user in one line that a browser tab is waiting for them to sign in, then run the three commands again once. Any other failure, or a second one, stops the audit with the exact error.
+
 Show the user the account id, alias and profile, and confirm it is the intended account before continuing. Cost data is billing data — auditing the wrong account wastes the run and leaks nothing useful.
 
 Then check whether this profile is an Organizations management (payer) account:
