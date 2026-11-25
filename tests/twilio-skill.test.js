@@ -21,7 +21,8 @@ const enumValue = /^[A-Za-z][A-Za-z-]*$/
 const accepted = (value) => enumValue.test(value) || Object.values(patterns).some((re) => re.test(value))
 
 const bashBlocks = [...skill.matchAll(/```bash\n([\s\S]*?)```/g)].map((m) => m[1])
-const curlLines = bashBlocks.flatMap((block) => block.split('\n')).filter((line) => /\bcurl\b/.test(line) && !line.includes('raw.githubusercontent.com'))
+const SPEC_FETCH = /^curl -sS "https:\/\/raw\.githubusercontent\.com\/twilio\/twilio-oai\/main\/spec\/json\/[a-z0-9_]+\.json" \|/
+const curlLines = bashBlocks.flatMap((block) => block.split('\n')).filter((line) => /\bcurl\b/.test(line) && !SPEC_FETCH.test(line))
 const AUTH = '-u "${TWILIO_API_KEY:-$TWILIO_ACCOUNT_SID}:${TWILIO_API_SECRET:-$TWILIO_AUTH_TOKEN}"'
 
 describe('twilio skill value patterns', () => {
