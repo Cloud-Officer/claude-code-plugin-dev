@@ -4,7 +4,7 @@ const { test } = require('node:test')
 const assert = require('node:assert')
 const path = require('node:path')
 const { spawnSync } = require('node:child_process')
-const { decide, isComposeTool } = require('../hooks/email-guard.js')
+const { decide, isComposeTool, visibleText } = require('../hooks/email-guard.js')
 
 const DRAFT = 'mcp__google-workspace__draft_gmail_message'
 const GOOD = '<p>Hi Sam,</p><p>Here is where things stand:</p><ul><li>Release 2.4 shipped Monday</li><li>QA starts on 2.5 next week</li></ul><p>Thanks,<br>Yves</p>'
@@ -23,6 +23,14 @@ test('denies em dashes, en dashes and double hyphens in subject or body', () => 
 
 test('ignores dashes inside markup, comments and addresses', () => {
   assert.strictEqual(run({ to: 'a--b@example.com', subject: 'Hi', body: '<!-- x --><p><a href="https://x.io/a--b">link</a></p>', body_format: 'html' }), null)
+})
+
+test('visibleText drops tags and comments in one pass, keeping stray angle brackets', () => {
+  assert.strictEqual(visibleText('<p>a</p><ul><li>b</li></ul>'), 'a\nb\n')
+  assert.strictEqual(visibleText('x<!<!---->-- y -->z'), 'x-- y -->z')
+  assert.strictEqual(visibleText('<!-- open forever'), '')
+  assert.strictEqual(visibleText('5 < 6 is true'), '5 < 6 is true')
+  assert.match(reason({ subject: 'Hi', body: '<p>5 < 6 — yes</p>', body_format: 'html' }), /dash in body/)
 })
 
 test('denies Markdown bullets, headings, bold and links', () => {

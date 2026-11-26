@@ -9,6 +9,8 @@ const FORMAT_KEY = /^(body_?format|body_?type|content_?type|mime_?type|format)$/
 const PLAIN_FORMAT = /^(plain|text|text\/plain)$/i
 const DASH = /[‒–—―]/
 const DOUBLE_HYPHEN = /(\s|\w)--(\s|\w)/
+const TAG_START = /[A-Za-z/!?]/
+const LINE_BREAK_TAG =/^<(br|\/p|\/li|\/div|\/h[1-6]|\/tr|\/blockquote)\b/i
 
 const MARKDOWN = [
   ['a Markdown bullet ("- ", "* ", "• ")', /^\s*[-*+•·▪◦]\s+\S/],
@@ -38,11 +40,23 @@ function fields(value, key = '', out = []) {
 }
 
 function visibleText(text) {
-  return text
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<(br|\/p|\/li|\/div|\/h[1-6]|\/tr|\/blockquote)\b[^>]*>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
+  let out = ''
+  let i = 0
+
+  while (i < text.length) {
+    if (text.startsWith('<!--', i)) {
+      const end = text.indexOf('-->', i + 4)
+      i = end === -1 ? text.length : end + 3
+    } else if (text[i] === '<' && TAG_START.test(text[i + 1] ?? '') && text.indexOf('>', i + 1) !== -1) {
+      const end = text.indexOf('>', i + 1)
+      if (LINE_BREAK_TAG.test(text.slice(i, end + 1))) out += '\n'
+      i = end + 1
+    } else {
+      out += text[i++]
+    }
+  }
+
+  return out.replace(/&nbsp;/g, ' ')
 }
 
 function snippet(text, at) {
