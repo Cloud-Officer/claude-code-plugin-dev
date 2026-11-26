@@ -783,8 +783,8 @@ If run without `--send`:
 If run with `--send`:
 
 1. Build the recipient list: primary = `$WEEKLY_DEV_REPORT_TO` (abort if unset); append each address from `WEEKLY_DEV_REPORT_CC` (comma-separated, ignore empty entries, dedupe)
-2. Subject: `Weekly Dev Report — <sprint name> — <week_start> to <week_end>`
-3. Body: the rendered Markdown. If the available Gmail transport supports HTML, render the Markdown to HTML first (simple conversion: tables → `<table>`, headings → `<hN>`, links → `<a href>`); otherwise send as plain text with Markdown preserved.
+2. Subject: `Weekly Dev Report: <sprint name>, <week_start> to <week_end>` (no em or en dashes)
+3. Body: read `${CLAUDE_PLUGIN_ROOT}/skills/email-writing/SKILL.md` and convert the rendered Markdown to an HTML body as its "Emailing a rendered report" section describes, replacing every em and en dash. For the Google Workspace MCP pass `body_format: "html"`; for the `gmail` CLI pass its HTML option when it has one. Never send the Markdown itself.
 4. Try delivery in this order:
    - A Google Workspace MCP tool discovered in the session's tool list at runtime (do not hardcode): eligible names match `mcp__*gmail*send*` or `mcp__google*workspace*gmail*` AND contain `send` (so a search or draft tool never qualifies). Use this path only when exactly one tool is eligible; zero or several eligible tools skip this path entirely and fall through to the `gmail` CLI, so which mail lands never depends on discovery order
    - `gmail send` CLI if installed (`which gmail`)

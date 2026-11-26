@@ -1,5 +1,5 @@
 {
-  "description": "Block git worktrees created outside the repository, and give /code-review the repository's ISO 27001 / ISO 13485 scope",
+  "description": "Block git worktrees created outside the repository, block emails that break the house email style, and give /code-review the repository's ISO 27001 / ISO 13485 scope",
   "hooks": {
     "PreToolUse": [
       {
@@ -8,6 +8,16 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/worktree-guard.js\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*([Mm]ail|MAIL|[Oo]utlook).*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/email-guard.js\"",
             "timeout": 10
           }
         ]
