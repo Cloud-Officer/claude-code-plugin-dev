@@ -427,8 +427,8 @@ If run **without** `--send`:
 If run **with** `--send`:
 
 1. Build the recipient list: primary = `$MONDAY_WEEKLY_REPORT_TO` (abort if unset); append each address from `MONDAY_WEEKLY_REPORT_CC` (comma-separated, ignore empties, dedupe).
-2. Subject: `Weekly Project Report — <board names> — <week_start> to <week_end>`.
-3. Body: the rendered Markdown (render to simple HTML if the transport supports it; otherwise plain text with Markdown preserved).
+2. Subject: `Weekly Project Report: <board names>, <week_start> to <week_end>` (no em or en dashes).
+3. Body: read `${CLAUDE_PLUGIN_ROOT}/skills/email-writing/SKILL.md` and convert the rendered Markdown to an HTML body as its "Emailing a rendered report" section describes, replacing every em and en dash. Send it in the sender's HTML mode (`body_format: "html"` for the Google Workspace MCP, `contentType: "HTML"` for Microsoft Graph, an HTML MIME part for the `gmail` CLI or SMTP relay). Never send the Markdown itself.
 4. Deliver via the email sender the user confirmed once, cached in `email.json` under `~/.config/monday-weekly-report/` — the exact MCP tool name, the `gmail` CLI, or a configured SMTP relay. A `--send` run never prompts: with no cached sender it skips the send with a printed note (the report is still written) telling the user to confirm a sender in a preview. In a preview/interactive run with no cached sender, list the candidate senders present in the session with AskUserQuestion, confirm one, and cache it. Never pick a sender by glob over whatever tools happen to be registered in the session. The subject and body carry monday board and item names, so for the `gmail` CLI or an SMTP relay they reach the command over stdin or from a file the Write tool created, per the sink rule in Caches — never as a command-line argument.
 5. On success, print `Sent to: <list>`. On failure, leave `PROJECT_REPORT.md` in place, print the error, and tell the user to send manually.
 
