@@ -155,6 +155,17 @@ function sameOwner(a, b) {
   return a.toLowerCase() === b.toLowerCase()
 }
 
+function repoList(repos, home) {
+  const groups = new Map()
+  for (const r of repos) {
+    const key = path.dirname(r.path) + '\0' + r.owner
+    if (!groups.has(key)) groups.set(key, { dir: path.dirname(r.path), owner: r.owner, names: [] })
+    const folder = path.basename(r.path)
+    groups.get(key).names.push('`' + folder + '`' + (folder === r.repo ? '' : ' (`' + r.repo + '`)'))
+  }
+  return [...groups.values()].map(g => '- `' + g.owner + '` in `' + tildify(g.dir, home) + '/`: ' + g.names.join(', '))
+}
+
 function buildContext(cwd, deps = defaults()) {
   const ws = resolveWorkspace(cwd, deps)
   const home = deps.home
@@ -166,9 +177,10 @@ function buildContext(cwd, deps = defaults()) {
 
   const sameOrg = ws.siblings.filter(s => ws.orgs.some(o => sameOwner(o, s.owner)))
   if (sameOrg.length) {
-    out.push('', 'Other repositories cloned next to it (read them directly; for any repository not listed, read it on GitHub with the GitHub MCP tools or `gh`):')
-    for (const s of sameOrg) out.push('- `' + s.owner + '/' + s.repo + '`: `' + tildify(s.path, home) + '`')
+    out.push('', 'Other repositories cloned next to it (folder name, then the GitHub name when it differs; read them directly, and read any repository not listed on GitHub with the GitHub MCP tools or `gh`):')
+    out.push(...repoList(sameOrg, home))
   }
+  out.push('', 'To learn what a repository does and how it is built, read its `README.md` and `docs/architecture.md` first, and `docs/db.md` for its database, before searching the code.')
 
   let catalog
   try {
@@ -182,7 +194,7 @@ function buildContext(cwd, deps = defaults()) {
   const privList = priv ? priv.repos.filter(r => path.resolve(r.path) !== path.resolve(ws.root || '') && !sameOrg.some(s => s.path === r.path)) : []
   if (privList.length) {
     tail.push('', '## Cloud Officer repositories cloned locally (CO_PRIVATE_DIR)', '')
-    for (const r of privList) tail.push('- `' + r.owner + '/' + r.repo + '`: `' + tildify(r.path, home) + '`')
+    tail.push(...repoList(privList, home))
   }
 
   const orgTexts = ws.orgs.map(owner => ({ owner, text: orgContext(owner, deps) })).filter(o => o.text)

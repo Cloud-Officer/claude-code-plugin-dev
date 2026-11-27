@@ -1,6 +1,6 @@
 # Organization context template
 
-Copy this file to `claude/context.md` in a **private** `.github` repository in your GitHub organization (`<org>/.github`), and give every team read access. The co-dev session-start hook reads it through GitHub, so everyone gets it with no clone needed. Keep it under about 5,000 characters: the hook cuts off anything past its share of the session context.
+Copy this file to `claude/context.md` in a **private** `.github` repository in your GitHub organization (`<org>/.github`), and give every team read access. The co-dev session-start hook reads it through GitHub, so everyone gets it with no clone needed. Keep it under about 6,000 characters: the hook cuts off anything past its share of the session context.
 
 Keep the repository private. A public `.github` repository becomes the organization's public profile and default community files, which would publish everything below.
 
