@@ -38,28 +38,12 @@
       "args": ["-y", "chrome-devtools-mcp@latest"]
     },
     "postgres": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@bytebase/dbhub",
-        "--transport",
-        "stdio"
-      ],
-      "env": {
-        "DSN": "postgres://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}"
-      }
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/dbhub.js", "postgres"]
     },
     "mysql": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@bytebase/dbhub",
-        "--transport",
-        "stdio"
-      ],
-      "env": {
-        "DSN": "mysql://${MYSQL_USER}:${MYSQL_PASS}@${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DB}"
-      }
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/dbhub.js", "mysql"]
     },
     "mongodb": {
       "command": "npx",
