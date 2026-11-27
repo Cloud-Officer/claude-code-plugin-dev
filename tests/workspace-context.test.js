@@ -63,9 +63,9 @@ test('lists only same-org siblings and the org context from the .github repo', (
   const out = hook.buildContext(path.join(tmp, 'pnp-web', 'src'), deps)
 
   assert.match(out, /Current repository: `Acme\/pnp-web`/)
-  assert.match(out, /`Acme\/pnp-api`/)
-  assert.match(out, /`Acme\/pnp-ios`/)
+  assert.match(out, /- `Acme` in `[^`]+\/`: `pnp-api`, `pnp-ios`\n/)
   assert.doesNotMatch(out, /draw/)
+  assert.match(out, /read its `README\.md` and `docs\/architecture\.md` first/)
   assert.match(out, /## Organization context: Acme/)
   assert.match(out, /Backend: pnp-api/)
   assert.match(out, /## Cloud Officer open-source tools/)
@@ -82,8 +82,8 @@ test('a top folder with no repo uses the most common org among its children', ()
   const out = hook.buildContext(tmp, deps)
 
   assert.match(out, /Started outside a git repository/)
-  assert.match(out, /`Acme\/a`/)
-  assert.doesNotMatch(out, /Other\/c/)
+  assert.match(out, /- `Acme` in `[^`]+\/`: `a`, `b`\n/)
+  assert.doesNotMatch(out, /`Other`/)
   assert.deepStrictEqual(deps.calls.gh, ['repos/Acme/.github/contents/claude/context.md'])
 })
 
@@ -136,8 +136,18 @@ test('CO_PRIVATE_DIR adds the repos cloned there', () => {
   const out = hook.buildContext(path.join(tmp, 'client', 'app'), deps)
 
   assert.match(out, /## Cloud Officer repositories cloned locally \(CO_PRIVATE_DIR\)/)
-  assert.match(out, /`Cloud-Officer\/compliance`/)
+  assert.match(out, /- `Cloud-Officer` in `[^`]+\/co\/`: `compliance`\n/)
   assert.doesNotMatch(hook.buildContext(path.join(tmp, 'client', 'app'), makeDeps({ remotes })), /CO_PRIVATE_DIR/)
+})
+
+test('names the GitHub repository when the folder is named differently', () => {
+  const { tmp, remotes } = workspace({
+    app: 'git@github.com:Acme/app.git',
+    'php-extensions': 'git@github.com:Acme/apt-packages.git',
+  })
+  const out = hook.buildContext(path.join(tmp, 'app'), makeDeps({ remotes }))
+
+  assert.match(out, /`php-extensions` \(`apt-packages`\)/)
 })
 
 test('rejects remotes whose owner or name is not a plain GitHub name', () => {
