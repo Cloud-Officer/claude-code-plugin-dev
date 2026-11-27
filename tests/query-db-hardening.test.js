@@ -76,7 +76,7 @@ describe('DBHub credentials', () => {
       const server = mcp[name]
       assert.ok(!server.args.includes('--dsn'), `${name} still passes --dsn`)
       assert.ok(!server.args.some((a) => a.includes('PASS')), `${name} has a password in argv`)
-      assert.match(server.env.DSN, /^(postgres|mysql):\/\/\$\{/)
+      assert.deepEqual(server.args, ['${CLAUDE_PLUGIN_ROOT}/mcp/dbhub.js', name])
     })
   }
 })

@@ -195,6 +195,9 @@ npm i -g yaml-language-server
 npm i -g intelephense
 
 # Kotlin (covers .kt/.kts) — JetBrains' official LSP, bundles its own Java runtime
+# Use this tap formula, not the `kotlin-lsp` cask: the cask's intellij-server is not notarized, so macOS blocks it
+# ("Apple could not verify…") and "Move to Trash" deletes it. If you already use the cask, clear the quarantine flag:
+#   xattr -dr com.apple.quarantine "$(brew --prefix)/Caskroom/kotlin-lsp"
 brew install JetBrains/utils/kotlin-lsp
 
 # Java (covers .java) — pulls in openjdk
@@ -689,8 +692,9 @@ Two bundled servers read vars that are easy to miss. The `github` MCP server rea
 CLI fallback — no second variable to set. The `postgres` and `mysql` servers are both
 [DBHub](https://github.com/bytebase/dbhub), which builds its
 connection string from the `query-db` vars (`PGUSER`, `PGPASSWORD`, `PGHOST`, `PGPORT`, `PGDATABASE` and
-`MYSQL_USER`, `MYSQL_PASS`, `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_DB`); unset vars mean the server starts with no
-usable DSN and its tools are unavailable for that session.
+`MYSQL_USER`, `MYSQL_PASS`, `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_DB`). A small launcher (`mcp/dbhub.js`) starts DBHub
+only when all five vars for that engine are set; otherwise the server connects with no tools, so a project without
+that database shows no plugin error.
 
 For switching between accounts/projects per directory, see the [Multi-Account Setups](#multi-account-setups-direnv) section.
 
