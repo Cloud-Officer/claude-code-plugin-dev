@@ -19,6 +19,8 @@ Claude Code plugin for development workflow automation.
 * [Usage](#usage)
   * [Skills](#skills)
   * [Language Servers (LSPs)](#language-servers-lsps)
+  * [Workspace context hook](#workspace-context-hook)
+  * [direnv reload hook](#direnv-reload-hook)
   * [Local Development](#local-development)
 * [Contributing](#contributing)
 
@@ -761,6 +763,9 @@ that moment. The implication:
 **Bottom line:** to switch accounts, quit Claude Code and relaunch it from the target directory. direnv (or the
 launcher script) handles the rest.
 
+Shell commands are different: the plugin's [direnv reload hook](#direnv-reload-hook) reloads `.envrc` whenever a
+Bash command changes folder, so `gh`, `git`, `jira` and `aws` always use the credentials of the folder they run in.
+
 #### Database environments and tunnels (beta / rc / prod)
 
 When a repo's databases exist once per environment, declare them all in the same `.envrc` instead of commenting lines
@@ -1052,6 +1057,21 @@ agents) becomes meaningfully more accurate.
 
 Install commands per LSP are in the [macOS](#macos-homebrew) and [Windows](#windows-scoop) Quick Start sections. **Install only the LSPs for languages
 you actually write** — each one adds a small startup cost only when its file types appear in a workspace.
+
+### Workspace context hook
+
+`hooks/workspace-context.js` (needs `node` and `gh`) runs when a session starts and gives Claude a short map of where it is working, so it knows the related repositories without being told each time:
+
+* The current repository, and the other repositories from the same GitHub organization cloned next to it. When the session starts in a project's top folder instead of a repository, it uses the organization most of the subfolders belong to.
+* The organization's shared context, read from `claude/context.md` in the organization's `.github` repository: what each repository does, which clients call which backend, the environments, the tracker and the compliance scope. Everyone in the organization gets it through GitHub, including people who cloned only one repository. Start from [docs/org-context-template.md](docs/org-context-template.md). Keep that repository **private** and readable by every team: a public `.github` repository becomes the organization's public profile.
+* The [Cloud Officer open-source tools](hooks/references/cloud-officer-tools.md) (`ci-tools`, `github-build`, `ci-actions`, `soup`, ...) and when to use them.
+* With `CO_PRIVATE_DIR` set (for example `export CO_PRIVATE_DIR="$HOME/Downloads/cloud-officer"` in `.envrc`), the Cloud Officer repositories cloned in that folder, such as `compliance` and `aws`. Leave it unset if you don't have them.
+
+The organization file is cached for 24 hours in `~/.cache/co-dev/workspace-context/` (6 hours when the file does not exist), and the last cached copy is used when GitHub is unreachable; delete the cache to pick up an edit sooner. The whole context stays under Claude Code's 10,000-character limit, so a long organization file is cut off with a link to the full file. `work-issue` uses the map to check how the other apps already handle a feature before changing one. `CO_DEV_WORKSPACE_CONTEXT=off` disables the hook.
+
+### direnv reload hook
+
+`hooks/direnv-reload.js` (needs `node`) runs when a session starts and adds a few lines to Claude Code's `CLAUDE_ENV_FILE`, which Claude Code runs before every Bash command. Those lines load the current folder's `.envrc` and wrap `cd`, `pushd` and `popd` so they reload it on every change of folder. A `cd ../pnp-api && gh pr create` in one command now uses `pnp-api`'s `GITHUB_TOKEN`, not the token of the folder Claude started in. It does nothing when `direnv` is not installed or the `.envrc` is not allowed. MCP servers still keep the credentials they started with; see [Switching accounts](#switching-accounts). `CO_DEV_DIRENV_RELOAD=off` disables it.
 
 ### ISO review context hook
 

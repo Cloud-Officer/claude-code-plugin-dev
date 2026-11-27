@@ -33,13 +33,13 @@ If `--apply` is set, **confirm with the user once** before the first write, list
 
 The CLI / `curl` fallbacks below authenticate with credentials that [direnv](https://direnv.net/) loads from the `.envrc` of the **current working directory**: `GITHUB_TOKEN` for `gh`, and `JIRA_URL`/`JIRA_EMAIL`/`JIRA_API_TOKEN` for `jira`/`curl`. Run one of these from a directory whose `.envrc` belongs to a **different** repo and it authenticates as the wrong account — the command fails, or worse, comments on / closes issues in the wrong repo.
 
-**Before any command that needs per-repo credentials (`gh`, `jira`, `curl` against Jira), make the target repo the working directory in its own step:**
+**Before any command that needs per-repo credentials (`gh`, `jira`, `curl` against Jira), make the target repo the working directory:**
 
 ```bash
 cd /path/to/target-repo        # or, when already inside it: cd "$(git rev-parse --show-toplevel)"
 ```
 
-Run the `cd` as a **separate** Bash call — never chain it as `cd … && gh …`. direnv reloads `.envrc` on the next prompt, so the *following* calls get the right token; a command on the same line as the `cd` still runs with the old environment. When `--repo` or `--project` targets something other than your current directory, `cd` into that repo's checkout first so the token matches. MCP tools (`mcp__github__*`, `mcp__atlassian__*`) captured their credentials when Claude started and are unaffected.
+The co-dev direnv hook reloads `.envrc` on every `cd`, so a `cd … && gh …` in one call already gets the right token. When `--repo` or `--project` targets something other than your current directory, `cd` into that repo's checkout first so the token matches. MCP tools (`mcp__github__*`, `mcp__atlassian__*`) captured their credentials when Claude started and are unaffected.
 
 ## MCP Tools with Fallbacks
 
@@ -97,7 +97,7 @@ The expensive part of this skill — reading each issue's claims, reading its li
 - **The skill (this file) does:** tracker detection (Step 1), candidate discovery (Step 2-G / 2-J + 3-J), resolver identification (Step 3-G / 4-J), and finding the linked merged PRs (Step 5-J). Then it **confirms once** before any write (`--apply`) and performs the actual writes (Step 5-G / 7-J).
 - **The workflow does:** the per-issue verification (Step 4-G / 6-J) and comment drafting, returning a structured verdict per issue. The verification checklist, the four-way outcome rules, the `SKIP_NEEDS_MANUAL` guidance, the comment templates, and the language rule all live in `${CLAUDE_PLUGIN_ROOT}/skills/verify-resolved-issues/verify-resolved-issues.workflow.js`. To tune *how a fix is judged or how a comment reads*, edit that file — not the steps below.
 
-**Before launching**, `cd` into the target repo (its own Bash call) so the workflow's agents inherit the right working directory and direnv token — their `gh`/`git`/test-runner calls depend on it. Then invoke:
+**Before launching**, `cd` into the target repo so the workflow's agents inherit the right working directory and direnv token — their `gh`/`git`/test-runner calls depend on it. Then invoke:
 
 The Workflow tool refuses a `scriptPath` outside the working directory, and the plugin root always is, so pass the script inline: Read the whole `${CLAUDE_PLUGIN_ROOT}/skills/verify-resolved-issues/verify-resolved-issues.workflow.js` with the Read tool and send its text verbatim as `script`, without Read's line-number prefixes.
 

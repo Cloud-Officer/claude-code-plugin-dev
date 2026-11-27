@@ -61,7 +61,7 @@ If `mcp__monday__*` tools are absent (tool-not-found), the server is not added o
 
 ### Jira (MCP first, curl/CLI fallback) — run from the target repo's directory (direnv)
 
-Prefer `mcp__atlassian__*`. On tool-not-found or repeated error, fall back to the `jira` CLI / `curl`. The CLI / `curl` paths authenticate with `JIRA_URL` / `JIRA_EMAIL` / `JIRA_API_TOKEN`, which [direnv](https://direnv.net/) loads from the **current working directory**'s `.envrc`. Before any `jira` / `curl` Jira call, make the target repo the working directory **in its own Bash call** (direnv reloads on the next prompt — a `cd … && curl …` on one line still uses the old token):
+Prefer `mcp__atlassian__*`. On tool-not-found or repeated error, fall back to the `jira` CLI / `curl`. The CLI / `curl` paths authenticate with `JIRA_URL` / `JIRA_EMAIL` / `JIRA_API_TOKEN`, which [direnv](https://direnv.net/) loads from the **current working directory**'s `.envrc`. Before any `jira` / `curl` Jira call, make the target repo the working directory (the co-dev direnv hook reloads `.envrc` on every `cd`):
 
 ```bash
 cd /path/to/target-repo        # separate call; never chain `cd … && curl …`

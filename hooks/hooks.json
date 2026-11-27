@@ -1,5 +1,5 @@
 {
-  "description": "Block git worktrees created outside the repository, block emails that break the house email style, and give /code-review the repository's ISO 27001 / ISO 13485 scope",
+  "description": "Block git worktrees created outside the repository, block emails that break the house email style, give /code-review the repository's ISO 27001 / ISO 13485 scope, give each session a map of the workspace and its organization's context, and reload direnv after every cd so commands use the right folder's credentials",
   "hooks": {
     "PreToolUse": [
       {
@@ -74,6 +74,22 @@
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/iso-review-context.js\"",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/direnv-reload.js\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/workspace-context.js\"",
+            "timeout": 30
           }
         ]
       }

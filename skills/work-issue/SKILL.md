@@ -20,13 +20,13 @@ The user names one or more issues to work on — GitHub issue numbers or Jira ke
 
 The CLI fallbacks below authenticate with credentials that [direnv](https://direnv.net/) loads from the `.envrc` of the **current working directory**: `GITHUB_TOKEN` for `gh`/`git`, and the Jira credentials for the `jira` CLI. Run one of these from a directory whose `.envrc` belongs to a **different** repo and it authenticates as the wrong account — the command fails, or the PR is opened against the wrong place.
 
-**Before any command that needs per-repo credentials (`gh`, `git push`, `git fetch`, `jira`), make the target repo the working directory in its own step:**
+**Before any command that needs per-repo credentials (`gh`, `git push`, `git fetch`, `jira`), make the target repo the working directory:**
 
 ```bash
 cd /path/to/target-repo        # or, when already inside it: cd "$(git rev-parse --show-toplevel)"
 ```
 
-Run the `cd` as a **separate** Bash call — never chain it as `cd … && gh …`. direnv reloads `.envrc` on the next prompt, so the *following* calls get the right token; a command on the same line as the `cd` still runs with the old environment. Step 3 already `cd`s into `$REPO_ROOT` (or the worktree under it) — keep every later `gh`/`jira`/`git push` running from there. MCP tools (`mcp__github__*`, `mcp__atlassian__*`) captured their credentials when Claude started and are unaffected.
+The co-dev direnv hook reloads `.envrc` on every `cd`, so a `cd … && gh …` in one call already gets the right token. Step 3 already `cd`s into `$REPO_ROOT` (or the worktree under it) — keep every later `gh`/`jira`/`git push` running from there. MCP tools (`mcp__github__*`, `mcp__atlassian__*`) captured their credentials when Claude started and are unaffected.
 
 ## MCP Tools with Fallbacks
 
@@ -98,7 +98,7 @@ Each issue is implemented by its own agent in its own **git worktree**, so paral
 
 ### P1 — Preflight
 
-`cd` into the target repo in its own Bash call (so direnv loads the right token — see the direnv note above), then gather the base context once:
+`cd` into the target repo (so direnv loads the right token — see the direnv note above), then gather the base context once:
 
 ```bash
 DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
@@ -328,6 +328,10 @@ Steps 4–6 are gated by Issue Type (detected above) — the gating note on each
    **After the agents return, read all files they identified yourself.** Agent summaries miss details — always read the actual code before designing.
 
    Skip for Bug fixes (you already know the failure point from the issue) and trivial Tasks.
+
+   **Then check how the other apps do it** (all types, Bug included — only when the change calls a backend API or reads or writes data another repository also uses). A web, iOS, Android or tvOS client often has siblings that already call the same backend for the same feature. Find them from the session's **Workspace context** (the other repositories in the organization and the organization context file), then search each one for the endpoints, request fields and response handling the change touches. Read a sibling from its local clone when the workspace context lists one; otherwise read it on GitHub (`mcp__github__search_code` and `mcp__github__get_file_contents`, or `gh search code` and `gh api repos/<owner>/<repo>/contents/<path>`), with `<owner>` and `<repo>` checked against the interpolation boundary in `## Arguments`.
+
+   Match what the siblings already do: the same endpoints and parameters, the same validation, the same error and empty-state handling, and the same reading of each response field. The UI may differ. When the siblings disagree with each other or with the issue, or the backend no longer behaves the way they assume, say so in the design (step 6, or the fix for a Bug) and in the PR body rather than copying a bug. Skip this step when no sibling handles the feature, and say that you checked.
 
 5. **Clarifying questions gate** (Feature: required · Task: if scope unclear · Bug: skip)
 

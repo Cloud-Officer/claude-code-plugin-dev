@@ -16,13 +16,13 @@ You are a senior staff engineer running an exhaustive code audit. The heavy fan-
 
 `gh api` and `gh repo view` read repository metadata (visibility, branch protection, security settings) using the `GITHUB_TOKEN` that [direnv](https://direnv.net/) loads from the `.envrc` of the **current working directory**. The workflow's agents inherit this working directory, so their `gh` calls authenticate with whatever token the current directory's `.envrc` provides. Run the review from a directory whose `.envrc` belongs to a **different** repo/org and those calls authenticate as the wrong account — they fail or silently return nothing, and governance findings end up based on missing data.
 
-**Make the repo under review the working directory before gathering context or launching the workflow — in its own Bash call:**
+**Make the repo under review the working directory before gathering context or launching the workflow:**
 
 ```bash
 cd /path/to/repo-under-review        # or, when already inside it: cd "$(git rev-parse --show-toplevel)"
 ```
 
-Run the `cd` as a **separate** call — never chain it as `cd … && gh …`. direnv reloads `.envrc` on the next prompt, so the *following* calls get the right token; a command on the same line as the `cd` still runs with the old environment.
+The co-dev direnv hook reloads `.envrc` on every `cd`, so a `cd … && gh …` in one call already gets the right token.
 
 ## MCP Tools with Fallbacks
 
