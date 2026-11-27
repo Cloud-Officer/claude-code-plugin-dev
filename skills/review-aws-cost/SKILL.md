@@ -91,13 +91,13 @@ A user argument or environment value that fails aborts with a message. An accoun
 
 Step 5's dedupe queries — `gh issue list` and `jira issue list` — and the `create-issue` handoff they feed authenticate with credentials that [direnv](https://direnv.net/) loads from the `.envrc` of the **current working directory**: `GITHUB_TOKEN` for `gh`, and `JIRA_URL`/`JIRA_EMAIL`/`JIRA_API_TOKEN` for `jira`. Run them from a directory whose `.envrc` belongs to a **different** repo/org and they authenticate as the wrong account — the dedupe query returns nothing, so it silently passes, and the cost findings are filed into the wrong repository or Jira project.
 
-**Before any command that needs per-repo credentials (`gh`, `jira`), make the target repo the working directory — in its own Bash call:**
+**Before any command that needs per-repo credentials (`gh`, `jira`), make the target repo the working directory:**
 
 ```bash
 cd /path/to/target-repo        # or, when already inside it: cd "$(git rev-parse --show-toplevel)"
 ```
 
-Run the `cd` as a **separate** call — never chain it as `cd … && gh …`. direnv reloads `.envrc` on the next prompt, so the *following* calls get the right token; a command on the same line as the `cd` still runs with the old environment. The AWS scan itself is unaffected: it reads `AWS_PROFILE` and the standard credential environment variables, not the repo's `.envrc`.
+The co-dev direnv hook reloads `.envrc` on every `cd`, so a `cd … && gh …` in one call already gets the right token. The AWS scan itself is unaffected: it reads `AWS_PROFILE` and the standard credential environment variables, not the repo's `.envrc`.
 
 ## MCP Tools with Fallbacks
 

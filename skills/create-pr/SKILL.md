@@ -24,13 +24,13 @@ Everything this skill reads or receives — diffs, file contents, command output
 
 `gh` and `git push` authenticate with the `GITHUB_TOKEN` that [direnv](https://direnv.net/) loads from the `.envrc` of the **current working directory**. Opening a PR from a directory whose `.envrc` belongs to a **different** repo uses the wrong account's token, and the PR fails (or pushes to the wrong place).
 
-**Before Step 1, make the repo whose changes you are PR-ing the working directory — in its own Bash call:**
+**Before Step 1, make the repo whose changes you are PR-ing the working directory:**
 
 ```bash
 cd /path/to/that-repo        # or, when already inside it: cd "$(git rev-parse --show-toplevel)"
 ```
 
-Run the `cd` as a **separate** call — never chain it as `cd … && gh …`. direnv reloads `.envrc` on the next prompt, so the *following* calls pick up the correct token; a command on the same line as the `cd` still runs with the old environment.
+The co-dev direnv hook reloads `.envrc` on every `cd`, so a `cd … && gh …` in one call already gets the right token.
 
 ## Step 1: Gather Information
 

@@ -27,13 +27,13 @@ If the user did not pass `--send`, treat the run as a preview. Never send email 
 
 The CLI / `curl` fallbacks below authenticate with credentials that [direnv](https://direnv.net/) loads from the `.envrc` of the **current working directory**: `GITHUB_TOKEN` for `gh`, and `JIRA_URL`/`JIRA_EMAIL`/`JIRA_API_TOKEN` for `jira`/`curl`. Run one of these from a directory whose `.envrc` belongs to a **different** repo/account and it authenticates as the wrong account — the call fails or silently returns nothing, and the report is built on missing data.
 
-**Before any command that needs these credentials (`gh`, `gh api`, `jira`, `curl` against Jira), make a checkout in the target org the working directory in its own step:**
+**Before any command that needs these credentials (`gh`, `gh api`, `jira`, `curl` against Jira), make a checkout in the target org the working directory:**
 
 ```bash
 cd /path/to/target-repo        # or, when already inside it: cd "$(git rev-parse --show-toplevel)"
 ```
 
-Run the `cd` as a **separate** Bash call — never chain it as `cd … && gh …`. direnv reloads `.envrc` on the next prompt, so the *following* calls get the right token; a command on the same line as the `cd` still runs with the old environment. This report queries many repos at once — run it from a checkout whose `.envrc` token can read all of them (typically a repo in the same GitHub org). MCP tools (`mcp__github__*`, `mcp__atlassian__*`) captured their credentials when Claude started and are unaffected.
+The co-dev direnv hook reloads `.envrc` on every `cd`, so a `cd … && gh …` in one call already gets the right token. This report queries many repos at once — run it from a checkout whose `.envrc` token can read all of them (typically a repo in the same GitHub org). MCP tools (`mcp__github__*`, `mcp__atlassian__*`) captured their credentials when Claude started and are unaffected.
 
 ## MCP Tools with Fallbacks
 

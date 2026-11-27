@@ -24,7 +24,7 @@ Reject any argument that does not match, never sanitise it, and ask the user to 
 
 ## Step 1 — Repository and scope
 
-1. Run `cd "$(git rev-parse --show-toplevel)"` as its own Bash call so direnv loads this repository's credentials.
+1. Run `cd "$(git rev-parse --show-toplevel)"` so direnv loads this repository's credentials.
 2. With `--all-open`, list the PRs:
 
    ```bash
